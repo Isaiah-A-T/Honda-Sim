@@ -17,6 +17,7 @@
 import { clamp, lookup1 } from './tables.js';
 import { MATERIALS } from './materials.js';
 import { bottomEnd } from './parts.js';
+import { viscRatio } from './thermal.js';
 export { MATERIALS };
 
 export const GEOMETRY = {
@@ -122,7 +123,8 @@ export function stepInternals(s, e, dt) {
   // conducts heat better runs cooler (relative to A390's published 130 W/m·K).
   const kRel = (M.piston.conductivityWmK ?? 130) / 130;
   const heat = 0.64 * (e.airGs ?? 0) + (e.lambda > 0.85 && e.map > 90 ? 150 * Math.min(e.lambda - 0.85, 0.5) : 0) + (e.knocking ? 40 * (s.knockSpike - 1) / 0.15 : 0);
-  const tTarget = cut ? 150 : 150 + heat / kRel ** 0.5;
+  const base = (e.oilC ?? 100) + 50;                 // the oil under the crown sets its floor
+  const tTarget = cut ? base : base + heat / kRel ** 0.5;
   s.pistonC += (tTarget - s.pistonC) * Math.min(1, dt * 0.25);
 
   // Forces on the rod: gas load down on the firing stroke (inertia helps a little), inertia up at exhaust
@@ -141,14 +143,18 @@ export function stepInternals(s, e, dt) {
   s.load.rod = Math.max(s.rodCompN / (G.rodBeamAreaM2 * M.rod.yieldMPa * 1e6 * 0.75), s.rodTensionN / (G.rodBeamAreaM2 * 1e6) / M.rod.fatigueMPa);
   // Rod bolts: stress amplitude in the thread from the inertia load (the joint takes most of it).
   s.load.rodBolt = (0.25 * s.rodTensionN / G.rodBoltStressAreaM2 / 2 / 1e6) / M.rodBolt.threadFatigueMPa;
-  s.load.bearing = Math.max(s.rodCompN, s.rodTensionN) / (G.bigEndM * G.bearingWidthM) / 1e6 / M.bearing.loadRatingMPa;
+  // Oil film strength scales with viscosity: thin hot oil carries less load.
+  const film = clamp(viscRatio(e.oilC ?? 100, e.thermal?.g) ** 0.3, 0.5, 1.6);
+  s.load.bearing = Math.max(s.rodCompN, s.rodTensionN) / (G.bigEndM * G.bearingWidthM) / 1e6 / (M.bearing.loadRatingMPa * film);
   s.load.crank = 0.0035 * (s.rodCompN + 0.5 * s.rodTensionN) / M.crank.fatigueMPa;   // MPa per N at the pin fillet, estimated
 
   // Head joint: bolts torqued to 75% of yield clamp the head down; the gasket lifts when cylinder
   // pressure overcomes the share of clamp it needs to seal.
   const clampN = G.headBolts / 4 * 0.75 * M.headBolt.yieldMPa * 1e6 * G.headBoltAreaM2;
   s.gasketLiftBar = M.gasket.sealFactor * clampN / PISTON_AREA / 1e5;
-  s.load.gasket = s.pmaxBar / s.gasketLiftBar;
+  // Boiling coolant lets the head run hot and grow, which unloads the gasket; it gets worse the longer it lasts.
+  const overheat = clamp((e.thermal?.overheatS ?? 0) / 20, 0, 1);
+  s.load.gasket = s.pmaxBar / s.gasketLiftBar * (1 + 0.6 * overheat);
   const boltAmp = G.headJointFactor * s.pmaxBar * 1e5 * PISTON_AREA / (G.headBolts / 4) / G.headBoltAreaM2 / 2 / 1e6;
   s.load.headBolt = boltAmp / M.headBolt.threadFatigueMPa;
 

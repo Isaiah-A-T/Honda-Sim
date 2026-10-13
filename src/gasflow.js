@@ -155,7 +155,10 @@ function volumeAt(s, thetaDeg) {
 export function runCycle(s, c, stepDeg = 1) {
   const G = s.G, rpm = Math.max(c.rpm, 300);
   const cam = c.highCam ? G.cams.high : G.cams.low;
-  const p0 = c.mapKpa * 1000, Tm = 273 + c.iatC, T0 = Tm + G.chargeHeatK * (3000 / rpm) ** 0.3, pOut = (c.outKpa ?? 101.3) * 1000;
+  // Port walls heat the incoming air in proportion to how hot they are (head at coolant temperature,
+  // calibrated at 90 °C), and cold walls take more heat out of combustion.
+  const wallC = c.wallC ?? 90, wallF = Math.max(0, (wallC - 25) / 65), heatLoss = G.heatLoss * (1 + 0.004 * (90 - wallC));
+  const p0 = c.mapKpa * 1000, Tm = 273 + c.iatC, T0 = Tm + G.chargeHeatK * wallF * (3000 / rpm) ** 0.3, pOut = (c.outKpa ?? 101.3) * 1000;
   const outArea = (c.outAreaM2 ?? Math.PI / 4 * G.exhaustDiaM ** 2) / 4;
   const inCentre = -360 + G.intakeCentre0 - (c.vtc ?? 0), exCentre = 360 - G.exhaustCentre;
   const throatIn = G.valves * (Math.PI / 4 * (0.88 * G.inValveM) ** 2 - Math.PI / 4 * G.stemM ** 2);
@@ -236,7 +239,7 @@ export function runCycle(s, c, stepDeg = 1) {
         // stoichiometric make the most power (charge cooling, more gas moles, less dissociation).
         const richGain = lam < 1 ? clamp(1 + 0.045 * (1 - ((lam - 0.87) / 0.13) ** 2), 0.85, 1.045) : 1;
         const misfire = lam > 1.35 ? clamp(1 - (lam - 1.35) * 4, 0, 1) : 1;
-        qTotal = Math.min(trappedFresh / (STOICH * lam), trappedFresh / STOICH) * LHV * (1 - G.heatLoss) * richGain * misfire;
+        qTotal = Math.min(trappedFresh / (STOICH * lam), trappedFresh / STOICH) * LHV * (1 - heatLoss) * richGain * misfire;
       }
       const x = clamp((th + stepDeg - thetaS) / burnDur, 0, 1), xb = 1 - Math.exp(-6.9 * x ** 3);
       dU += qTotal * (xb - xbPrev);

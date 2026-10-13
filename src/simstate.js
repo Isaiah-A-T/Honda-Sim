@@ -10,6 +10,7 @@
 import { PARTS, partMaterial, engineGeometry } from './internals.js';
 import { bottomEnd } from './parts.js';
 import { FLOW, valveLiftM, camCard } from './gasflow.js';
+import { circuits, viscosityCst, boilingC } from './thermal.js';
 
 export const FIRING_ORDER = [1, 3, 4, 2];
 // Crank angle of each cylinder's firing TDC after cylinder 1's (cylinders 1–4).
@@ -61,7 +62,25 @@ export function renderState(sim) {
     forces: { rodDownN: s.rodCompN, rodUpN: s.rodTensionN, sleeveMPa: s.sleeveMPa ?? 0 },
     geometry: { boreM: G.boreM, strokeM: G.strokeM, rodM: G.rodM, compression: G.compression, displacementL: b.displacementL,
       deckM: b.deckMm / 1000, deckClearanceM: b.deckClearanceMm / 1000, inValveM: geom.inValveM, exValveM: geom.exValveM },
+    cooling: coolingState(e),
     bottomEnd: { stock: b.stock, crank: b.crank.name, pistons: b.pistonName, rods: b.rodName, block: b.crank.block ?? 'K20Z3', issues: b.issues },
+  };
+}
+
+// Coolant and oil: temperatures, flows, the thermostat and fans, and the circuits as from/to segments
+// between named components (see COMPONENTS in thermal.js for where each one sits on the car).
+function coolingState(e) {
+  const th = e.thermal, g = th.g, c = circuits(th);
+  return {
+    coolantC: th.coolantC, radiatorInC: th.coolantC, radiatorOutC: th.radiatorOutC, pumpInletC: th.inletC,
+    boilingC: boilingC(g), boiling: th.boiling, overheatS: th.overheatS,
+    thermostatOpen: th.thermostat, thermostatOpenC: g.thermostatOpenC, thermostatFullC: g.thermostatFullC,
+    fanOn: th.fanOn, fans: g.fans, fanOnC: g.fanOnC, fanOffC: g.fanOffC, airMs: th.airMs,
+    pumpLpm: th.pumpLpm, radiatorLpm: th.radiatorLpm, bypassLpm: th.bypassLpm,
+    radiatorKw: th.radiatorKw, heatToCoolantKw: th.heatToCoolantKw, heatToOilKw: th.heatToOilKw,
+    oil: { tempC: th.oilC, pressureKpa: e.oilKpa ?? 0, viscosityCst: viscosityCst(th.oilC, g), grade: g.oilGrade,
+      cooler: g.oilCooler, coolerKw: th.oilCoolerKw, toCoolantKw: th.oilToCoolantKw, sumpKw: th.sumpKw },
+    coolantCircuit: c.coolant, oilCircuit: c.oil,
   };
 }
 

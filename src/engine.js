@@ -10,6 +10,7 @@
 import { clamp, lookup2, guessFuelUnits } from './tables.js';
 import { ENGINE, TURBO_GT35, veCorrection, mbt, frictionNm } from './k20z3.js';
 import { bottomEnd, flowGeometry } from './parts.js';
+import { createThermal, oilPressureKpa, viscRatio, COOLING } from './thermal.js';
 import { FLOW, createGasflow, runCycle, settle, vtcFor, valveLiftM } from './gasflow.js';
 
 const AIR_DENSITY_G_PER_L = 1.184;   // 25 °C, sea level
@@ -34,7 +35,7 @@ function gasConditions(e, high) {
   const vtc = vtcFor(t, e.rpm, e.map, e.highCam);
   e.vtc = vtc;
   return { rpm: Math.max(e.rpm, 300), mapKpa: e.map, iatC: e.iat, highCam: high, vtc, ignDeg: e.ign,
-    lambda: Math.min(e.lambda, 3), fire: !cut && e.rpm > 200, octane: t.octane ?? 91, ...exhaustOutlet(e) };
+    lambda: Math.min(e.lambda, 3), fire: !cut && e.rpm > 200, octane: t.octane ?? 91, wallC: e.ect, ...exhaustOutlet(e) };
 }
 const blend = (a, b, f) => Object.fromEntries(Object.keys(a).map(k => [k, Number.isFinite(a[k]) && Number.isFinite(b[k]) ? a[k] + (b[k] - a[k]) * f : (f < 0.5 ? a[k] : b[k])]));
 // One gas state per cam lobe set. While VTEC is switching, some cylinders are on each, so both run and
@@ -63,16 +64,12 @@ function updateGas(e, dt, force = false) {
 const VTEC_OIL_KPA = 250;          // oil pressure needed to move the pins (estimate)
 const PIN_TRAVEL_S = 0.04;         // time for oil to stroke a pin once it's free to move (estimate)
 const CYL_OFFSET = [0, 540, 180, 360];   // firing TDC of each cylinder after cylinder 1 (order 1-3-4-2)
-function oilPressureKpa(rpm, ectC) {
-  const warm = clamp((ectC - 20) / 70, 0, 1);
-  return clamp(80 + rpm * 0.065, 0, 600) * (1.25 - 0.25 * warm);   // hot oil is thinner (estimate shape)
-}
 function stepVtec(e, dt) {
   const t = e.tune, rpm = e.rpm, G = e.gas.G;
-  const want = rpm >= t.vtecRpm && e.map >= t.vtecMinMap && (e.ect ?? 90) >= 60;
+  const want = rpm >= t.vtecRpm && e.map >= t.vtecMinMap && e.ect >= (t.cooling?.ectVtecMinC ?? COOLING.ectVtecMinC);
   // Hysteresis: once on, stay on until rpm or load fall clearly below the switch point.
   e.vtecCmd = e.vtecCmd ? rpm >= t.vtecRpm - 150 && e.map >= t.vtecMinMap - 5 : want;
-  e.oilKpa = oilPressureKpa(rpm, e.ect ?? 90);
+  e.oilKpa = oilPressureKpa(rpm, e.oilC, { ...COOLING, ...(t.cooling || {}) });
   const pressurised = e.vtecCmd && e.oilKpa >= VTEC_OIL_KPA;
   for (let i = 0; i < 4; i++) {
     const theta = e.crankDeg - CYL_OFFSET[i];
@@ -100,7 +97,8 @@ export function createEngine(tune) {
     ign: 10, ignTable: 10, knockRetard: 0, knockLimit: 30, knocking: false, knockCount: 0, knockAcc: 0,
     lambda: 1, lambdaTarget: 1, afr: STOICH, ipw: 2,
     torqueNm: 0, airGs: 0, airDeliveredGs: 0,
-    iat: 25, ect: 90,
+    iat: 25, ect: 90, oilC: 100, fuelGs: 0, frictionNm: 0,
+    thermal: createThermal(tune.ambientC ?? 25, true, tune.cooling),
     boost: 0, icDropKpa: 0, chargeOutC: 25, boostTarget: NaN, wgDuty: 0, wgOpen: 0, turboRadS: 0, turbineKw: 0, compressorKw: 0, boostCut: false, overTorque: false,
     gas: null, gasOut: null, gasT: 0, gasFlowRef: undefined, vtc: 0, pmepKpa: 0, exhKpa: P_AMB, egtC: 600,
   };
@@ -222,6 +220,7 @@ export function stepEngine(e, pedal, dt) {
   if (e.ipw > cycleMs) fuelPerCyl = (cycleMs - deadMs) * injGPerMs;   // injectors maxed out
   if (e.revCut || e.dfco || e.boostCut) fuelPerCyl = 0;
   const fuel = fuelPerCyl * ENGINE.cylinders;
+  e.fuelGs = fuel * rpm / 120;
   e.lambda = fuel > 0 ? airPerCycle / (fuel * STOICH) : 9.99;
   e.afr = e.lambda * STOICH;
 
@@ -246,7 +245,9 @@ export function stepEngine(e, pedal, dt) {
   e.cylPmaxBar = g.pmaxBar * corr;
   const indicated = fired ? g.imepKpa * corr * e.dispL / (4 * Math.PI) : g.imepKpa * e.dispL / (4 * Math.PI);
   e.pumpingNm = e.pmepKpa * e.dispL / (4 * Math.PI);
-  e.torqueNm = indicated - frictionNm(rpm) - e.pumpingNm;
+  // Friction rises with oil viscosity (the hydrodynamic part; the fixed part is seals and mixed contact).
+  e.frictionNm = 5 + (frictionNm(rpm) - 5) * viscRatio(e.oilC, e.thermal.g) ** 0.35;
+  e.torqueNm = indicated - e.frictionNm - e.pumpingNm;
   e.sparkEff = clamp(1 - ((e.ign - e.mbt) / 28) ** 2, 0.2, 1);   // display only
   e.overTorque = e.torqueNm > (t.torqueLimitNm ?? Infinity);
   return e.torqueNm;
