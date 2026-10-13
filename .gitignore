@@ -5,3 +5,4 @@ node_modules/
 !docs/*.png
 dist/
 native/target/
+viewer/target/
