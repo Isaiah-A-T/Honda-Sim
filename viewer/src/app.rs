@@ -94,18 +94,27 @@ pub struct Options {
     pub demo_build: (bool, bool),
     /// Starting camera: 0 exhaust side, 1 intake side, 2 front, 3 side, 4 top, 5 valvetrain.
     pub view: usize,
+    /// Lets a host program (the native sim) draw its own egui panels around the 3D view. Called every frame,
+    /// before the viewer's own panels, with the root `Ui` and the state being shown. Panels it adds with
+    /// `egui::Panel::top/left/right/bottom(..).show_inside(ui, ..)` take their space first; the 3D view fills
+    /// whatever is left in the middle.
+    pub host_panels: Option<Box<dyn FnMut(&mut egui::Ui, &SimState)>>,
+    /// Show the viewer's own mode tabs (top) and side panel. A host that draws its own can turn them off.
+    pub builtin_panels: bool,
 }
 
 impl Default for Options {
     fn default() -> Self {
-        Options { link: Link::in_process(), mode: Mode::Full, title: "Honda Sim · K20Z3 engine viewer".to_string(), check_clearance: false, demo_build: (true, true), view: 0 }
+        Options { link: Link::in_process(), mode: Mode::Full, title: "Honda Sim · K20Z3 engine viewer".to_string(), check_clearance: false, demo_build: (true, true), view: 0, host_panels: None, builtin_panels: true }
     }
 }
 
 /// Opens the viewer window and runs until it is closed. Must be called on the main thread (a windowing rule on
 /// Windows and macOS), so a sim built into the same program runs its own loop on another thread and calls
 /// `link.send(state)` from there.
-pub fn run(opts: Options) {
+pub fn run(mut opts: Options) {
+    let mut host_panels = opts.host_panels.take();
+    let builtin_panels = opts.builtin_panels;
     let window = Window::new(WindowSettings { title: opts.title.clone(), min_size: (900, 600), initial_size: Some((1400, 860)), ..Default::default() }).unwrap();
     let ctx = window.gl();
     let mut camera = Camera::new_perspective(window.viewport(), view_pos(&VIEWS[0], 1.6), TARGET, vec3(0.0, 1.0, 0.0), degrees(38.0), 0.05, 100.0);
@@ -182,6 +191,10 @@ pub fn run(opts: Options) {
         gui.update(&mut frame_input.events, frame_input.accumulated_time, screen, dpr, |ui| {
             let ectx = ui.ctx().clone();
             ectx.set_visuals(egui::Visuals::dark());
+            if let Some(host) = host_panels.as_mut() {
+                host(ui, &state);
+            }
+            if builtin_panels {
             egui::Panel::top("modes").show_inside(ui, |ui| {
                 ui.horizontal_wrapped(|ui| {
                     for m in Mode::ALL {
@@ -379,6 +392,7 @@ pub fn run(opts: Options) {
                     ui.weak("At real speed the parts strobe, like under a timing light.");
                 });
             });
+            }
             view_rect = ui.available_rect_before_wrap();
             pointer_over_gui = ectx.is_pointer_over_egui();
 
