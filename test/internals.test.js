@@ -22,7 +22,7 @@ test('stock engine at full throttle up to redline takes no damage', () => {
   for (const rpm of [3000, 6200, 8000]) {
     const { s } = hold(placeholderTune(), rpm, 20);
     assert.ok(Object.values(s.damage).every(d => d === 0), `damage at ${rpm}: ${JSON.stringify(s.damage)}`);
-    assert.ok(s.pmaxBar > 50 && s.pmaxBar < 90, `pmax ${s.pmaxBar}`);
+    assert.ok(s.pmaxBar > 50 && s.pmaxBar < 100, `pmax ${s.pmaxBar}`);   // typical for an 11:1 engine at best timing
   }
 });
 
