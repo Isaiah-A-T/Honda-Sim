@@ -22,7 +22,20 @@ Drag to orbit, scroll to zoom. The camera buttons jump to set views.
    "Viewer app connected", and the viewer's Data section says "Following the sim."
 
 Either can start first; the sim retries every 2 seconds. The viewer only listens on 127.0.0.1, so it is not
-reachable from other machines. `--mode stress` (or internals, block, airflow, materials) opens on that view.
+reachable from other machines.
+
+Command-line options: `--mode stress` (or internals, block, airflow, materials) and `--view intake` (or exhaust,
+front, side, top, valvetrain) pick the starting view; `--build na`, `turbo` or `ic` sets the demo's build;
+`--check-clearance` prints any pipe that passes through another part in any build and exits (non-zero if any).
+
+## Layout
+
+The intake faces +z and the exhaust -z; cylinder 1 and the timing chain are at -x and the flywheel at +x. As on the
+K20, the throttle body is on the transmission end of the intake manifold. N/A builds run a pipe from it forward to
+a cone filter. Turbo builds put the turbo under the exhaust manifold; with an intercooler, the hot pipe runs under
+the oil pan to a front-mount core and the cold pipe climbs the transmission end into the throttle body. Without
+one, the charge pipe wraps around the transmission end straight to the throttle body. `--check-clearance` checks
+every pipe against the box of every other part.
 
 ## Building
 
@@ -79,7 +92,9 @@ for 1.5 seconds the viewer falls back to its demo.
 | `knock` | bool | Knocking now |
 | `fuelCut` | bool | Rev, decel or boost cut |
 | `lambda` | number | Air-fuel ratio as lambda |
-| `turbo` | bool | Turbo build (shows the turbo and its plumbing) |
+| `turbo` | bool | Turbo build (shows the turbo and its plumbing); false draws the N/A intake with a cone filter |
+| `intercooler` | bool | Turbo build has a front-mount intercooler (default true); false runs the charge pipe straight to the throttle body |
+| `iatC` | number | Intake air temperature at the throttle body, °C |
 | `stress` | object | Part key to load (1 = at the limit), or an array of 4 for per-cylinder parts |
 | `partMaterials` | object | Part key to `{ part, label, family, detail }`. When present the Materials view is read-only |
 | `readouts` | array | Extra `[label, value]` rows for the side panel |

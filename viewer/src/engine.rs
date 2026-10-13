@@ -24,6 +24,41 @@ pub enum Sys {
     Exhaust,
     Turbo,
     NaIntake,
+    /// Turbo charge piping through an intercooler.
+    Intercooled,
+    /// Turbo charge pipe straight to the throttle body.
+    DirectCharge,
+}
+
+/// Which builds a part or flow belongs to.
+#[derive(Clone, Copy, PartialEq, Eq, Debug)]
+enum When {
+    Always,
+    Na,
+    Turbo,
+    TurboIc,
+    TurboDirect,
+}
+
+impl When {
+    fn holds(self, turbo: bool, ic: bool) -> bool {
+        match self {
+            When::Always => true,
+            When::Na => !turbo,
+            When::Turbo => turbo,
+            When::TurboIc => turbo && ic,
+            When::TurboDirect => turbo && !ic,
+        }
+    }
+    fn of(sys: Sys) -> When {
+        match sys {
+            Sys::Turbo => When::Turbo,
+            Sys::NaIntake => When::Na,
+            Sys::Intercooled => When::TurboIc,
+            Sys::DirectCharge => When::TurboDirect,
+            _ => When::Always,
+        }
+    }
 }
 
 #[derive(Clone, Copy, PartialEq, Eq, Debug)]
@@ -114,8 +149,17 @@ struct Flow {
     curve: Curve,
     intake: bool,
     cyl: Option<usize>,
-    only_turbo: Option<bool>,
+    when: When,
+    /// Charge air straight off the compressor, before any intercooler.
+    hot: bool,
     u: Vec<f32>,
+}
+
+/// A pipe's centreline, kept to check it clears every other part.
+struct PipeCheck {
+    part: usize,
+    curve: Curve,
+    radius: f32,
 }
 
 pub struct Engine {
@@ -131,6 +175,8 @@ pub struct Engine {
     pub shake: f32,
     turbo_offset: Vec3,
     tb_pos: Vec3,
+    bounds: Vec<Option<(Vec3, Vec3)>>,
+    pipes: Vec<PipeCheck>,
 }
 
 fn srgba(hex: u32, a: u8) -> Srgba {
@@ -145,6 +191,9 @@ fn lerp_color(a: Srgba, b: [f32; 3], t: f32) -> Srgba {
 struct Builder<'a> {
     ctx: &'a Context,
     parts: Vec<Part>,
+    /// Each part's box at rest (mm), for the clearance check. None for parts that move along a path.
+    bounds: Vec<Option<(Vec3, Vec3)>>,
+    pipes: Vec<PipeCheck>,
 }
 
 struct Spec {
@@ -174,6 +223,19 @@ impl<'a> Builder<'a> {
         };
         let material = if s.alpha < 255 { PhysicalMaterial::new_transparent(self.ctx, &cpu) } else { PhysicalMaterial::new_opaque(self.ctx, &cpu) };
         let gm = Gm::new(Mesh::new(self.ctx, mesh), material);
+        // Parts that only spin about their own axis keep the same box; sliding ones don't get one.
+        let bound = matches!(mover, Mover::Fixed | Mover::Crank | Mover::Butterfly).then(|| {
+            let local = if matches!(mover, Mover::Butterfly) { Mat4::identity() } else { local };
+            let mut lo = vec3(f32::MAX, f32::MAX, f32::MAX);
+            let mut hi = -lo;
+            for p in mesh.positions.to_f32() {
+                let w = (local * p.extend(1.0)).truncate();
+                lo = vec3(lo.x.min(w.x), lo.y.min(w.y), lo.z.min(w.z));
+                hi = vec3(hi.x.max(w.x), hi.y.max(w.y), hi.z.max(w.z));
+            }
+            (lo, hi)
+        });
+        self.bounds.push(bound);
         self.parts.push(Part {
             gm,
             local,
@@ -190,6 +252,16 @@ impl<'a> Builder<'a> {
             visible: true,
         });
         self.parts.len() - 1
+    }
+
+    /// A round pipe along `pts`, recorded for the clearance check.
+    #[allow(clippy::too_many_arguments)]
+    fn pipe(&mut self, pts: &[[f32; 3]], radius: f32, s: Spec, key: Option<&'static str>, label: &str, sys: Sys) -> usize {
+        let curve = Curve::new(pts, false);
+        let steps = ((curve.length() / 8.0) as u32).clamp(20, 160);
+        let i = self.add(&tube(&curve, radius, steps, 16), s, key, label, None, sys, Mover::Fixed, Mat4::identity());
+        self.pipes.push(PipeCheck { part: i, curve, radius });
+        i
     }
 }
 
@@ -212,12 +284,13 @@ pub struct FlowPath {
     pts: Vec<[f32; 3]>,
     intake: bool,
     cyl: Option<usize>,
-    only_turbo: Option<bool>,
+    when: When,
+    hot: bool,
 }
 
 impl Engine {
     pub fn new(ctx: &Context) -> Self {
-        let mut b = Builder { ctx, parts: Vec::new() };
+        let mut b = Builder { ctx, parts: Vec::new(), bounds: Vec::new(), pipes: Vec::new() };
         let mut valves = Vec::new();
         let mut glows = Vec::new();
         let mut paths: Vec<FlowPath> = Vec::new();
@@ -347,22 +420,29 @@ impl Engine {
         }
 
         // ---------- Intake ----------
+        // The K20's throttle body sits on the transmission (+x) end of the manifold, the far end from the timing chain.
         let intake = || metal(0x3a3f46, 0.4, 0.6);
         for c in 1..=4 {
             let x = cyl_x(c);
-            let runner = Curve::new(&[[x, DECK + 70.0, 80.0], [x, DECK + 110.0, 150.0], [x, DECK + 70.0, 220.0], [x, DECK - 10.0, 235.0]], false);
-            b.add(&tube(&runner, 19.0, 48, 16), intake(), Some("intake"), &format!("Intake runner {c}"), None, Sys::Intake, Mover::Fixed, id);
+            b.pipe(&[[x, DECK + 70.0, 80.0], [x, DECK + 110.0, 150.0], [x, DECK + 70.0, 220.0], [x, DECK - 10.0, 235.0]], 19.0, intake(), Some("intake"), &format!("Intake runner {c}"), Sys::Intake);
             b.add(&transformed(cylinder_y(6.0, 4.0, 55.0, 10), Mat4::from_angle_x(radians(-0.6))), metal(0x24282e, 0.3, 0.6), None, &format!("Fuel injector {c}"), None, Sys::Intake, Mover::Fixed, t(x + 20.0, DECK + 100.0, 105.0));
-            paths.push(FlowPath { pts: vec![[x, DECK - 30.0, 250.0], [x, DECK - 10.0, 235.0], [x, DECK + 70.0, 220.0], [x, DECK + 110.0, 150.0], [x, DECK + 70.0, 80.0], [x, ROOF + 22.0, VALVE_SEAT_Z + 6.0], [x, ROOF - 10.0, 0.0]], intake: true, cyl: Some(c), only_turbo: None });
+            paths.push(FlowPath { pts: vec![[x, DECK - 30.0, 250.0], [x, DECK - 10.0, 235.0], [x, DECK + 70.0, 220.0], [x, DECK + 110.0, 150.0], [x, DECK + 70.0, 80.0], [x, ROOF + 22.0, VALVE_SEAT_Z + 6.0], [x, ROOF - 10.0, 0.0]], intake: true, cyl: Some(c), when: When::Always, hot: false });
         }
-        paths.push(FlowPath { pts: vec![[-LEN / 2.0 - 70.0, DECK - 30.0, 250.0], [-LEN / 2.0 + 30.0, DECK - 30.0, 250.0], [LEN / 2.0 - 30.0, DECK - 30.0, 250.0]], intake: true, cyl: None, only_turbo: None });
+        let tb_pos = vec3(LEN / 2.0 + 40.0, DECK - 30.0, 250.0);
+        let tb_in = [LEN / 2.0 + 70.0, DECK - 30.0, 250.0];
+        paths.push(FlowPath { pts: vec![tb_in, [LEN / 2.0 - 30.0, DECK - 30.0, 250.0], [-LEN / 2.0 + 30.0, DECK - 30.0, 250.0]], intake: true, cyl: None, when: When::Always, hot: false });
         b.add(&along_x(cylinder_y(55.0, 55.0, LEN - 20.0, 32)), intake(), Some("intake"), "Intake plenum", None, Sys::Intake, Mover::Fixed, t(0.0, DECK - 30.0, 250.0));
-        let tb_pos = vec3(-LEN / 2.0 - 40.0, DECK - 30.0, 250.0);
         b.add(&along_x(open_cylinder_y(36.0, 60.0, 32)), metal(0x9aa3ad, 0.6, 0.4), None, "Throttle body", None, Sys::Intake, Mover::Fixed, t(tb_pos.x, tb_pos.y, tb_pos.z));
         b.add(&along_x(cylinder_y(33.0, 33.0, 2.0, 32)), metal(0xc7ccd2, 0.6, 0.35), None, "Throttle plate", None, Sys::Intake, Mover::Butterfly, id);
-        let na = Curve::new(&[[-LEN / 2.0 - 70.0, DECK - 30.0, 250.0], [-LEN / 2.0 - 160.0, DECK - 30.0, 260.0], [-LEN / 2.0 - 220.0, DECK - 80.0, 150.0]], false);
-        b.add(&tube(&na, 36.0, 40, 18), metal(0x2b2f35, 0.3, 0.8), Some("intake"), "Intake pipe", None, Sys::NaIntake, Mover::Fixed, id);
-        paths.push(FlowPath { pts: vec![[-LEN / 2.0 - 220.0, DECK - 80.0, 150.0], [-LEN / 2.0 - 160.0, DECK - 30.0, 260.0], [-LEN / 2.0 - 70.0, DECK - 30.0, 250.0]], intake: true, cyl: None, only_turbo: Some(false) });
+
+        // N/A: intake pipe from the throttle body forward to a cone filter.
+        let na = [tb_in, [LEN / 2.0 + 150.0, DECK - 30.0, 262.0], [LEN / 2.0 + 210.0, DECK - 60.0, 340.0], [LEN / 2.0 + 230.0, DECK - 90.0, 420.0]];
+        b.pipe(&na, 36.0, metal(0x2b2f35, 0.3, 0.8), Some("intake"), "Intake pipe", Sys::NaIntake);
+        let filter_at = vec3(LEN / 2.0 + 232.0, DECK - 92.0, 490.0);
+        b.add(&transformed(cylinder_y(48.0, 62.0, 140.0, 28), Mat4::from_angle_x(degrees(90.0))), metal(0xb3262b, 0.1, 0.9), None, "Air filter", None, Sys::NaIntake, Mover::Fixed, t(filter_at.x, filter_at.y, filter_at.z));
+        let mut na_flow = vec![[filter_at.x, filter_at.y, filter_at.z + 60.0]];
+        na_flow.extend(na.iter().rev());
+        paths.push(FlowPath { pts: na_flow, intake: true, cyl: None, when: When::Na, hot: false });
 
         // ---------- Exhaust ----------
         let exh = || metal(0x4f4945, 0.45, 0.8);
@@ -370,10 +450,10 @@ impl Engine {
             let x = cyl_x(c);
             let runner = Curve::new(&[[x, DECK + 70.0, -80.0], [x, DECK + 60.0, -150.0], [x * 0.6, DECK - 10.0, -210.0], [x * 0.15, DECK - 80.0, -235.0]], false);
             b.add(&tube(&runner, 18.0, 48, 16), exh(), Some("exhaust"), &format!("Exhaust runner {c}"), None, Sys::Exhaust, Mover::Fixed, id);
-            paths.push(FlowPath { pts: vec![[x, ROOF - 10.0, 0.0], [x, ROOF + 22.0, -VALVE_SEAT_Z - 6.0], [x, DECK + 70.0, -80.0], [x, DECK + 60.0, -150.0], [x * 0.6, DECK - 10.0, -210.0], [x * 0.15, DECK - 80.0, -235.0], [0.0, DECK - 140.0, -240.0]], intake: false, cyl: Some(c), only_turbo: None });
+            paths.push(FlowPath { pts: vec![[x, ROOF - 10.0, 0.0], [x, ROOF + 22.0, -VALVE_SEAT_Z - 6.0], [x, DECK + 70.0, -80.0], [x, DECK + 60.0, -150.0], [x * 0.6, DECK - 10.0, -210.0], [x * 0.15, DECK - 80.0, -235.0], [0.0, DECK - 140.0, -240.0]], intake: false, cyl: Some(c), when: When::Always, hot: false });
         }
         b.add(&cylinder_y(32.0, 40.0, 70.0, 24), exh(), Some("exhaust"), "Exhaust collector", None, Sys::Exhaust, Mover::Fixed, t(0.0, DECK - 110.0, -240.0));
-        paths.push(FlowPath { pts: vec![[0.0, DECK - 140.0, -240.0], [0.0, DECK - 260.0, -240.0]], intake: false, cyl: None, only_turbo: Some(false) });
+        paths.push(FlowPath { pts: vec![[0.0, DECK - 140.0, -240.0], [0.0, DECK - 260.0, -240.0]], intake: false, cyl: None, when: When::Na, hot: false });
 
         // ---------- Turbo ----------
         let to = vec3(0.0, DECK - 180.0, -260.0);
@@ -394,14 +474,40 @@ impl Engine {
         b.add(&wheel(44.0, 12), metal(0xd8dde2, 0.85, 0.35), None, "Compressor wheel", None, Sys::Turbo, Mover::CompWheel, id);
         let downpipe = Curve::new(&shift(&[[-50.0, 0.0, -60.0], [-60.0, -60.0, -80.0], [-60.0, -160.0, -60.0]]), false);
         b.add(&tube(&downpipe, 30.0, 30, 16), metal(0x8a8f96, 0.6, 0.5), Some("exhaust"), "Downpipe", None, Sys::Turbo, Mover::Fixed, id);
-        let charge = Curve::new(&shift(&[[110.0, 0.0, 0.0], [180.0, 60.0, 80.0], [-LEN / 2.0 - 120.0, 150.0, 510.0], [-LEN / 2.0 - 70.0, 150.0, 510.0]]), false);
-        b.add(&tube(&charge, 26.0, 80, 16), metal(0x2f6fb5, 0.5, 0.45), Some("intake"), "Charge pipe", None, Sys::Turbo, Mover::Fixed, id);
         let up = Curve::new(&[[0.0, DECK - 140.0, -240.0], [-30.0, DECK - 160.0, -250.0], [-50.0, DECK - 180.0, -262.0]], false);
         b.add(&tube(&up, 28.0, 20, 16), exh(), Some("exhaust"), "Turbo up-pipe", None, Sys::Turbo, Mover::Fixed, id);
         let mut ex_turbo = vec![[0.0, DECK - 140.0, -240.0], [-30.0, DECK - 160.0, -250.0], [-50.0, DECK - 180.0, -262.0]];
         ex_turbo.extend(shift(&[[-50.0, 0.0, -60.0], [-60.0, -60.0, -80.0], [-60.0, -160.0, -60.0]]));
-        paths.push(FlowPath { pts: ex_turbo, intake: false, cyl: None, only_turbo: Some(true) });
-        paths.push(FlowPath { pts: shift(&[[70.0, 0.0, 0.0], [110.0, 0.0, 0.0], [180.0, 60.0, 80.0], [-LEN / 2.0 - 120.0, 150.0, 510.0], [-LEN / 2.0 - 70.0, 150.0, 510.0]]), intake: true, cyl: None, only_turbo: Some(true) });
+        paths.push(FlowPath { pts: ex_turbo, intake: false, cyl: None, when: When::Turbo, hot: false });
+
+        // Charge piping. The turbo sits on the exhaust side (-z) and the throttle body on the intake side (+z) at the
+        // transmission end, so every route goes around the engine rather than across it.
+        let charge = || metal(0x2f6fb5, 0.5, 0.45);
+        let comp_out = [to.x + 110.0, to.y, to.z];
+
+        // No intercooler: around the transmission end, clear of the flywheel and clutch, into the throttle body.
+        let direct = [comp_out, [220.0, 40.0, -310.0], [370.0, 60.0, -230.0], [395.0, 110.0, 40.0], [360.0, DECK - 30.0, 240.0], [330.0, DECK - 30.0, 252.0], tb_in];
+        b.pipe(&direct, 26.0, charge(), Some("intake"), "Charge pipe", Sys::DirectCharge);
+        let mut f = shift(&[[70.0, 0.0, 0.0]]);
+        f.extend(direct);
+        paths.push(FlowPath { pts: f, intake: true, cyl: None, when: When::TurboDirect, hot: true });
+
+        // Intercooler: front-mounted below the intake side. Hot pipe runs under the oil pan to its left tank,
+        // the cold pipe leaves the right tank and climbs to the throttle body.
+        let ic = vec3(0.0, -90.0, 480.0);
+        b.add(&boxed(520.0, 180.0, 60.0), metal(0x9aa0a8, 0.7, 0.45), Some("intake"), "Intercooler core", None, Sys::Intercooled, Mover::Fixed, t(ic.x, ic.y, ic.z));
+        for (side, name) in [(-1.0, "Intercooler inlet tank"), (1.0, "Intercooler outlet tank")] {
+            b.add(&boxed(50.0, 200.0, 80.0), metal(0x6d737b, 0.7, 0.4), Some("intake"), name, None, Sys::Intercooled, Mover::Fixed, t(side * 285.0, ic.y, ic.z));
+        }
+        let hot = [comp_out, [200.0, -20.0, -330.0], [170.0, -200.0, -320.0], [0.0, -250.0, -150.0], [-200.0, -240.0, 150.0], [-300.0, -160.0, 380.0], [-290.0, -90.0, 455.0]];
+        b.pipe(&hot, 26.0, charge(), Some("intake"), "Charge pipe (hot side)", Sys::Intercooled);
+        let cold = [[290.0, -90.0, 455.0], [310.0, -60.0, 380.0], [350.0, 40.0, 330.0], [350.0, 150.0, 285.0], [330.0, DECK - 30.0, 255.0], tb_in];
+        b.pipe(&cold, 26.0, charge(), Some("intake"), "Charge pipe (cold side)", Sys::Intercooled);
+        let mut f = shift(&[[70.0, 0.0, 0.0]]);
+        f.extend(hot);
+        paths.push(FlowPath { pts: f, intake: true, cyl: None, when: When::TurboIc, hot: true });
+        paths.push(FlowPath { pts: vec![[-285.0, ic.y, ic.z], [-150.0, ic.y + 40.0, ic.z], [0.0, ic.y - 40.0, ic.z], [150.0, ic.y + 40.0, ic.z], [285.0, ic.y, ic.z]], intake: true, cyl: None, when: When::TurboIc, hot: false });
+        paths.push(FlowPath { pts: cold.to_vec(), intake: true, cyl: None, when: When::TurboIc, hot: false });
 
         let flows = paths
             .into_iter()
@@ -409,7 +515,7 @@ impl Engine {
                 let curve = Curve::new(&p.pts, false);
                 let n = ((curve.length() / 16.0).round() as usize).max(6);
                 let u = (0..n).map(|i| (i as f32 + 0.3 * ((i * 7919) % 10) as f32 / 10.0) / n as f32).collect();
-                Flow { curve, intake: p.intake, cyl: p.cyl, only_turbo: p.only_turbo, u }
+                Flow { curve, intake: p.intake, cyl: p.cyl, when: p.when, hot: p.hot, u }
             })
             .collect();
         let mut dot = CpuMesh::sphere(6);
@@ -430,6 +536,8 @@ impl Engine {
             shake: 0.0,
             turbo_offset: to,
             tb_pos,
+            bounds: b.bounds,
+            pipes: b.pipes,
         }
     }
 
@@ -489,8 +597,7 @@ impl Engine {
 
             // Visibility for this mode.
             let mut vis = mode.shows(p.sys);
-            if p.sys == Sys::Turbo { vis &= s.turbo; }
-            if p.sys == Sys::NaIntake { vis &= !s.turbo; }
+            vis &= When::of(p.sys).holds(s.turbo, s.intercooler);
             let cast_mode = match mode {
                 Mode::Block => Castings::Solid,
                 Mode::Airflow => Castings::SeeThrough,
@@ -500,7 +607,7 @@ impl Engine {
             p.visible = vis;
 
             // Transparency: castings follow the setting; airflow mode ghosts the plumbing.
-            let ghost = mode == Mode::Airflow && matches!(p.sys, Sys::Intake | Sys::Exhaust | Sys::Turbo | Sys::NaIntake);
+            let ghost = mode == Mode::Airflow && matches!(p.sys, Sys::Intake | Sys::Exhaust | Sys::Turbo | Sys::NaIntake | Sys::Intercooled | Sys::DirectCharge);
             let (alpha, transparent) = if p.sys == Sys::Casting {
                 match (mode, cast_mode) {
                     (Mode::Airflow, _) => ((p.base_alpha as f32 * 0.45) as u8, true),
@@ -587,9 +694,7 @@ impl Engine {
             let mut tf = Vec::new();
             let mut colors = Vec::new();
             for f in self.flows.iter_mut() {
-                if let Some(turbo) = f.only_turbo {
-                    if turbo != s.turbo { continue; }
-                }
+                if !f.when.holds(s.turbo, s.intercooler) { continue; }
                 let gate = match f.cyl {
                     Some(c) => {
                         let lift = lifts[c - 1][if f.intake { 0 } else { 1 }];
@@ -600,8 +705,11 @@ impl Engine {
                 };
                 let cut = if !f.intake && s.fuel_cut { 0.5 } else { 1.0 };
                 let du = base * gate * cut * dt / f.curve.length();
-                let col = if f.intake {
-                    [(0.43 + 0.5 * boost) * 255.0, (0.78 + 0.2 * boost) * 255.0, 255.0]
+                let col = if f.intake && f.hot {
+                    [255.0, (0.75 - 0.25 * boost) * 255.0, (0.55 - 0.35 * boost) * 255.0]   // compressor heat
+                } else if f.intake {
+                    let warm = ((s.iat_c - 30.0) / 60.0).clamp(0.0, 1.0);
+                    [(0.43 + 0.5 * boost + 0.5 * warm).min(1.0) * 255.0, (0.78 + 0.2 * boost - 0.2 * warm) * 255.0, (1.0 - 0.5 * warm) * 255.0]
                 } else {
                     [255.0, (0.42 + 0.45 * heat) * 255.0, (0.1 + 0.35 * (heat - 0.6).max(0.0)) * 255.0]
                 };
@@ -615,6 +723,35 @@ impl Engine {
             }
             self.particles.geometry.set_instances(&Instances { transformations: tf, colors: Some(colors), ..Default::default() });
         }
+    }
+
+    /// Every pipe that passes through another part, as "pipe / part" lines, for each build (N/A, turbo with and
+    /// without an intercooler). A pipe may sit inside the parts its ends connect to.
+    pub fn clearance_problems(&self) -> Vec<String> {
+        let mut out = Vec::new();
+        for (turbo, ic, build) in [(false, true, "N/A"), (true, true, "turbo + intercooler"), (true, false, "turbo, no intercooler")] {
+            let shown = |i: usize| When::of(self.parts[i].sys).holds(turbo, ic);
+            for pc in self.pipes.iter().filter(|pc| shown(pc.part)) {
+                let len = pc.curve.length();
+                let end_skip = (pc.radius * 2.5).min(len * 0.25);
+                for (j, part) in self.parts.iter().enumerate() {
+                    if j == pc.part || !shown(j) || part.label.starts_with("Fuel injector") { continue; }
+                    let Some((lo, hi)) = self.bounds[j] else { continue };
+                    let dist = |p: Vec3| vec3((lo.x - p.x).max(0.0).max(p.x - hi.x), (lo.y - p.y).max(0.0).max(p.y - hi.y), (lo.z - p.z).max(0.0).max(p.z - hi.z)).magnitude();
+                    // What a pipe's ends sit in is what it connects to (runner into plenum, charge pipe into throttle body).
+                    if dist(pc.curve.point_at(0.0)) < pc.radius || dist(pc.curve.point_at(1.0)) < pc.radius { continue; }
+                    let hit = (0..=240).map(|k| k as f32 / 240.0).filter(|u| u * len > end_skip && (1.0 - u) * len > end_skip).find(|&u| {
+                        dist(pc.curve.point_at(u)) < pc.radius - 1.0
+                    });
+                    if let Some(u) = hit {
+                        out.push(format!("{build}: {} passes through {} at {:.0}% along", self.parts[pc.part].label, part.label, u * 100.0));
+                    }
+                }
+            }
+        }
+        out.sort();
+        out.dedup();
+        out
     }
 
     pub fn objects(&self) -> Vec<&dyn Object> {

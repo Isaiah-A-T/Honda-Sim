@@ -22,7 +22,7 @@ struct View {
 
 const VIEWS: [View; 6] = [
     View { label: "Exhaust side", dir: [-0.45, 0.62, -0.64], dist: 11.5 },
-    View { label: "Intake side", dir: [0.4, 0.55, 0.73], dist: 11.5 },
+    View { label: "Intake side", dir: [0.35, 0.8, 1.0], dist: 18.0 },
     View { label: "Front", dir: [-1.0, 0.12, 0.001], dist: 10.5 },
     View { label: "Side", dir: [0.001, 0.1, -1.0], dist: 10.5 },
     View { label: "Top", dir: [0.001, 1.0, -0.08], dist: 11.0 },
@@ -86,11 +86,17 @@ pub struct Options {
     /// The view it opens on.
     pub mode: Mode,
     pub title: String,
+    /// Print any pipe that passes through another part, then exit (a model check, run with `--check-clearance`).
+    pub check_clearance: bool,
+    /// The demo's starting build: (turbo, intercooler).
+    pub demo_build: (bool, bool),
+    /// Starting camera: 0 exhaust side, 1 intake side, 2 front, 3 side, 4 top, 5 valvetrain.
+    pub view: usize,
 }
 
 impl Default for Options {
     fn default() -> Self {
-        Options { link: Link::in_process(), mode: Mode::Full, title: "Honda Sim · K20Z3 engine viewer".to_string() }
+        Options { link: Link::in_process(), mode: Mode::Full, title: "Honda Sim · K20Z3 engine viewer".to_string(), check_clearance: false, demo_build: (true, true), view: 0 }
     }
 }
 
@@ -104,6 +110,12 @@ pub fn run(opts: Options) {
     let mut control = OrbitControl::new(TARGET, 1.5, 30.0);
     let mut gui = three_d::GUI::new(&ctx);
     let mut engine = Engine::new(&ctx);
+    if opts.check_clearance {
+        let problems = engine.clearance_problems();
+        for p in &problems { println!("{p}"); }
+        println!("{} clearance problem(s)", problems.len());
+        std::process::exit(if problems.is_empty() { 0 } else { 1 });
+    }
     let ambient = AmbientLight::new(&ctx, 0.55, Srgba::new(225, 232, 255, 255));
     let sun = DirectionalLight::new(&ctx, 2.2, Srgba::WHITE, vec3(-0.4, -0.8, -0.5));
     let fill = DirectionalLight::new(&ctx, 0.9, Srgba::new(200, 210, 255, 255), vec3(0.6, -0.3, 0.7));
@@ -113,6 +125,7 @@ pub fn run(opts: Options) {
     let mut slow_mo: f32 = 0.02;
     let mut source = Source::Auto;
     let mut demo = FakeSim::new();
+    (demo.turbo, demo.intercooler) = opts.demo_build;
     let mut manual = false;
     let mut manual_in = ManualInput { rpm: 3000.0, throttle: 0.4, boost_kpa: 110.0 };
     let mut choices: HashMap<String, String> = HashMap::new();
@@ -200,6 +213,8 @@ pub fn run(opts: Options) {
                         ui.label("MAP"); ui.monospace(format!("{:.0} kPa", state.map_kpa)); ui.end_row();
                         ui.label("Boost"); ui.monospace(if state.turbo { format!("{:.1} psi", state.boost_kpa * 0.145) } else { "NA".into() }); ui.end_row();
                         ui.label("Ignition"); ui.monospace(format!("{:.1}° BTDC", state.ign_deg)); ui.end_row();
+                        ui.label("Intake air"); ui.monospace(format!("{:.0} °C", state.iat_c)); ui.end_row();
+                        ui.label("Induction"); ui.monospace(if !state.turbo { "N/A" } else if state.intercooler { "Turbo, intercooled" } else { "Turbo, no intercooler" }); ui.end_row();
                         for (k, v) in &state.readouts { ui.label(k); ui.monospace(v); ui.end_row(); }
                     });
                     ui.separator();
@@ -332,9 +347,15 @@ pub fn run(opts: Options) {
                             ui.add(egui::Slider::new(&mut manual_in.throttle, 0.0..=1.0).text("throttle"));
                             ui.add(egui::Slider::new(&mut manual_in.boost_kpa, 0.0..=200.0).text("boost kPa"));
                         }
+                        if ui.button("Make it knock").clicked() { demo.knock_until = demo.t + 1.2; }
                         ui.horizontal(|ui| {
-                            if ui.button("Make it knock").clicked() { demo.knock_until = demo.t + 1.2; }
-                            ui.checkbox(&mut demo.turbo, "Turbo build");
+                            ui.label("Build");
+                            let mut build = if !demo.turbo { 0 } else if demo.intercooler { 1 } else { 2 };
+                            ui.selectable_value(&mut build, 0, "N/A");
+                            ui.selectable_value(&mut build, 1, "Turbo + intercooler");
+                            ui.selectable_value(&mut build, 2, "Turbo, no IC");
+                            demo.turbo = build != 0;
+                            demo.intercooler = build != 2;
                         });
                     }
                     heading(ui, "Playback");
@@ -378,7 +399,7 @@ pub fn run(opts: Options) {
         };
         camera.set_viewport(vp);
         if frame_no == 1 {
-            camera.set_view(view_pos(&VIEWS[0], vp.width as f32 / vp.height as f32), TARGET, vec3(0.0, 1.0, 0.0));
+            camera.set_view(view_pos(&VIEWS[opts.view.min(VIEWS.len() - 1)], vp.width as f32 / vp.height as f32), TARGET, vec3(0.0, 1.0, 0.0));
         }
         if let Some(i) = clicked_view {
             view_anim = Some((camera.position(), view_pos(&VIEWS[i], vp.width as f32 / vp.height as f32), 0.0));

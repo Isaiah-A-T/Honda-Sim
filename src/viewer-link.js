@@ -85,6 +85,8 @@ export function stateForViewer(sim) {
     fuelCut: !!(e.revCut || e.dfco || e.boostCut),
     lambda: e.lambda > 5 ? 1 : e.lambda,
     turbo: !!e.tune.turbo?.enabled,
+    intercooler: e.tune.turbo?.intercooler !== false,   // until the sim models it, turbo builds count as intercooled
+    iatC: e.iat,
     stress: stressOf(sim),
     partMaterials: partMaterials(),
     readouts: [

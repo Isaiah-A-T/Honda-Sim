@@ -37,6 +37,10 @@ pub struct SimState {
     pub fuel_cut: bool,
     pub lambda: f32,
     pub turbo: bool,
+    /// Turbo build has an intercooler between the compressor and the throttle body (ignored when N/A).
+    pub intercooler: bool,
+    /// Intake air temperature at the throttle body, °C.
+    pub iat_c: f32,
     pub stress: HashMap<String, StressValue>,
     /// The sim's own materials per part (read-only in the viewer). None = use the placeholder catalog.
     pub part_materials: Option<HashMap<String, PartMaterial>>,
@@ -60,6 +64,8 @@ impl Default for SimState {
             fuel_cut: false,
             lambda: 1.0,
             turbo: false,
+            intercooler: true,
+            iat_c: 25.0,
             stress: HashMap::new(),
             part_materials: None,
             readouts: Vec::new(),

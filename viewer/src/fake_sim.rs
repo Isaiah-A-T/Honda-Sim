@@ -6,6 +6,7 @@ use crate::state::{SimState, StressValue};
 pub struct FakeSim {
     pub t: f32,
     pub turbo: bool,
+    pub intercooler: bool,
     pub knock_until: f32,
     rpm: f32,
     boost: f32,
@@ -22,7 +23,7 @@ pub struct ManualInput {
 
 impl FakeSim {
     pub fn new() -> Self {
-        FakeSim { t: 0.0, turbo: true, knock_until: 0.0, rpm: 800.0, boost: 0.0, vtc: 0.0, iat: 25.0, knock_retard: 0.0 }
+        FakeSim { t: 0.0, turbo: true, intercooler: true, knock_until: 0.0, rpm: 800.0, boost: 0.0, vtc: 0.0, iat: 25.0, knock_retard: 0.0 }
     }
 
     pub fn step(&mut self, dt: f32, input: Option<&ManualInput>, strength: &dyn Fn(&str) -> f32) -> SimState {
@@ -54,7 +55,8 @@ impl FakeSim {
         let knocking = self.t < self.knock_until;
         self.knock_retard = if knocking { (self.knock_retard + dt * 10.0).min(8.0) } else { (self.knock_retard - dt * 0.5).max(0.0) };
         let ign = (mbt - 2.0 - self.boost * 0.06).max(8.0) - self.knock_retard;
-        self.iat += ((25.0 + self.boost * 0.12) - self.iat) * (dt * 0.3).min(1.0);
+        let heat_soak = if self.intercooler { 0.12 } else { 0.45 };   // compressor heat the intercooler doesn't remove
+        self.iat += ((25.0 + self.boost * heat_soak) - self.iat) * (dt * 0.3).min(1.0);
         let ve = if high_cam {
             0.70 + 0.31 * (-((rpm / 1000.0 - 7.0) / 2.6).powi(2)).exp()
         } else {
@@ -99,6 +101,8 @@ impl FakeSim {
             fuel_cut: rev_cut || dfco,
             lambda,
             turbo: self.turbo,
+            intercooler: self.intercooler,
+            iat_c: self.iat,
             stress: stress.into_iter().map(|(k, v)| (k.to_string(), StressValue::One(v))).collect(),
             part_materials: None,
             readouts: vec![],
