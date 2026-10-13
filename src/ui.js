@@ -1,7 +1,7 @@
 // Browser front end: runs the sim in real time and shows a dash, the tune tables and a dyno chart.
 
 import { parseTable, activeCell, guessFuelUnits } from './tables.js';
-import { CAR, placeholderTune } from './k20z3.js';
+import { CAR, placeholderTune, turboSetup } from './k20z3.js';
 import { createSim, step, shift, shiftUp, shiftDown, startEngine, snapshot, logToCsv, setTune } from './sim.js';
 import { createInput, attachKeyboard, readInput, startLearn, AXES, BUTTONS } from './input.js';
 
@@ -14,7 +14,24 @@ const TABLES = [
   ['ignHigh', 'Ignition (high cam)'],
   ['fuelLow', 'Fuel (low cam)'],
   ['fuelHigh', 'Fuel (high cam)'],
+  ['boostTarget', 'Boost target'],
+  ['wgDuty', 'Wastegate duty'],
 ];
+// Paste/CSV targets: "both cams" writes the same table into low and high cam.
+const TARGETS = [
+  ['ignBoth', 'Ignition (both cams)', ['ignLow', 'ignHigh']],
+  ['fuelBoth', 'Fuel (both cams)', ['fuelLow', 'fuelHigh']],
+  ...TABLES.map(([k, l]) => [k, l, [k]]),
+];
+// Which table a CSV file goes to, from its name.
+function targetForFile(name) {
+  const n = name.toLowerCase();
+  if (/wg|wastegate|duty/.test(n)) return 'wgDuty';
+  if (/boost/.test(n)) return 'boostTarget';
+  if (/ign|timing/.test(n)) return /high/.test(n) ? 'ignHigh' : /low/.test(n) ? 'ignLow' : 'ignBoth';
+  if (/afr|fuel|lambda/.test(n)) return /high/.test(n) ? 'fuelHigh' : /low/.test(n) ? 'fuelLow' : 'fuelBoth';
+  return null;
+}
 
 function loadTune() {
   try {
@@ -38,17 +55,18 @@ const dyno = { cur: new Map(), prev: null };
 // ------------------------------------------------------------------ tables
 function renderTabs() {
   $('tableTabs').innerHTML = '';
-  for (const [key, label] of TABLES) {
+  for (const [key, label] of TABLES.filter(([k]) => tune[k])) {
     const b = document.createElement('button');
     b.textContent = label;
     b.className = key === shownTable ? 'active' : '';
     b.onclick = () => { shownTable = key; renderTabs(); renderTable(); };
     $('tableTabs').append(b);
   }
-  $('pasteTarget').innerHTML = TABLES.map(([k, l]) => `<option value="${k}"${k === shownTable ? ' selected' : ''}>${l}</option>`).join('');
+  $('pasteTarget').innerHTML = TARGETS.map(([k, l]) => `<option value="${k}"${k === shownTable ? ' selected' : ''}>${l}</option>`).join('');
 }
 
 function renderTable() {
+  if (!tune[shownTable]) shownTable = 'ignLow';
   const t = tune[shownTable];
   const head = `<thead><tr><th>rpm \\ kPa</th>${t.cols.map(c => `<th>${c}</th>`).join('')}</tr></thead>`;
   const body = t.rows.map((r, i) => `<tr><th>${r}</th>${t.data[i].map((v, j) => `<td data-c="${i},${j}">${fmt(v)}</td>`).join('')}</tr>`).join('');
@@ -60,7 +78,8 @@ const fmt = v => (Math.abs(v) < 3 ? v.toFixed(2) : v.toFixed(1));
 function highlightCell() {
   const e = sim.eng;
   const usingHigh = e.highCam;
-  const live = shownTable.endsWith(usingHigh ? 'High' : 'Low');
+  const camTable = /Low$|High$/.test(shownTable);
+  const live = !camTable || shownTable.endsWith(usingHigh && tune[shownTable.replace(/Low$/, 'High')] ? 'High' : 'Low');
   const [i, j] = activeCell(tune[shownTable], e.rpm, e.map);
   const key = live ? `${i},${j}` : '';
   if (key === lastCell) return;
@@ -76,6 +95,10 @@ function renderSettings() {
   $('setRev').value = tune.revLimit;
   $('setOct').value = tune.octane ?? 91;
   $('setFuelUnits').value = tune.fuelUnits || guessFuelUnits(tune.fuelLow);
+  const T = tune.turbo || {};
+  $('setTurbo').checked = !!T.enabled;
+  for (const [id, v] of [['setInjCc', tune.injectorCc], ['setDead', tune.injectorDeadMs], ['setOverboost', tune.overboostKpa], ['setTorqueLim', tune.torqueLimitNm],
+    ['setClutch', tune.clutchNm], ['setSpring', T.springKpa], ['setMaxBoost', T.maxBoostKpa], ['setSpool', T.spoolRpm], ['setWgGain', T.wgGain ?? 1]]) $(id).value = v ?? '';
 }
 
 function applyTune(t) {
@@ -92,19 +115,52 @@ for (const [id, key] of [['setVtec', 'vtecRpm'], ['setVtecMap', 'vtecMinMap'], [
     if (Number.isFinite(v)) { tune[key] = v; saveTune(tune); }
   });
 }
+for (const [id, key] of [['setInjCc', 'injectorCc'], ['setDead', 'injectorDeadMs'], ['setOverboost', 'overboostKpa'], ['setTorqueLim', 'torqueLimitNm'], ['setClutch', 'clutchNm']]) {
+  $(id).addEventListener('change', ev => {
+    const v = ev.target.value === '' ? undefined : Number(ev.target.value);
+    if (v === undefined || Number.isFinite(v)) { tune[key] = v; saveTune(tune); }
+  });
+}
+for (const [id, key] of [['setSpring', 'springKpa'], ['setMaxBoost', 'maxBoostKpa'], ['setSpool', 'spoolRpm'], ['setWgGain', 'wgGain']]) {
+  $(id).addEventListener('change', ev => {
+    const v = Number(ev.target.value);
+    if (Number.isFinite(v)) { tune.turbo = { ...tune.turbo, [key]: v }; saveTune(tune); }
+  });
+}
+$('setTurbo').addEventListener('change', ev => { tune.turbo = { ...tune.turbo, enabled: ev.target.checked }; saveTune(tune); });
+$('btnTurbo').onclick = () => { applyTune(turboSetup(tune)); renderTabs(); };
+$('fileCsv').addEventListener('change', async ev => {
+  const msgs = [];
+  for (const f of ev.target.files) {
+    const target = targetForFile(f.name);
+    if (!target) { if (/\.csv$/i.test(f.name)) msgs.push(`${f.name}: couldn't tell which table it is (name it afr, ignition, boost or wg_duty).`); continue; }
+    try { loadInto(target, parseTable(await f.text())); msgs.push(`${f.name} → ${TARGETS.find(x => x[0] === target)[1]}`); }
+    catch (err) { msgs.push(`${f.name}: ${err.message}`); }
+  }
+  applyTune(tune);
+  renderTabs();
+  $('pasteMsg').textContent = msgs.join(' · ');
+  $('pasteMsg').closest('details').open = true;
+  ev.target.value = '';
+});
+
+function loadInto(target, t) {
+  for (const k of TARGETS.find(x => x[0] === target)[2]) tune[k] = t;
+  if (target.startsWith('fuel')) tune.fuelUnits = guessFuelUnits(t);
+  if (/Placeholder/.test(tune.name)) tune.name = 'Imported tables';
+  shownTable = TARGETS.find(x => x[0] === target)[2][0];
+}
+
 $('setFuelUnits').addEventListener('change', ev => { tune.fuelUnits = ev.target.value; saveTune(tune); });
 
 $('btnPaste').onclick = () => {
   const target = $('pasteTarget').value;
   try {
     const t = parseTable($('pasteBox').value);
-    tune[target] = t;
-    if (target.startsWith('fuel')) tune.fuelUnits = guessFuelUnits(t);
-    if (/Placeholder/.test(tune.name)) tune.name = 'Imported from FlashPro Manager';
-    shownTable = target;
+    loadInto(target, t);
     applyTune(tune);
     renderTabs();
-    $('pasteMsg').textContent = `Loaded ${t.rows.length} × ${t.cols.length} table into ${TABLES.find(x => x[0] === target)[1]}.` +
+    $('pasteMsg').textContent = `Loaded ${t.rows.length} × ${t.cols.length} table into ${TARGETS.find(x => x[0] === target)[1]}.` +
       (target.startsWith('fuel') ? ` Fuel values look like: ${tune.fuelUnits}. Change it below if that's wrong.` : '');
     $('pasteBox').value = '';
   } catch (err) {
@@ -164,7 +220,7 @@ function download(name, text, type) {
 
 function recordDyno(throttle) {
   const e = sim.eng;
-  if (throttle > 0.95 && sim.car.locked && sim.running && e.rpm > 1500) {
+  if (throttle > 0.95 && sim.car.locked && sim.running && e.rpm > 1500 && !e.revCut && !e.boostCut) {
     const bin = Math.round(e.rpm / 100) * 100;
     const best = dyno.cur.get(bin);
     if (!best || e.torqueNm > best) dyno.cur.set(bin, e.torqueNm);
@@ -175,11 +231,13 @@ function drawDyno() {
   const c = $('dyno'), g = c.getContext('2d');
   const css = getComputedStyle(document.documentElement);
   const W = c.width, H = c.height, pad = 30;
+  const peakVal = Math.max(200, ...[...dyno.cur, ...(dyno.prev || [])].map(([r, t]) => Math.max(t * r / 7120.9, t * NM_TO_LBFT)));
+  const yMax = Math.ceil(peakVal / 50) * 50;
   g.clearRect(0, 0, W, H);
   g.strokeStyle = css.getPropertyValue('--line'); g.fillStyle = css.getPropertyValue('--muted'); g.font = '11px system-ui';
-  const x = rpm => pad + (rpm - 1000) / 8000 * (W - pad * 2), y = v => H - pad - v / 220 * (H - pad * 1.5);
+  const x = rpm => pad + (rpm - 1000) / 8000 * (W - pad * 2), y = v => H - pad - v / yMax * (H - pad * 1.5);
   for (let r = 1000; r <= 9000; r += 1000) { g.beginPath(); g.moveTo(x(r), pad / 2); g.lineTo(x(r), H - pad); g.stroke(); g.fillText(`${r / 1000}k`, x(r) - 6, H - pad + 14); }
-  for (let v = 0; v <= 200; v += 50) { g.fillText(v, 4, y(v) + 4); }
+  for (let v = 0; v <= yMax; v += 50) { g.fillText(v, 4, y(v) + 4); }
   const plot = (map, alpha) => {
     const pts = [...map.entries()].sort((a, b) => a[0] - b[0]);
     if (pts.length < 2) return;
@@ -223,8 +281,15 @@ function updateDash(input) {
   $('speedUnit').textContent = kmh ? 'km/h' : 'mph';
   $('tps').textContent = s.tps.toFixed(0);
   $('map').textContent = s.map_kpa.toFixed(0);
-  $('afr').textContent = e.revCut || e.dfco ? 'cut' : s.afr.toFixed(1);
-  $('lambda').textContent = e.revCut || e.dfco ? '–' : s.lambda.toFixed(2);
+  $('boost').textContent = s.boost_psi.toFixed(1);
+  $('boostTarget').textContent = s.boost_target_kpa === '' ? '–' : `${((s.boost_target_kpa - 101.3) * 0.145).toFixed(1)} psi`;
+  $('wgDuty').textContent = s.wg_duty.toFixed(0);
+  $('iat').textContent = s.iat_c.toFixed(0);
+  $('boostCutLamp').classList.toggle('on', !!s.boost_cut);
+  $('torqueLamp').classList.toggle('on', !!s.over_torque);
+  const cut = e.revCut || e.dfco || e.boostCut;
+  $('afr').textContent = cut ? 'cut' : s.afr.toFixed(1);
+  $('lambda').textContent = cut ? '–' : s.lambda.toFixed(2);
   $('lamTarget').textContent = Number.isFinite(e.lambdaTarget) ? e.lambdaTarget.toFixed(2) : 'from ms table';
   $('ign').textContent = s.ign_deg.toFixed(1);
   $('ignTable').textContent = s.ign_table.toFixed(1);

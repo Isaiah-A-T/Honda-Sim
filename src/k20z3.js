@@ -72,5 +72,26 @@ export function placeholderTune() {
     revLimit: 8000,
     revLimitHyst: 200,
     octane: 91,
+    turbo: { ...TURBO_GT3582R, enabled: false },
+    injectorCc: ENGINE.injectorCcMin,
+    injectorDeadMs: ENGINE.injectorDeadMs,
+    clutchNm: CAR.clutchCapacityNm,
+  };
+}
+
+// Garrett GT3582R on a 2.0 L: full boost around 4,500–5,000 rpm. Values are kPa of boost (gauge).
+export const TURBO_GT3582R = { name: 'Garrett GT3582R', maxBoostKpa: 165, spoolRpm: 3400, springKpa: 48 };
+
+// Turbo build on stock internals: GT3582R, 1000 cc injectors, 4-bar MAP, overboost cut and a torque
+// warning for the stock rods. Tables still come from the user's tune.
+export function turboSetup(tune = placeholderTune()) {
+  return {
+    ...tune,
+    turbo: { ...TURBO_GT3582R, enabled: true },
+    injectorCc: 1000,
+    injectorDeadMs: 1.0,
+    overboostKpa: 200,
+    torqueLimitNm: 350,              // commonly quoted ceiling for stock K20 rods; a warning, not a failure model
+    clutchNm: 450,                   // assumes an upgraded clutch; a stock clutch slips with this much torque
   };
 }

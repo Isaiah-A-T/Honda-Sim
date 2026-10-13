@@ -3,6 +3,7 @@ import assert from 'node:assert/strict';
 import { createSim, step, shift, snapshot, logToCsv } from '../src/sim.js';
 import { createEngine, stepEngine, hp } from '../src/engine.js';
 import { placeholderTune } from '../src/k20z3.js';
+import * as placeholderTuneModule from '../src/k20z3.js';
 
 const run = (sim, input, seconds) => { for (let t = 0; t < seconds; t += 0.01) step(sim, input, 0.01); };
 
@@ -73,4 +74,26 @@ test('datalog rows export as CSV', () => {
   const csv = logToCsv(s.log);
   assert.match(csv.split('\n')[0], /^time,rpm,vss_kmh,gear/);
   assert.equal(Object.keys(snapshot(s)).length, csv.split('\n')[0].split(',').length);
+});
+
+test('turbo build makes boost, and wastegate duty raises it above the spring', () => {
+  const { turboSetup } = placeholderTuneModule;
+  const flat = (v) => ({ rows: [1000, 8000], cols: [20, 250], data: [[v, v], [v, v]] });
+  const base = { ...turboSetup(), fuelUnits: 'afr', fuelLow: flat(11.8), fuelHigh: flat(11.8), ignLow: flat(10), ignHigh: flat(10), overboostKpa: 300 };
+  const springOnly = wot({ ...base, wgDuty: flat(0) }, 6000);
+  const withDuty = wot({ ...base, wgDuty: flat(40) }, 6000);
+  assert.ok(Math.abs(springOnly.map - 101.3 - base.turbo.springKpa) < 8, `spring boost ${springOnly.map}`);
+  assert.ok(withDuty.map > springOnly.map + 30);
+  assert.ok(withDuty.torqueNm > springOnly.torqueNm);
+});
+
+test('overboost cut stops fuel above the limit', () => {
+  const { turboSetup } = placeholderTuneModule;
+  const flat = (v) => ({ rows: [1000, 8000], cols: [20, 250], data: [[v, v], [v, v]] });
+  const t = { ...turboSetup(), fuelUnits: 'afr', fuelLow: flat(11.8), ignLow: flat(8), wgDuty: flat(100), overboostKpa: 180 };
+  delete t.fuelHigh; delete t.ignHigh;   // single tables are used for both cams
+  const e = createEngine(t);
+  let sawCut = false;
+  for (let i = 0; i < 8000; i++) { e.rpm = 6000; stepEngine(e, 1, 0.001); sawCut ||= e.boostCut; }
+  assert.ok(sawCut);
 });

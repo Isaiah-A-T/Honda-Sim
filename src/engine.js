@@ -1,6 +1,7 @@
 // Engine model: runs the loaded tune the way the ECU would, and works out what the engine really does.
 //
-// The ECU side reads the tune tables (fuel, low/high cam ignition, VTEC switch point, rev limit).
+// The ECU side reads the tune tables (fuel, low/high cam ignition, VTEC switch point, rev limit,
+// and for turbo builds the wastegate duty, boost target and overboost cut).
 // The physics side (k20z3.js) decides airflow, best-torque timing and knock. Comparing the two is
 // what makes the sim useful for testing a tune: too much timing knocks, too little loses torque,
 // lean or rich mixtures change power, and VTEC in the wrong place leaves a hole in the curve.
@@ -27,6 +28,7 @@ export function createEngine(tune) {
     lambda: 1, lambdaTarget: 1, afr: STOICH, ipw: 2,
     torqueNm: 0, airGs: 0,
     iat: 25, ect: 90,
+    boost: 0, boostTarget: NaN, wgDuty: 0, boostCut: false, overTorque: false,
   };
 }
 
@@ -43,9 +45,26 @@ export function stepEngine(e, pedal, dt) {
   } else e.idleAir += (e.idleI - e.idleAir) * Math.min(1, dt * 2);
   e.tps = clamp(pedal * 100 + (pedal < 0.02 ? e.idleAir : 0), 0, 100);
 
-  // Manifold pressure follows throttle and rpm (more rpm pulls the manifold down at part throttle).
+  // Turbo: what it can make at this rpm and throttle, held back by the wastegate. The wastegate opens at
+  // its spring pressure; the boost solenoid duty from the tune lets boost climb above the spring.
+  const tb = t.turbo;
+  e.boostTarget = t.boostTarget ? lookup2(t.boostTarget, rpm, e.map) : NaN;
+  e.wgDuty = 0;
+  let boostT = 0;
+  if (tb?.enabled) {
+    const spool = clamp((rpm - tb.spoolRpm * 0.6) / (tb.spoolRpm * 0.8), 0, 1) ** 1.6 * clamp((e.tps - 30) / 60, 0, 1);
+    const spring = Math.min(tb.springKpa, tb.maxBoostKpa);
+    e.wgDuty = t.wgDuty ? clamp(lookup2(t.wgDuty, rpm, e.map), 0, 100) : 0;
+    // Duty → boost depends on the solenoid and wastegate; wgGain scales it (1 = full duty reaches max boost).
+    boostT = Math.min(tb.maxBoostKpa * spool, spring + clamp(e.wgDuty / 100 * (tb.wgGain ?? 1), 0, 1) * (tb.maxBoostKpa - spring));
+    if (e.boostCut || e.revCut) boostT *= 0.3;                       // fuel cut: no exhaust energy to drive the turbo
+  }
+  e.boost += (boostT - e.boost) * Math.min(1, dt * (boostT > e.boost ? 2.5 : 8));
+  e.iat += ((25 + e.boost * 0.12) - e.iat) * Math.min(1, dt * 0.3);   // intercooled: some heat soak on boost
+
+  // Manifold pressure follows throttle and rpm (more rpm pulls the manifold down at part throttle), plus boost.
   const k = 0.06 * Math.sqrt(3000 / Math.max(rpm, 600));
-  const mapTarget = 12 + 88 * (1 - Math.exp(-e.tps * k));
+  const mapTarget = 12 + 88 * (1 - Math.exp(-e.tps * k)) + e.boost;
   e.map += (mapTarget - e.map) * Math.min(1, dt * (mapTarget > e.map ? 6 : 9));
 
   // VTEC: switch to high cam above the set rpm at load, with a little hysteresis.
@@ -56,6 +75,8 @@ export function stepEngine(e, pedal, dt) {
   e.dfco = pedal < 0.02 && rpm > 1500;
   if (rpm > t.revLimit) e.revCut = true;
   else if (rpm < t.revLimit - (t.revLimitHyst ?? 200)) e.revCut = false;
+  if (t.overboostKpa && e.map > t.overboostKpa) e.boostCut = true;
+  else if (e.map < (t.overboostKpa ?? 0) - 20) e.boostCut = false;
 
   // Air the engine actually breathes this cycle (grams per 2 revolutions, whole engine).
   const ve = trueVE(rpm, e.highCam);
@@ -63,35 +84,36 @@ export function stepEngine(e, pedal, dt) {
   e.airGs = airPerCycle * rpm / 120;
 
   // Fuel the ECU commands from the tune.
-  const fuelTable = e.highCam ? t.fuelHigh : t.fuelLow;
+  const fuelTable = (e.highCam && t.fuelHigh) || t.fuelLow;
   const units = t.fuelUnits || guessFuelUnits(fuelTable);
   const fuelVal = lookup2(fuelTable, rpm, e.map);
-  const injGPerMs = ENGINE.injectorCcMin * FUEL_DENSITY_G_PER_CC / 60000;
+  const injGPerMs = (t.injectorCc ?? ENGINE.injectorCcMin) * FUEL_DENSITY_G_PER_CC / 60000;
+  const deadMs = t.injectorDeadMs ?? ENGINE.injectorDeadMs;
   let fuelPerCyl;
   if (units === 'ms') {
     e.ipw = fuelVal;
-    fuelPerCyl = Math.max(0, fuelVal - ENGINE.injectorDeadMs) * injGPerMs;
+    fuelPerCyl = Math.max(0, fuelVal - deadMs) * injGPerMs;
     e.lambdaTarget = NaN;
   } else {
     e.lambdaTarget = units === 'afr' ? fuelVal / STOICH : fuelVal;
     fuelPerCyl = airPerCycle / ENGINE.cylinders / (STOICH * e.lambdaTarget);
-    e.ipw = fuelPerCyl / injGPerMs + ENGINE.injectorDeadMs;
+    e.ipw = fuelPerCyl / injGPerMs + deadMs;
   }
   const cycleMs = 120000 / rpm;
   e.injDuty = clamp(e.ipw / cycleMs * 100, 0, 100);
-  if (e.ipw > cycleMs) fuelPerCyl = (cycleMs - ENGINE.injectorDeadMs) * injGPerMs;   // injectors maxed out
-  if (e.revCut || e.dfco) fuelPerCyl = 0;
+  if (e.ipw > cycleMs) fuelPerCyl = (cycleMs - deadMs) * injGPerMs;   // injectors maxed out
+  if (e.revCut || e.dfco || e.boostCut) fuelPerCyl = 0;
   const fuel = fuelPerCyl * ENGINE.cylinders;
   e.lambda = fuel > 0 ? airPerCycle / (fuel * STOICH) : 9.99;
   e.afr = e.lambda * STOICH;
 
   // Ignition from the tune, minus knock retard; compare to what the engine wants.
-  e.ignTable = lookup2(e.highCam ? t.ignHigh : t.ignLow, rpm, e.map);
+  e.ignTable = lookup2((e.highCam && t.ignHigh) || t.ignLow, rpm, e.map);
   e.ign = e.ignTable - e.knockRetard;
   const best = mbt(rpm, e.map);
   e.knockLimit = knockLimit(rpm, e.map, e.iat, t.octane ?? 91) + (e.lambda < 0.9 ? (0.9 - e.lambda) * 10 : 0);
   const over = e.ign - e.knockLimit;
-  e.knocking = !e.revCut && !e.dfco && over > 0 && e.map > 50;
+  e.knocking = !e.revCut && !e.dfco && !e.boostCut && over > 0 && e.map > 50;
   if (e.knocking) {
     e.knockAcc += dt * (1 + over);
     if (e.knockAcc > 0.1) { e.knockAcc = 0; e.knockCount++; e.knockRetard = Math.min(e.knockRetard + 1, 8); }
@@ -104,7 +126,8 @@ export function stepEngine(e, pedal, dt) {
   const leanMisfire = e.lambda > 1.35 ? clamp(1 - (e.lambda - 1.35) * 4, 0, 1) : 1;
   const loadEff = 0.75 + 0.25 * Math.min(e.map, 100) / 100;          // part load burns less efficiently
   const indicated = burned * FUEL_LHV_J_PER_G * INDICATED_EFF * loadEff * sparkEff * richBonus * leanMisfire / (4 * Math.PI);
-  e.torqueNm = indicated - frictionNm(rpm, e.map);
+  e.torqueNm = indicated - frictionNm(rpm, Math.min(e.map, 100));
+  e.overTorque = e.torqueNm > (t.torqueLimitNm ?? Infinity);
   e.sparkEff = sparkEff;
   e.mbt = best;
   return e.torqueNm;

@@ -29,10 +29,10 @@ export function roadLoadN(speedMs, brake = 0) {
 
 // Step the engine/car pair. engineTorque is brake torque at the crank; clutch is 0 (pressed) to 1 (released).
 // Updates eng.rpm and v.speedMs.
-export function stepDrivetrain(eng, v, engineTorque, { clutch = 1, brake = 0 }, dt) {
+export function stepDrivetrain(eng, v, engineTorque, { clutch = 1, brake = 0, capacityNm = CAR.clutchCapacityNm }, dt) {
   const ratio = overallRatio(v.gear);
   const r = CAR.tireRadiusM, eff = CAR.drivelineEff;
-  const capacity = CAR.clutchCapacityNm * clamp(clutch, 0, 1);
+  const capacity = capacityNm * clamp(clutch, 0, 1);
   let we = eng.rpm / RPM_PER_RADS;
   const wt = v.speedMs / r * ratio;           // clutch output speed, rad/s at the crank side
 

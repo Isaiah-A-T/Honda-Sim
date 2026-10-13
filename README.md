@@ -24,6 +24,9 @@ FlashPro `.fpcal` files are encrypted, so the sim can't read them directly. Copy
 4. Do this for the low and high cam ignition and fuel tables, then set the VTEC point and rev limit.
 5. **Save tune (.json)** keeps the result so you don't have to paste again.
 
+Have the tables as CSV files instead? **Load CSV tables** takes several at once and picks the table from the file name
+(`afr`, `fuel`, `ignition`, `boost`, `wg_duty`). A single ignition or fuel table is used for both cams.
+
 The fuel table can be lambda, AFR or injector pulse width (ms). The sim guesses from the numbers; check the **Fuel table units** setting.
 
 ## Wheel and pedals
@@ -33,6 +36,13 @@ use **Learn** next to each control: press the pedal all the way and let go, or p
 Mappings are saved in the browser. Without a clutch pedal mapped, the clutch works automatically for launches and shifts.
 
 Keyboard: W/↑ throttle, S/↓ brake, C or Space clutch, E/Q shift up/down, 1–6 gears, 0 reverse, N neutral, R start.
+
+## Turbo builds
+
+**Turbo build preset** switches on a Garrett GT3582R, 1000 cc injectors, a 200 kPa overboost cut, an upgraded clutch,
+and a torque warning (RODS lamp) at 350 Nm for stock connecting rods. Your tables stay as they are.
+Boost comes from the wastegate spring plus the wastegate duty table. How much boost a given duty makes depends on your
+solenoid and wastegate, so set **WG duty gain** until the sim's boost matches a real datalog.
 
 ## How it works
 

@@ -19,13 +19,16 @@
         <div class="rpmbar"><div id="rpmFill"></div><div id="rpmLimit"></div></div>
         <div class="rpmrow"><span id="rpm" class="big">0</span> rpm
           <span id="vtec" class="lamp">VTEC</span><span id="shiftLamp" class="lamp warn">SHIFT</span>
-          <span id="revcut" class="lamp bad">CUT</span><span id="knockLamp" class="lamp bad">KNOCK</span></div>
+          <span id="revcut" class="lamp bad">CUT</span><span id="knockLamp" class="lamp bad">KNOCK</span>
+          <span id="boostCutLamp" class="lamp bad">BOOST CUT</span><span id="torqueLamp" class="lamp warn" title="Torque above the limit set for stock rods">RODS</span></div>
       </div>
       <div class="grid">
         <div><label>Gear</label><span id="gear" class="big">N</span></div>
         <div><label>Speed</label><span id="speed" class="big">0</span> <span id="speedUnit">mph</span></div>
         <div><label>Throttle</label><span id="tps">0</span>%</div>
         <div><label>MAP</label><span id="map">0</span> kPa</div>
+        <div><label>Boost / target</label><span id="boost">0</span> psi <span class="muted">/ <span id="boostTarget">–</span></span></div>
+        <div><label>WG duty / IAT</label><span id="wgDuty">0</span>% <span class="muted">/ <span id="iat">0</span> °C</span></div>
         <div><label>AFR / λ</label><span id="afr">14.7</span> / <span id="lambda">1.00</span></div>
         <div><label>λ target</label><span id="lamTarget">–</span></div>
         <div><label>Ignition</label><span id="ign">0</span>° <span class="muted">(table <span id="ignTable">0</span>°)</span></div>
@@ -56,7 +59,7 @@
       <div class="tablewrap"><table id="tableView"></table></div>
       <details>
         <summary>Paste a table from FlashPro Manager</summary>
-        <p class="small">In FlashPro Manager, click inside the table, press Ctrl+A then Ctrl+C, and paste here. The first row should be the column axis (MAP) and the first column the row axis (RPM).</p>
+        <p class="small">For CSV files, use <b>Load CSV tables</b> below: files named like afr, fuel, ignition, boost or wg_duty go to the matching table. In FlashPro Manager, click inside the table, press Ctrl+A then Ctrl+C, and paste here. The first row should be the column axis (MAP) and the first column the row axis (RPM).</p>
         <textarea id="pasteBox" rows="8" placeholder="Paste table here"></textarea>
         <div class="row">
           <select id="pasteTarget"></select>
@@ -69,12 +72,24 @@
         <label>VTEC min MAP <input type="number" id="setVtecMap" step="1"></label>
         <label>Rev limit <input type="number" id="setRev" step="50"></label>
         <label>Octane <input type="number" id="setOct" step="1"></label>
+        <label>Injector cc/min <input type="number" id="setInjCc" step="10"></label>
+        <label>Injector dead time ms <input type="number" id="setDead" step="0.05"></label>
+        <label>Overboost cut kPa <input type="number" id="setOverboost" step="1"></label>
+        <label>Torque warning Nm <input type="number" id="setTorqueLim" step="10"></label>
+        <label>Clutch capacity Nm <input type="number" id="setClutch" step="10"></label>
+        <label class="inline"><input type="checkbox" id="setTurbo"> Turbo</label>
+        <label>Wastegate spring kPa <input type="number" id="setSpring" step="1"></label>
+        <label>Turbo max boost kPa <input type="number" id="setMaxBoost" step="5"></label>
+        <label>Spool rpm <input type="number" id="setSpool" step="100"></label>
+        <label>WG duty gain <input type="number" id="setWgGain" step="0.05" title="How strongly solenoid duty raises boost above the spring. 1 means 100% duty reaches max boost. Match it to a real datalog."></label>
         <label>Fuel table units
           <select id="setFuelUnits"><option value="lambda">Lambda target</option><option value="afr">AFR target</option><option value="ms">Injector ms</option></select></label>
       </div>
       <div class="row">
         <button id="btnSaveTune">Save tune (.json)</button>
         <label class="filebtn">Open tune (.json)<input type="file" id="fileTune" accept=".json,application/json"></label>
+        <label class="filebtn">Load CSV tables<input type="file" id="fileCsv" accept=".csv,.txt,text/csv" multiple></label>
+        <button id="btnTurbo">Turbo build preset</button>
         <button id="btnResetTune">Reset to placeholder</button>
       </div>
     </section>

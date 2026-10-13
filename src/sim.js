@@ -78,7 +78,7 @@ export function step(sim, input, dt) {
       sim.eng.torqueNm = 0;
       tq = sim.eng.rpm > 1 ? -12 : 0;              // a stopped engine just drags
     }
-    stepDrivetrain(sim.eng, sim.car, tq, { clutch, brake }, h);
+    stepDrivetrain(sim.eng, sim.car, tq, { clutch, brake, capacityNm: sim.eng.tune.clutchNm }, h);
     if (!sim.running && sim.eng.rpm < 1) sim.eng.rpm = 0;
     sim.t += h;
   }
@@ -112,6 +112,12 @@ export function snapshot(sim, throttle = 0) {
     torque_nm: +(sim.running ? e.torqueNm : 0).toFixed(1),
     hp: +(sim.running ? hp(e.torqueNm, e.rpm) : 0).toFixed(1),
     rev_cut: e.revCut ? 1 : 0,
+    boost_psi: +(Math.max(0, e.map - 101.3) * 0.145).toFixed(1),
+    boost_target_kpa: Number.isFinite(e.boostTarget) ? +e.boostTarget.toFixed(0) : '',
+    wg_duty: +e.wgDuty.toFixed(1),
+    boost_cut: e.boostCut ? 1 : 0,
+    iat_c: +e.iat.toFixed(1),
+    over_torque: e.overTorque ? 1 : 0,
   };
 }
 
