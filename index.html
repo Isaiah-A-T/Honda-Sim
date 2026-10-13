@@ -38,6 +38,11 @@
         <div><label>Injector</label><span id="ipw">0</span> ms <span class="muted"><span id="duty">0</span>%</span></div>
         <div><label>Torque</label><span id="tq">0</span> lb-ft</div>
         <div><label>Power</label><span id="hp">0</span> hp</div>
+        <div><label>Cam angle / VE</label><span id="vtc">0</span>° <span class="muted">/ <span id="ve">0</span>%</span></div>
+        <div><label>Half burned at</label><span id="ca50">–</span>° ATDC <span class="muted">knock <span id="knockIdx">0</span></span></div>
+        <div><label>EGT / exhaust</label><span id="egt">0</span> °C <span class="muted">/ <span id="exh">0</span> kPa</span></div>
+        <div><label>Pumping / residual</label><span id="pmep">0</span> kPa <span class="muted">/ <span id="resid">0</span>%</span></div>
+        <div><label>Turbo / wastegate</label><span id="turboK">0</span>k rpm <span class="muted">/ <span id="wgOpen">0</span>% open</span></div>
       </div>
       <div class="pedals">
         <div><label>Throttle</label><div class="bar"><div id="barThrottle"></div></div></div>
@@ -81,8 +86,12 @@
         <label class="inline"><input type="checkbox" id="setTurbo"> Turbo</label>
         <label>Wastegate spring kPa <input type="number" id="setSpring" step="1"></label>
         <label>Turbo max boost kPa <input type="number" id="setMaxBoost" step="5"></label>
-        <label>Boost starts at g/s <input type="number" id="setSpool" step="5" title="Engine airflow where the turbo starts making boost"></label>
-        <label>Full boost at g/s <input type="number" id="setFullBoost" step="5" title="Engine airflow where the turbo can hold its full boost"></label>
+        <label>Turbine area cm² <input type="number" id="setTurbArea" step="0.5" title="Effective flow area of the turbine housing. Smaller spools sooner but makes more back pressure."></label>
+        <label>Wastegate area cm² <input type="number" id="setWgArea" step="0.5" title="Effective flow area of the wastegate when fully open"></label>
+        <label>Compressor tip mm <input type="number" id="setCompTip" step="1" title="Compressor wheel tip radius; sets how much boost a given shaft speed makes"></label>
+        <label>Throttle body mm <input type="number" id="setTb" step="1"></label>
+        <label>Intake runner (effective) mm <input type="number" id="setRunner" step="10" title="Effective length of the air column the model treats as one slug; about half the physical runner"></label>
+        <label>Exhaust (effective) mm <input type="number" id="setExhaust" step="1" title="The whole exhaust after the manifold as one orifice. Stock 52; a free-flowing cat-back is about 60–65."></label>
         <label>WG duty gain <input type="number" id="setWgGain" step="0.05" title="How strongly solenoid duty raises boost above the spring. 1 means 100% duty reaches max boost. Match it to a real datalog."></label>
         <label>Fuel table units
           <select id="setFuelUnits"><option value="lambda">Lambda target</option><option value="afr">AFR target</option><option value="ms">Injector ms</option></select></label>
@@ -118,10 +127,10 @@
       <div id="failBanner" class="fail" hidden></div>
       <div class="tablewrap"><table id="partsTable"></table></div>
       <details>
-        <summary>Materials and what's estimated</summary>
+        <summary>Materials: pick an alloy per part, see its published properties</summary>
         <div class="tablewrap"><table id="matTable"></table></div>
-        <p class="small muted">Published: 86 × 86 mm bore and stroke, 11.0:1, 139 mm rods, 22 mm pins, 48 mm rod big end, powdered-metal stock rods.
-          Estimated: part masses and sections, material grades, the cylinder pressure and piston temperature model, and every limit.
+        <p class="small muted">Published: 86 × 86 mm bore and stroke, 11.0:1, 139 mm rods, 22 mm pins, 48 mm rod big end, powdered-metal stock rods, aluminium open-deck block with iron sleeves, and every material property shown unless it is marked est. (hover it for why).
+          Estimated: part masses and sections, which grade Honda used, load paths and the piston temperature model. Peak pressure comes from the gas exchange model.
           Load is demand ÷ capacity. Below 80% a part lives indefinitely; above it, fatigue builds up and "life used" climbs; at 150% it breaks at once.</p>
       </details>
     </section>

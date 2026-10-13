@@ -48,8 +48,8 @@ export const TORQUE_TARGETS = {
 // wall heat). Edit TORQUE_TARGETS or the geometry in gasflow.js and rerun the tool, not these.
 export const VE_RPM = TORQUE_TARGETS.low.map(([r]) => r);
 export const VE_HIGH_RPM = TORQUE_TARGETS.high.map(([r]) => r);
-export const VE_CORR_LOW = [0.7341, 0.7517, 0.79, 0.8202, 0.8548, 0.8865, 0.8779, 0.8585, 0.8513, 0.8326, 0.8293, 0.7882, 0.8374];
-export const VE_CORR_HIGH = [0.4828, 0.6297, 0.7594, 0.8318, 0.8564, 0.9369, 1.0294, 1.0149, 1.0621, 1.0406, 1.0059, 0.9784, 0.9937];
+export const VE_CORR_LOW = [0.7341, 0.7517, 0.79, 0.8202, 0.8548, 0.8865, 0.8779, 0.8585, 0.8499, 0.8291, 0.8277, 0.7881, 0.8378];
+export const VE_CORR_HIGH = [0.4828, 0.6297, 0.7594, 0.8318, 0.8565, 0.938, 1.0297, 1.0149, 1.0605, 1.0388, 1.004, 0.9765, 0.9919];
 
 export function veCorrection(rpm, highCam) {
   return highCam ? lookup1(VE_HIGH_RPM, VE_CORR_HIGH, rpm) : lookup1(VE_RPM, VE_CORR_LOW, rpm);
@@ -66,7 +66,7 @@ export function mbt(rpm, mapKpa) {
 
 // Highest advance before knock (degrees BTDC). Higher octane adds margin; hot intake air takes it away.
 export function knockLimit(rpm, mapKpa, iatC = 25, octane = 91) {
-  return 4 + 5.5 * rpm / 1000 - (mapKpa - 100) * 0.25 - Math.max(0, iatC - 30) * 0.12 + (octane - 91) * 1.2;
+  return Math.min(4 + 5.5 * rpm / 1000, 28 + rpm / 1000) - (mapKpa - 100) * 0.15 - Math.max(0, iatC - 30) * 0.12 + (octane - 91) * 1.2;
 }
 
 // Mechanical friction torque (Nm): rings, bearings, valvetrain, oil and water pumps. Pumping losses

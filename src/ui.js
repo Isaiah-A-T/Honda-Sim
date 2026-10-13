@@ -3,7 +3,8 @@
 import { parseTable, activeCell, guessFuelUnits } from './tables.js';
 import { CAR, placeholderTune, turboSetup } from './k20z3.js';
 import { createSim, step, shift, shiftUp, shiftDown, startEngine, rebuildEngine, snapshot, logToCsv, setTune } from './sim.js';
-import { PARTS, MATERIALS, partStatus } from './internals.js';
+import { PARTS, MATERIALS, partStatus, materialsFor, partMaterial } from './internals.js';
+import { FLOW } from './gasflow.js';
 import { createInput, attachKeyboard, readInput, startLearn, AXES, BUTTONS } from './input.js';
 
 const TUNE_KEY = 'honda-sim.tune.v1';
@@ -17,6 +18,8 @@ const TABLES = [
   ['fuelHigh', 'Fuel (high cam)'],
   ['boostTarget', 'Boost target'],
   ['wgDuty', 'Wastegate duty'],
+  ['vtcLow', 'Cam angle (low cam)'],
+  ['vtcHigh', 'Cam angle (high cam)'],
 ];
 // Paste/CSV targets: "both cams" writes the same table into low and high cam.
 const TARGETS = [
@@ -29,6 +32,7 @@ function targetForFile(name) {
   const n = name.toLowerCase();
   if (/wg|wastegate|duty/.test(n)) return 'wgDuty';
   if (/boost/.test(n)) return 'boostTarget';
+  if (/cam|vtc/.test(n)) return /high/.test(n) ? 'vtcHigh' : 'vtcLow';
   if (/ign|timing/.test(n)) return /high/.test(n) ? 'ignHigh' : /low/.test(n) ? 'ignLow' : 'ignBoth';
   if (/afr|fuel|lambda/.test(n)) return /high/.test(n) ? 'fuelHigh' : /low/.test(n) ? 'fuelLow' : 'fuelBoth';
   return null;
@@ -99,7 +103,9 @@ function renderSettings() {
   const T = tune.turbo || {};
   $('setTurbo').checked = !!T.enabled;
   for (const [id, v] of [['setInjCc', tune.injectorCc], ['setDead', tune.injectorDeadMs], ['setOverboost', tune.overboostKpa], ['setTorqueLim', tune.torqueLimitNm],
-    ['setClutch', tune.clutchNm], ['setSpring', T.springKpa], ['setMaxBoost', T.maxBoostKpa], ['setSpool', T.spoolStartGs], ['setFullBoost', T.fullBoostGs], ['setWgGain', T.wgGain ?? 1]]) $(id).value = v ?? '';
+    ['setClutch', tune.clutchNm], ['setSpring', T.springKpa], ['setMaxBoost', T.maxBoostKpa], ['setTurbArea', T.turbineAreaCm2], ['setWgArea', T.wastegateAreaCm2], ['setCompTip', T.compressorTipMm], ['setWgGain', T.wgGain ?? 1]]) $(id).value = v ?? '';
+  const F = { ...FLOW, ...(tune.flow || {}) };
+  $('setTb').value = Math.round(F.throttleDiaM * 1000); $('setRunner').value = Math.round(F.runnerM * 1000); $('setExhaust').value = Math.round(F.exhaustDiaM * 1000);
 }
 
 function applyTune(t) {
@@ -108,6 +114,7 @@ function applyTune(t) {
   saveTune(tune);
   renderSettings();
   renderTable();
+  renderMaterials();
 }
 
 for (const [id, key] of [['setVtec', 'vtecRpm'], ['setVtecMap', 'vtecMinMap'], ['setRev', 'revLimit'], ['setOct', 'octane']]) {
@@ -122,7 +129,13 @@ for (const [id, key] of [['setInjCc', 'injectorCc'], ['setDead', 'injectorDeadMs
     if (v === undefined || Number.isFinite(v)) { tune[key] = v; saveTune(tune); }
   });
 }
-for (const [id, key] of [['setSpring', 'springKpa'], ['setMaxBoost', 'maxBoostKpa'], ['setSpool', 'spoolStartGs'], ['setFullBoost', 'fullBoostGs'], ['setWgGain', 'wgGain']]) {
+for (const [id, key] of [['setTb', 'throttleDiaM'], ['setRunner', 'runnerM'], ['setExhaust', 'exhaustDiaM']]) {
+  $(id).addEventListener('change', ev => {
+    const v = Number(ev.target.value) / 1000;
+    if (Number.isFinite(v) && v > 0) { tune.flow = { ...(tune.flow || {}), [key]: v }; saveTune(tune); }
+  });
+}
+for (const [id, key] of [['setSpring', 'springKpa'], ['setMaxBoost', 'maxBoostKpa'], ['setTurbArea', 'turbineAreaCm2'], ['setWgArea', 'wastegateAreaCm2'], ['setCompTip', 'compressorTipMm'], ['setWgGain', 'wgGain']]) {
   $(id).addEventListener('change', ev => {
     const v = Number(ev.target.value);
     if (Number.isFinite(v)) { tune.turbo = { ...tune.turbo, [key]: v }; saveTune(tune); }
@@ -255,9 +268,28 @@ function drawDyno() {
 }
 
 // ------------------------------------------------------------------ internals
+const esc = t => String(t).replace(/[&<>"]/g, c => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;' }[c]));
+function matCell(m, f, digits = 0) {
+  const v = m[f];
+  if (v === undefined || v === null) return '<td class="num muted">–</td>';
+  const est = m.estimated?.[f];
+  return `<td class="num"${est ? ` title="Estimated: ${esc(est)}"` : ''}>${typeof v === 'number' ? v.toFixed(digits) : esc(v)}${est ? ' <span class="muted">est.</span>' : ''}</td>`;
+}
 function renderMaterials() {
-  $('matTable').innerHTML = '<thead><tr><th>Part</th><th>Material</th><th>Yield MPa</th><th>Tensile MPa</th><th>Modulus GPa</th><th>Density kg/m³</th><th>Capacity used</th></tr></thead><tbody>' +
-    PARTS.map(p => { const m = MATERIALS[p.material]; return `<tr><td>${p.name}</td><td>${m.name}</td><td class="num">${m.yieldMPa}</td><td class="num">${m.utsMPa}</td><td class="num">${m.modulusGPa}</td><td class="num">${m.densityKgM3}</td><td>${m.strengthMPa} (${m.note})</td></tr>`; }).join('') + '</tbody>';
+  const cols = [['densityKgM3', 'Density kg/m³'], ['modulusGPa', 'Modulus GPa'], ['yieldMPa', 'Yield MPa'], ['utsMPa', 'Tensile MPa'], ['fatigueMPa', 'Fatigue MPa'],
+    ['elongationPct', 'Elong. %', 1], ['thermalExpansionUmMK', 'Expansion µm/m·K', 1], ['conductivityWmK', 'Conductivity W/m·K'], ['maxServiceTempC', 'Max °C']];
+  $('matTable').innerHTML = `<thead><tr><th>Part</th><th>Alloy</th>${cols.map(c => `<th>${c[1]}</th>`).join('')}<th>Hot strength</th><th>Sources</th></tr></thead><tbody>` +
+    PARTS.map(p => {
+      const m = partMaterial(tune, p), id = Object.keys(MATERIALS).find(k => MATERIALS[k] === m);
+      const opts = materialsFor(p.category).map(k => `<option value="${k}"${k === id ? ' selected' : ''}>${esc(MATERIALS[k].name)}</option>`).join('');
+      const hot = m.strengthVsTempC ? m.strengthVsTempC.filter(([t]) => t >= 150).slice(0, 3).map(([t, f]) => `${(f * 100).toFixed(0)}% @ ${t}°`).join(', ') : '–';
+      const src = (m.sources || []).map((u, i) => `<a href="${esc(u)}" target="_blank" rel="noopener">${i + 1}</a>`).join(' ');
+      return `<tr><td>${p.name}</td><td><select data-part="${p.key}">${opts}</select></td>${cols.map(([f, , d]) => matCell(m, f, d)).join('')}<td${m.estimated?.strengthVsTempC ? ` title="Estimated: ${esc(m.estimated.strengthVsTempC)}"` : ''}>${hot}</td><td>${src || '–'}</td></tr>`;
+    }).join('') + '</tbody>';
+  $('matTable').querySelectorAll('select[data-part]').forEach(sel => sel.addEventListener('change', ev => {
+    tune.materials = { ...(tune.materials || {}), [ev.target.dataset.part]: ev.target.value };
+    saveTune(tune); renderMaterials();
+  }));
   $('partsTable').innerHTML = '<thead><tr><th>Part</th><th>Load now</th><th></th><th>Life used</th><th>Status</th></tr></thead><tbody>' +
     PARTS.map(p => `<tr><td>${p.name}</td><td><span class="loadbar"><div id="lb-${p.key}"></div></span></td><td class="num" id="lv-${p.key}"></td><td class="num" id="dm-${p.key}"></td><td id="st-${p.key}"></td></tr>`).join('') + '</tbody>';
 }
@@ -343,6 +375,16 @@ function updateDash(input) {
   $('kl').textContent = s.knock_limit.toFixed(1);
   $('knockCount').textContent = s.knock_count;
   $('retard').textContent = s.knock_retard.toFixed(1);
+  $('vtc').textContent = s.vtc_deg.toFixed(0);
+  $('ve').textContent = (s.ve * 100).toFixed(0);
+  $('ca50').textContent = cut || s.ca50_deg === '' ? '–' : s.ca50_deg.toFixed(0);
+  $('knockIdx').textContent = s.knock_index.toFixed(2);
+  $('egt').textContent = s.egt_c;
+  $('exh').textContent = s.exh_kpa.toFixed(0);
+  $('pmep').textContent = s.pmep_kpa;
+  $('resid').textContent = s.residual_pct.toFixed(0);
+  $('turboK').textContent = s.turbo_krpm;
+  $('wgOpen').textContent = s.wg_open_pct;
   $('ipw').textContent = s.inj_ms.toFixed(2);
   $('duty').textContent = s.inj_duty.toFixed(0);
   $('tq').textContent = (s.torque_nm * NM_TO_LBFT).toFixed(0);

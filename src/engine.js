@@ -8,7 +8,7 @@
 // lean or rich mixtures change power, and VTEC in the wrong place leaves a hole in the curve.
 
 import { clamp, lookup2, guessFuelUnits } from './tables.js';
-import { ENGINE, veCorrection, mbt, knockLimit, frictionNm } from './k20z3.js';
+import { ENGINE, TURBO_GT35, veCorrection, mbt, frictionNm } from './k20z3.js';
 import { FLOW, createGasflow, runCycle, settle, vtcFor } from './gasflow.js';
 
 const AIR_DENSITY_G_PER_L = 1.184;   // 25 °C, sea level
@@ -19,9 +19,11 @@ const GAS_EVERY_S = 0.01;              // run one gas exchange cycle this often 
 const P_AMB = 101.3, DOWNPIPE_KPA = 4;
 
 const flowGeom = t => ({ ...FLOW, ...(t.flow || {}) });
+// Turbo settings, with the GT35 defaults filling anything a saved tune from an older version lacks.
+const turboOf = t => (t.turbo?.enabled ? { ...TURBO_GT35, ...t.turbo } : t.turbo);
 // Exhaust outlet the gas model empties into: the exhaust system, or the turbine plus the open part of the wastegate.
 function exhaustOutlet(e) {
-  const tb = e.tune.turbo, G = e.gas.G;
+  const tb = turboOf(e.tune), G = e.gas.G;
   if (tb?.enabled && !tb.fixed) return { outKpa: P_AMB + DOWNPIPE_KPA, outAreaM2: (tb.turbineAreaCm2 + tb.wastegateAreaCm2 * e.wgOpen) * 1e-4 };
   return { outKpa: P_AMB, outAreaM2: Math.PI / 4 * G.exhaustDiaM ** 2 };
 }
@@ -77,7 +79,7 @@ export function stepEngine(e, pedal, dt) {
   // the boost its wheel speed makes. Any difference speeds the shaft up or slows it down. The wastegate
   // actuator opens once boost passes the spring (plus whatever solenoid duty the tune adds), letting
   // exhaust bypass the turbine, which is what holds boost at target.
-  const tb = t.turbo;
+  const tb = turboOf(t);
   e.boostTarget = t.boostTarget ? lookup2(t.boostTarget, rpm, e.map) : NaN;
   e.wgDuty = 0;
   if (tb?.enabled) {

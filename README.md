@@ -25,7 +25,7 @@ FlashPro `.fpcal` files are encrypted, so the sim can't read them directly. Copy
 5. **Save tune (.json)** keeps the result so you don't have to paste again.
 
 Have the tables as CSV files instead? **Load CSV tables** takes several at once and picks the table from the file name
-(`afr`, `fuel`, `ignition`, `boost`, `wg_duty`). A single ignition or fuel table is used for both cams.
+(`afr`, `fuel`, `ignition`, `boost`, `wg_duty`, `cam` or `vtc`). A single ignition, fuel or cam angle table is used for both cams.
 
 The fuel table can be lambda, AFR or injector pulse width (ms). The sim guesses from the numbers; check the **Fuel table units** setting.
 
@@ -39,15 +39,29 @@ Keyboard: W/↑ throttle, S/↓ brake, C or Space clutch, E/Q shift up/down, 1�
 
 ## Turbo builds
 
-**Turbo build preset** switches on a GT35-class turbo (spool and boost limits are estimates you can adjust), 1000 cc injectors, a 200 kPa overboost cut, an upgraded clutch,
+**Turbo build preset** switches on a GT35-class turbo (turbine and wastegate sizes are estimates you can adjust), 1000 cc injectors, a 200 kPa overboost cut, an upgraded clutch,
 and a torque warning (RODS lamp) at 350 Nm for stock connecting rods. Your tables stay as they are.
-Boost builds with airflow through the engine and is held by the wastegate spring plus the wastegate duty table. How much boost a given duty makes depends on your
-solenoid and wastegate, so set **WG duty gain** until the sim's boost matches a real datalog.
+The turbine is driven by exhaust energy from the flow model, the compressor takes power to make boost, and the shaft
+spools up from the difference. The wastegate opens past its spring plus whatever the wastegate duty table adds, and the
+turbine's back pressure costs pumping work. How much boost a given duty makes depends on your solenoid and wastegate,
+so set **WG duty gain** until the sim's boost matches a real datalog.
+
+## Air and exhaust flow, timing and cams
+
+Each cylinder is simulated through the whole cycle, degree by degree: cam lift on both cams, VTC cam phasing (from
+your cam angle tables if you load them), compressible flow through the valves, the inertia of the air in the intake
+runner and exhaust primary, exhaust back pressure, and a combustion burn that starts at the spark. Torque, peak
+cylinder pressure, exhaust temperature and knock all come out of that, so timing, cams and exhaust changes act the way
+they do on the engine. The dash shows cam angle, VE, where half the charge has burned, the knock margin, EGT,
+exhaust pressure, pumping loss and residual exhaust. Throttle body, intake runner and exhaust size are in the
+settings. Details and what's estimated: [docs/GASFLOW.md](docs/GASFLOW.md).
 
 ## Engine internals
 
 The **Engine internals** panel shows peak cylinder pressure, piston temperature and rod forces, and the load on
-each part (pistons, rods, rod bolts, bearings, crank, head gasket, valvetrain) against its material limits.
+each part (pistons, rods, rod bolts, bearings, crank, head gasket, head bolts, cylinder sleeves, block, valvetrain)
+against its material limits. Pick a different alloy for any part (forged 2618/4032 pistons, 4340/300M/titanium rods,
+ARP fasteners, tri-metal bearings, billet cranks, ductile iron sleeves) and see its published properties with sources.
 Fatigue builds up while a part is over its endurance limit; when one reaches 100% the engine fails and needs a
 rebuild. Details and what's estimated: [docs/INTERNALS.md](docs/INTERNALS.md).
 
@@ -64,15 +78,18 @@ It uses [Three.js](https://threejs.org) r160, included in `vendor/` (MIT license
 | File | What it does |
 |---|---|
 | `src/tables.js` | Table lookups and the parser for tables pasted from FlashPro Manager |
-| `src/k20z3.js` | Car data (gear ratios, weight, tires) and the engine's "truth": airflow per cam, best timing, knock limit, friction |
+| `src/k20z3.js` | Car data (gear ratios, weight, tires), friction, the fitted airflow corrections, turbo specs |
+| `src/gasflow.js` | Crank-angle gas exchange and combustion: cams, VTC, valves, runners, exhaust, burn, knock |
+| `src/materials.js` | Material library with published properties and sources (built from `docs/materials-sources.json`) |
 | `src/engine.js` | Runs the tune like the ECU (fuel, low/high cam ignition, VTEC, rev limit, decel cut, idle) and works out torque |
 | `src/vehicle.js` | Clutch, gearbox and road load |
-| `src/internals.js` | Cylinder pressure, part loads, materials and fatigue |
+| `src/internals.js` | Part loads (including sleeves, block and head bolts), per-part alloys and fatigue |
 | `src/render3d.js` | Three.js engine model, animated from the sim and colored by stress |
 | `src/sim.js` | Ties it together: shifting, auto-clutch, stalling, datalog |
 | `src/input.js` | Gamepad API wheel/pedal mapping and keyboard |
 | `src/ui.js` | Dash, table view with the active cell highlighted, dyno chart |
-| `tools/calibrate.mjs` | Re-solves the volumetric efficiency tables from the torque targets |
+| `tools/calibrate.mjs` | Re-fits the airflow corrections from the torque targets |
+| `tools/validate.mjs` | Runs the published dyno comparisons |
 
 The engine and car are calibrated to public data: Honda's 197 hp / 139 lb-ft rating and gear ratios, Hondata's
 VTEC crossover data, and road tests (0–60 in 6.8 s and a 15.2 s quarter mile at 94 mph, against 6.5–7.2 s and

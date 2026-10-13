@@ -21,9 +21,12 @@ factors; they are used only for where the peaks fall (torque near 6,200, power n
 
 ## What was tuned
 
-- **Volumetric efficiency per cam** is solved from crank torque targets in `src/k20z3.js` (`TORQUE_TARGETS`)
-  by `node tools/calibrate.mjs`. The anchors are the Honda rating, the peak torque rpm, and the 5,600 rpm cam crossover.
-  The low cam shape between anchors is an estimate.
+- **Breathing** comes from the gas exchange model ([GASFLOW.md](GASFLOW.md)): cams, cam phasing, valves, runners
+  and exhaust. `node tools/calibrate.mjs` then fits a per-rpm, per-cam correction on top so the stock engine hits the
+  crank torque targets in `src/k20z3.js` (`TORQUE_TARGETS`). The anchors are the Honda rating, the peak torque rpm,
+  and the 5,600 rpm cam crossover. The low cam shape between anchors is an estimate.
+- **Timing and knock** come from the same model (burn phasing and an end-gas autoignition model). Its knock scale was
+  set once so the stock engine on 91 octane is knock limited at low rpm and near best timing above about 6,000 rpm.
 - **Launch and traction**: front tires limit acceleration (about 0.5 g in 1st), with weight moving off the front as the car accelerates.
 - **Car data**: Honda spec ratios and weight, plus an 80 kg driver.
 
@@ -41,10 +44,12 @@ These checks run as tests (`npm test`), so a change that breaks them gets caught
 
 ## What isn't calibrated yet
 
-- **Ignition and knock.** Best-torque timing and the knock limit are physics-style estimates, not taken from stock
-  K20Z3 datalogs. Public FlashPro datalogs are mostly on forums (8thcivic.com, the Hondata forum, k20a.org) that this
+- **Ignition and knock.** Best-torque timing and the knock limit come from the combustion model, which uses textbook
+  burn rates and a published autoignition correlation, not stock K20Z3 datalogs. Public FlashPro datalogs are mostly on forums (8thcivic.com, the Hondata forum, k20a.org) that this
   environment can't reach. Datalogs from your own car would be the best way to fix this.
 - **Part throttle and cruise.** Manifold pressure versus throttle is a generic curve.
-- **Turbo.** How much boost a given wastegate duty makes depends on the actual solenoid and wastegate. Use the
-  WG duty gain setting and match it to a real boost log.
-- **Cam timing (VTC).** Not modelled separately; its effect is folded into the volumetric efficiency.
+- **Turbo.** Spool comes from exhaust energy, but turbine and wastegate flow areas and efficiencies are estimates, and
+  how much boost a given wastegate duty makes depends on the actual solenoid. Match the WG duty gain and turbine area
+  to a real boost log.
+- **Cam profiles and VTC.** VTC is modelled and follows your cam angle tables, but the stock lobe lift, duration and
+  centres aren't published, so they are estimates. Cam card numbers for aftermarket cams can go in `tune.flow.cams`.

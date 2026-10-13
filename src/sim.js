@@ -142,6 +142,17 @@ export function snapshot(sim, throttle = 0) {
     rod_load: +sim.internals.load.rod.toFixed(2),
     piston_load: +sim.internals.load.piston.toFixed(2),
     bearing_load: +sim.internals.load.bearing.toFixed(2),
+    sleeve_load: +sim.internals.load.sleeve.toFixed(2),
+    vtc_deg: +(e.vtc ?? 0).toFixed(1),
+    ve: +(e.ve ?? 0).toFixed(3),
+    ca50_deg: Number.isFinite(e.ca50) ? +e.ca50.toFixed(1) : '',
+    knock_index: +(e.knockIndex ?? 0).toFixed(2),
+    egt_c: +(e.egtC ?? 0).toFixed(0),
+    exh_kpa: +(e.exhKpa ?? 0).toFixed(1),
+    pmep_kpa: +(e.pmepKpa ?? 0).toFixed(0),
+    residual_pct: +((e.residual ?? 0) * 100).toFixed(1),
+    turbo_krpm: +((e.turboRadS ?? 0) * 30 / Math.PI / 1000).toFixed(0),
+    wg_open_pct: +((e.wgOpen ?? 0) * 100).toFixed(0),
   };
 }
 
