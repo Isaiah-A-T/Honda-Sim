@@ -26,7 +26,7 @@ Either can start first; the sim retries every 2 seconds. The viewer only listens
 reachable from other machines.
 
 Command-line options: `--mode stress` (or internals, block, airflow, materials) and `--view intake` (or exhaust,
-front, side, top, valvetrain) pick the starting view; `--build na`, `turbo` or `ic` sets the demo's build;
+front, side, top, valvetrain) pick the starting view; `--build na`, `turbo` or `ic` sets the demo's build; `--block k24` starts the demo on a K24A block;
 `--check-clearance` prints any pipe that passes through another part in any build and exits (non-zero if any).
 
 ## Layout
@@ -105,6 +105,8 @@ for 1.5 seconds the viewer falls back to its demo.
 | `oilKpa` | number | Oil pressure, kPa. Without it the viewer estimates it from rpm and oil temperature |
 | `thermostat` | 0–1 | Thermostat opening; 0 sends all coolant round the bypass, 1 all through the radiator (default 1) |
 | `fan` | 0–1 | Radiator fan speed (default 0) |
+| `block` | string | Block fitted: `K20Z3` (default, 86 × 86 mm, 139 mm rods, 212 mm deck) or `K24A` (87 × 99 mm, 152 mm rods, 231.5 mm deck). The viewer rebuilds the engine when it changes |
+| `boreMm`, `strokeMm`, `rodMm`, `deckMm` | number | Bottom-end dimensions when the parts differ from the block's stock ones. Without `deckMm` the deck follows a changed stroke or rod (30 mm compression height) |
 | `stress` | object | Part key to load (1 = at the limit), or an array of 4 for per-cylinder parts |
 | `partMaterials` | object | Part key to `{ part, label, family, detail }`. When present the Materials view is read-only |
 | `readouts` | array | Extra `[label, value]` rows for the side panel |

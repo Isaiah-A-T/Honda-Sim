@@ -8,14 +8,15 @@ use crate::state::SimState;
 use three_d::*;
 
 pub const SCALE: f32 = 0.01;
-const DECK: f32 = DECK_HEIGHT;
-const ROOF: f32 = DECK + 10.0;
-const CAM_Y: f32 = DECK + 142.0;
+// Heights follow the deck, which follows the block the sim has fitted.
+fn deck() -> f32 { deck_height() }
+fn roof() -> f32 { deck() + 10.0 }
+fn cam_y() -> f32 { deck() + 142.0 }
 const CAM_Z: f32 = 38.0;
 const VALVE_SEAT_Z: f32 = 20.0;
-const VALVE_TIP_Y: f32 = DECK + 109.0;
+fn valve_tip_y() -> f32 { deck() + 109.0 }
 /// Rocker followers ride between the cam's base circle and the valve tips; the VTEC pin runs through them.
-const FOLLOWER_Y: f32 = DECK + 118.0;
+fn follower_y() -> f32 { deck() + 118.0 }
 const BASE_R: f32 = 17.0;
 const LEN: f32 = 4.0 * BORE_SPACING + 40.0;
 
@@ -235,6 +236,8 @@ struct PipeCheck {
 }
 
 pub struct Engine {
+    /// The dimensions this engine was built with.
+    pub geometry: crate::kinematics::Geometry,
     pub parts: Vec<Part>,
     valves: Vec<ValveInfo>,
     glows: Vec<Glow>,
@@ -441,16 +444,16 @@ impl Engine {
         let mut paths: Vec<FlowPath> = Vec::new();
         let mut lobes: Vec<(usize, Side, bool)> = Vec::new();
         let id = Mat4::identity();
-        let r = STROKE / 2.0;
+        let r = stroke() / 2.0;
 
         // ---------- Castings ----------
-        b.add(&boxed(LEN, DECK + 60.0, 190.0), glass(0x8fa3b8, 34), Some("block"), "Engine block", None, Sys::Casting, Mover::Fixed, t(0.0, (DECK - 60.0) / 2.0, 0.0));
+        b.add(&boxed(LEN, deck() + 60.0, 190.0), glass(0x8fa3b8, 34), Some("block"), "Engine block", None, Sys::Casting, Mover::Fixed, t(0.0, (deck() - 60.0) / 2.0, 0.0));
         for c in 1..=4 {
-            b.add(&open_cylinder_y(BORE / 2.0 + 2.0, 130.0, 40), glass(0xa9b8c8, 46), Some("block"), "Cylinder liner", None, Sys::Casting, Mover::Fixed, t(cyl_x(c), DECK - 65.0, 0.0));
+            b.add(&open_cylinder_y(bore() / 2.0 + 2.0, 130.0, 40), glass(0xa9b8c8, 46), Some("block"), "Cylinder liner", None, Sys::Casting, Mover::Fixed, t(cyl_x(c), deck() - 65.0, 0.0));
         }
         b.add(&boxed(LEN - 30.0, 90.0, 170.0), glass(0x6f7782, 34), None, "Oil pan", None, Sys::Casting, Mover::Fixed, t(0.0, -105.0, 0.0));
-        b.add(&boxed(LEN, 120.0, 160.0), glass(0x9fb0c2, 30), Some("head"), "Cylinder head", None, Sys::Casting, Mover::Fixed, t(0.0, DECK + 60.0, 0.0));
-        b.add(&boxed(LEN - 20.0, 45.0, 150.0), glass(0xb3262b, 40), None, "Cam cover", None, Sys::Casting, Mover::Fixed, t(0.0, DECK + 156.0, 0.0));
+        b.add(&boxed(LEN, 120.0, 160.0), glass(0x9fb0c2, 30), Some("head"), "Cylinder head", None, Sys::Casting, Mover::Fixed, t(0.0, deck() + 60.0, 0.0));
+        b.add(&boxed(LEN - 20.0, 45.0, 150.0), glass(0xb3262b, 40), None, "Cam cover", None, Sys::Casting, Mover::Fixed, t(0.0, deck() + 156.0, 0.0));
 
         // ---------- Crankshaft ----------
         let steel = || metal(0x9aa0a6, 0.8, 0.3);
@@ -485,22 +488,22 @@ impl Engine {
 
         // ---------- Pistons and rods ----------
         let piston_mesh = merge(&[
-            transformed(cylinder_y(BORE / 2.0 - 0.5, BORE / 2.0 - 0.5, 48.0, 40), t(0.0, 6.0, 0.0)),
+            transformed(cylinder_y(bore() / 2.0 - 0.5, bore() / 2.0 - 0.5, 48.0, 40), t(0.0, 6.0, 0.0)),
         ]);
-        let rings = merge(&[24.0, 18.0, 12.0].map(|y| transformed(cylinder_y(BORE / 2.0, BORE / 2.0, 1.6, 40), t(0.0, y, 0.0))));
+        let rings = merge(&[24.0, 18.0, 12.0].map(|y| transformed(cylinder_y(bore() / 2.0, bore() / 2.0, 1.6, 40), t(0.0, y, 0.0))));
         for c in 1..=4 {
             let i = Some(c - 1);
             b.add(&piston_mesh, metal(0xd5d8dc, 0.4, 0.35), Some("pistons"), &format!("Piston {c}"), i, Sys::Internals, Mover::Piston(c), id);
             b.add(&rings, metal(0x30343a, 0.5, 0.5), None, &format!("Piston rings {c}"), i, Sys::Internals, Mover::Piston(c), id);
             b.add(&along_x(cylinder_y(10.0, 10.0, 60.0, 16)), metal(0x8c939b, 0.9, 0.3), Some("pistons"), &format!("Wrist pin {c}"), i, Sys::Internals, Mover::Piston(c), id);
             let rod = metal(0xb8bcc2, 0.75, 0.3);
-            b.add(&boxed(20.0, ROD_LENGTH - 30.0, 16.0), rod, Some("rods"), &format!("Connecting rod {c}"), i, Sys::Internals, Mover::Rod(c), t(0.0, -ROD_LENGTH / 2.0, 0.0));
+            b.add(&boxed(20.0, rod_length() - 30.0, 16.0), rod, Some("rods"), &format!("Connecting rod {c}"), i, Sys::Internals, Mover::Rod(c), t(0.0, -rod_length() / 2.0, 0.0));
             b.add(&along_x(cylinder_y(15.0, 15.0, 22.0, 20)), metal(0xb8bcc2, 0.75, 0.3), Some("rods"), &format!("Rod small end {c}"), i, Sys::Internals, Mover::Rod(c), id);
-            b.add(&along_x(cylinder_y(32.0, 32.0, 24.0, 28)), metal(0xb8bcc2, 0.75, 0.3), Some("rods"), &format!("Rod big end {c}"), i, Sys::Internals, Mover::Rod(c), t(0.0, -ROD_LENGTH, 0.0));
+            b.add(&along_x(cylinder_y(32.0, 32.0, 24.0, 28)), metal(0xb8bcc2, 0.75, 0.3), Some("rods"), &format!("Rod big end {c}"), i, Sys::Internals, Mover::Rod(c), t(0.0, -rod_length(), 0.0));
 
             for (kind, color) in [(GlowKind::Flame(c), Srgba::new(255, 140, 30, 0)), (GlowKind::Plug(c), Srgba::new(160, 212, 255, 0))] {
                 let mesh = match kind {
-                    GlowKind::Flame(_) => cylinder_y(BORE / 2.0 - 4.0, BORE / 2.0 - 4.0, 1.0, 32),
+                    GlowKind::Flame(_) => cylinder_y(bore() / 2.0 - 4.0, bore() / 2.0 - 4.0, 1.0, 32),
                     GlowKind::Plug(_) => {
                         let mut s = CpuMesh::sphere(12);
                         s.transform(Mat4::from_scale(7.0)).unwrap();
@@ -545,14 +548,14 @@ impl Engine {
                 for (dx, secondary) in [(-17.0, false), (0.0, true), (17.0, false)] {
                     let label = if secondary { format!("Cyl {c} {} VTEC rocker (secondary)", name.to_lowercase()) } else { format!("Cyl {c} {} rocker (primary)", name.to_lowercase()) };
                     let color = if secondary { 0x6a7480 } else { 0x58606a };
-                    b.add(&boxed(12.0, 14.0, 26.0), metal(color, 0.75, 0.35), Some("valves"), &label, Some(c - 1), Sys::Internals, Mover::Follower { cyl: c, side, secondary }, t(cyl_x(c) + dx, FOLLOWER_Y, fz(side)));
+                    b.add(&boxed(12.0, 14.0, 26.0), metal(color, 0.75, 0.35), Some("valves"), &label, Some(c - 1), Sys::Internals, Mover::Follower { cyl: c, side, secondary }, t(cyl_x(c) + dx, follower_y(), fz(side)));
                 }
-                let pin = b.add(&along_x(cylinder_y(3.5, 3.5, 48.0, 12)), metal(0xd4a017, 0.85, 0.3), None, &format!("Cyl {c} {} VTEC lock pin", name.to_lowercase()), Some(c - 1), Sys::Internals, Mover::Pin { cyl: c, side }, t(0.0, FOLLOWER_Y, fz(side)));
+                let pin = b.add(&along_x(cylinder_y(3.5, 3.5, 48.0, 12)), metal(0xd4a017, 0.85, 0.3), None, &format!("Cyl {c} {} VTEC lock pin", name.to_lowercase()), Some(c - 1), Sys::Internals, Mover::Pin { cyl: c, side }, t(0.0, follower_y(), fz(side)));
                 b.parts[pin].vtec_part = Some((c, side));
 
                 for dx in [-17.0, 17.0] {
-                    let seat = vec3(cyl_x(c) + dx, ROOF, if side == Side::Intake { VALVE_SEAT_Z } else { -VALVE_SEAT_Z });
-                    let tip = vec3(cyl_x(c) + dx, VALVE_TIP_Y, z);
+                    let seat = vec3(cyl_x(c) + dx, roof(), if side == Side::Intake { VALVE_SEAT_Z } else { -VALVE_SEAT_Z });
+                    let tip = vec3(cyl_x(c) + dx, valve_tip_y(), z);
                     let stem_len = (tip - seat).magnitude();
                     let axis = (tip - seat).normalize();
                     let head_r = if side == Side::Intake { 17.5 } else { 15.0 };
@@ -568,15 +571,15 @@ impl Engine {
         }
         let chain_x = cyl_x(1) - 72.0;
         let chain = Curve::new(
-            &[[-25.0, 0.0], [-12.0, -22.0], [12.0, -22.0], [25.0, 0.0], [CAM_Z + 36.0, CAM_Y - 10.0], [CAM_Z + 22.0, CAM_Y + 28.0],
-              [0.0, CAM_Y + 30.0], [-CAM_Z - 22.0, CAM_Y + 28.0], [-CAM_Z - 36.0, CAM_Y - 10.0]]
+            &[[-25.0, 0.0], [-12.0, -22.0], [12.0, -22.0], [25.0, 0.0], [CAM_Z + 36.0, cam_y() - 10.0], [CAM_Z + 22.0, cam_y() + 28.0],
+              [0.0, cam_y() + 30.0], [-CAM_Z - 22.0, cam_y() + 28.0], [-CAM_Z - 36.0, cam_y() - 10.0]]
                 .map(|[zz, y]| [chain_x, y, zz]),
             true,
         );
         b.add(&tube(&chain, 3.0, 160, 6), metal(0x3b4048, 0.9, 0.4), None, "Timing chain", None, Sys::Internals, Mover::Fixed, id);
         for c in 1..=4 {
-            b.add(&cylinder_y(6.0, 6.0, 90.0, 12), metal(0xeeeeee, 0.1, 0.4), None, &format!("Spark plug {c}"), None, Sys::Internals, Mover::Fixed, t(cyl_x(c), ROOF + 56.0, 0.0));
-            b.add(&boxed(26.0, 40.0, 26.0), metal(0x1e2226, 0.3, 0.6), None, &format!("Ignition coil {c}"), None, Sys::Internals, Mover::Fixed, t(cyl_x(c), ROOF + 126.0, 0.0));
+            b.add(&cylinder_y(6.0, 6.0, 90.0, 12), metal(0xeeeeee, 0.1, 0.4), None, &format!("Spark plug {c}"), None, Sys::Internals, Mover::Fixed, t(cyl_x(c), roof() + 56.0, 0.0));
+            b.add(&boxed(26.0, 40.0, 26.0), metal(0x1e2226, 0.3, 0.6), None, &format!("Ignition coil {c}"), None, Sys::Internals, Mover::Fixed, t(cyl_x(c), roof() + 126.0, 0.0));
         }
 
         // ---------- Intake ----------
@@ -584,21 +587,21 @@ impl Engine {
         let intake = || metal(0x3a3f46, 0.4, 0.6);
         for c in 1..=4 {
             let x = cyl_x(c);
-            b.pipe(&[[x, DECK + 70.0, 80.0], [x, DECK + 110.0, 150.0], [x, DECK + 70.0, 220.0], [x, DECK - 10.0, 235.0]], 19.0, intake(), Some("intake"), &format!("Intake runner {c}"), Sys::Intake);
-            b.add(&transformed(cylinder_y(6.0, 4.0, 55.0, 10), Mat4::from_angle_x(radians(-0.6))), metal(0x24282e, 0.3, 0.6), None, &format!("Fuel injector {c}"), None, Sys::Intake, Mover::Fixed, t(x + 20.0, DECK + 100.0, 105.0));
-            paths.push(FlowPath { fluid: Fluid::Air, pts: vec![[x, DECK - 30.0, 250.0], [x, DECK - 10.0, 235.0], [x, DECK + 70.0, 220.0], [x, DECK + 110.0, 150.0], [x, DECK + 70.0, 80.0], [x, ROOF + 22.0, VALVE_SEAT_Z + 6.0], [x, ROOF - 10.0, 0.0]], intake: true, cyl: Some(c), when: When::Always, hot: false, motion: Motion::Static });
+            b.pipe(&[[x, deck() + 70.0, 80.0], [x, deck() + 110.0, 150.0], [x, deck() + 70.0, 220.0], [x, deck() - 10.0, 235.0]], 19.0, intake(), Some("intake"), &format!("Intake runner {c}"), Sys::Intake);
+            b.add(&transformed(cylinder_y(6.0, 4.0, 55.0, 10), Mat4::from_angle_x(radians(-0.6))), metal(0x24282e, 0.3, 0.6), None, &format!("Fuel injector {c}"), None, Sys::Intake, Mover::Fixed, t(x + 20.0, deck() + 100.0, 105.0));
+            paths.push(FlowPath { fluid: Fluid::Air, pts: vec![[x, deck() - 30.0, 250.0], [x, deck() - 10.0, 235.0], [x, deck() + 70.0, 220.0], [x, deck() + 110.0, 150.0], [x, deck() + 70.0, 80.0], [x, roof() + 22.0, VALVE_SEAT_Z + 6.0], [x, roof() - 10.0, 0.0]], intake: true, cyl: Some(c), when: When::Always, hot: false, motion: Motion::Static });
         }
-        let tb_pos = vec3(LEN / 2.0 + 40.0, DECK - 30.0, 250.0);
-        let tb_in = [LEN / 2.0 + 70.0, DECK - 30.0, 250.0];
-        paths.push(FlowPath { fluid: Fluid::Air, pts: vec![tb_in, [LEN / 2.0 - 30.0, DECK - 30.0, 250.0], [-LEN / 2.0 + 30.0, DECK - 30.0, 250.0]], intake: true, cyl: None, when: When::Always, hot: false, motion: Motion::Static });
-        b.add(&along_x(cylinder_y(55.0, 55.0, LEN - 20.0, 32)), intake(), Some("intake"), "Intake plenum", None, Sys::Intake, Mover::Fixed, t(0.0, DECK - 30.0, 250.0));
+        let tb_pos = vec3(LEN / 2.0 + 40.0, deck() - 30.0, 250.0);
+        let tb_in = [LEN / 2.0 + 70.0, deck() - 30.0, 250.0];
+        paths.push(FlowPath { fluid: Fluid::Air, pts: vec![tb_in, [LEN / 2.0 - 30.0, deck() - 30.0, 250.0], [-LEN / 2.0 + 30.0, deck() - 30.0, 250.0]], intake: true, cyl: None, when: When::Always, hot: false, motion: Motion::Static });
+        b.add(&along_x(cylinder_y(55.0, 55.0, LEN - 20.0, 32)), intake(), Some("intake"), "Intake plenum", None, Sys::Intake, Mover::Fixed, t(0.0, deck() - 30.0, 250.0));
         b.add(&along_x(open_cylinder_y(36.0, 60.0, 32)), metal(0x9aa3ad, 0.6, 0.4), None, "Throttle body", None, Sys::Intake, Mover::Fixed, t(tb_pos.x, tb_pos.y, tb_pos.z));
         b.add(&along_x(cylinder_y(33.0, 33.0, 2.0, 32)), metal(0xc7ccd2, 0.6, 0.35), None, "Throttle plate", None, Sys::Intake, Mover::Butterfly, id);
 
         // N/A: intake pipe from the throttle body forward to a cone filter.
-        let na = [tb_in, [LEN / 2.0 + 150.0, DECK - 30.0, 262.0], [LEN / 2.0 + 210.0, DECK - 60.0, 340.0], [LEN / 2.0 + 230.0, DECK - 90.0, 420.0]];
+        let na = [tb_in, [LEN / 2.0 + 150.0, deck() - 30.0, 262.0], [LEN / 2.0 + 210.0, deck() - 60.0, 340.0], [LEN / 2.0 + 230.0, deck() - 90.0, 420.0]];
         b.pipe(&na, 36.0, metal(0x2b2f35, 0.3, 0.8), Some("intake"), "Intake pipe", Sys::NaIntake);
-        let filter_at = vec3(LEN / 2.0 + 232.0, DECK - 92.0, 490.0);
+        let filter_at = vec3(LEN / 2.0 + 232.0, deck() - 92.0, 490.0);
         b.add(&transformed(cylinder_y(48.0, 62.0, 140.0, 28), Mat4::from_angle_x(degrees(90.0))), metal(0xb3262b, 0.1, 0.9), None, "Air filter", None, Sys::NaIntake, Mover::Fixed, t(filter_at.x, filter_at.y, filter_at.z));
         let mut na_flow = vec![[filter_at.x, filter_at.y, filter_at.z + 60.0]];
         na_flow.extend(na.iter().rev());
@@ -608,15 +611,15 @@ impl Engine {
         let exh = || metal(0x4f4945, 0.45, 0.8);
         for c in 1..=4 {
             let x = cyl_x(c);
-            let runner = Curve::new(&[[x, DECK + 70.0, -80.0], [x, DECK + 60.0, -150.0], [x * 0.6, DECK - 10.0, -210.0], [x * 0.15, DECK - 80.0, -235.0]], false);
+            let runner = Curve::new(&[[x, deck() + 70.0, -80.0], [x, deck() + 60.0, -150.0], [x * 0.6, deck() - 10.0, -210.0], [x * 0.15, deck() - 80.0, -235.0]], false);
             b.add(&tube(&runner, 18.0, 48, 16), exh(), Some("exhaust"), &format!("Exhaust runner {c}"), None, Sys::Exhaust, Mover::Fixed, id);
-            paths.push(FlowPath { fluid: Fluid::Exhaust, pts: vec![[x, ROOF - 10.0, 0.0], [x, ROOF + 22.0, -VALVE_SEAT_Z - 6.0], [x, DECK + 70.0, -80.0], [x, DECK + 60.0, -150.0], [x * 0.6, DECK - 10.0, -210.0], [x * 0.15, DECK - 80.0, -235.0], [0.0, DECK - 140.0, -240.0]], intake: false, cyl: Some(c), when: When::Always, hot: false, motion: Motion::Static });
+            paths.push(FlowPath { fluid: Fluid::Exhaust, pts: vec![[x, roof() - 10.0, 0.0], [x, roof() + 22.0, -VALVE_SEAT_Z - 6.0], [x, deck() + 70.0, -80.0], [x, deck() + 60.0, -150.0], [x * 0.6, deck() - 10.0, -210.0], [x * 0.15, deck() - 80.0, -235.0], [0.0, deck() - 140.0, -240.0]], intake: false, cyl: Some(c), when: When::Always, hot: false, motion: Motion::Static });
         }
-        b.add(&cylinder_y(32.0, 40.0, 70.0, 24), exh(), Some("exhaust"), "Exhaust collector", None, Sys::Exhaust, Mover::Fixed, t(0.0, DECK - 110.0, -240.0));
-        paths.push(FlowPath { fluid: Fluid::Exhaust, pts: vec![[0.0, DECK - 140.0, -240.0], [0.0, DECK - 260.0, -240.0]], intake: false, cyl: None, when: When::Na, hot: false, motion: Motion::Static });
+        b.add(&cylinder_y(32.0, 40.0, 70.0, 24), exh(), Some("exhaust"), "Exhaust collector", None, Sys::Exhaust, Mover::Fixed, t(0.0, deck() - 110.0, -240.0));
+        paths.push(FlowPath { fluid: Fluid::Exhaust, pts: vec![[0.0, deck() - 140.0, -240.0], [0.0, deck() - 260.0, -240.0]], intake: false, cyl: None, when: When::Na, hot: false, motion: Motion::Static });
 
         // ---------- Turbo ----------
-        let to = vec3(0.0, DECK - 180.0, -260.0);
+        let to = vec3(0.0, deck() - 180.0, -260.0);
         let tt = |x: f32, y: f32, z: f32| t(to.x + x, to.y + y, to.z + z);
         let shift = |pts: &[[f32; 3]]| -> Vec<[f32; 3]> { pts.iter().map(|p| [p[0] + to.x, p[1] + to.y, p[2] + to.z]).collect() };
         b.add(&along_x(torus_y(55.0, 30.0, 40, 16)), metal(0x8a8f96, 0.6, 0.5), Some("turbo"), "Turbine housing", None, Sys::Turbo, Mover::Fixed, tt(-50.0, 0.0, 0.0));
@@ -634,9 +637,9 @@ impl Engine {
         b.add(&wheel(44.0, 12), metal(0xd8dde2, 0.85, 0.35), None, "Compressor wheel", None, Sys::Turbo, Mover::CompWheel, id);
         let downpipe = Curve::new(&shift(&[[-50.0, 0.0, -60.0], [-60.0, -60.0, -80.0], [-60.0, -160.0, -60.0]]), false);
         b.add(&tube(&downpipe, 30.0, 30, 16), metal(0x8a8f96, 0.6, 0.5), Some("exhaust"), "Downpipe", None, Sys::Turbo, Mover::Fixed, id);
-        let up = Curve::new(&[[0.0, DECK - 140.0, -240.0], [-30.0, DECK - 160.0, -250.0], [-50.0, DECK - 180.0, -262.0]], false);
+        let up = Curve::new(&[[0.0, deck() - 140.0, -240.0], [-30.0, deck() - 160.0, -250.0], [-50.0, deck() - 180.0, -262.0]], false);
         b.add(&tube(&up, 28.0, 20, 16), exh(), Some("exhaust"), "Turbo up-pipe", None, Sys::Turbo, Mover::Fixed, id);
-        let mut ex_turbo = vec![[0.0, DECK - 140.0, -240.0], [-30.0, DECK - 160.0, -250.0], [-50.0, DECK - 180.0, -262.0]];
+        let mut ex_turbo = vec![[0.0, deck() - 140.0, -240.0], [-30.0, deck() - 160.0, -250.0], [-50.0, deck() - 180.0, -262.0]];
         ex_turbo.extend(shift(&[[-50.0, 0.0, -60.0], [-60.0, -60.0, -80.0], [-60.0, -160.0, -60.0]]));
         paths.push(FlowPath { fluid: Fluid::Exhaust, pts: ex_turbo, intake: false, cyl: None, when: When::Turbo, hot: false, motion: Motion::Static });
 
@@ -646,7 +649,7 @@ impl Engine {
         let comp_out = [to.x + 110.0, to.y, to.z];
 
         // No intercooler: around the transmission end, clear of the flywheel and clutch, into the throttle body.
-        let direct = [comp_out, [220.0, 40.0, -310.0], [370.0, 60.0, -230.0], [395.0, 110.0, 40.0], [360.0, DECK - 30.0, 240.0], [330.0, DECK - 30.0, 252.0], tb_in];
+        let direct = [comp_out, [220.0, 40.0, -310.0], [370.0, 60.0, -230.0], [395.0, 110.0, 40.0], [360.0, deck() - 30.0, 240.0], [330.0, deck() - 30.0, 252.0], tb_in];
         b.pipe(&direct, 26.0, charge(), Some("intake"), "Charge pipe", Sys::DirectCharge);
         let mut f = shift(&[[70.0, 0.0, 0.0]]);
         f.extend(direct);
@@ -661,7 +664,7 @@ impl Engine {
         }
         let hot = [comp_out, [200.0, -20.0, -330.0], [170.0, -200.0, -320.0], [0.0, -250.0, -150.0], [-200.0, -240.0, 150.0], [-310.0, -170.0, 380.0], [-315.0, -150.0, 520.0], [-290.0, -90.0, 605.0]];
         b.pipe(&hot, 26.0, charge(), Some("intake"), "Charge pipe (hot side)", Sys::Intercooled);
-        let cold = [[290.0, -90.0, 605.0], [315.0, -60.0, 520.0], [325.0, -10.0, 420.0], [350.0, 40.0, 330.0], [350.0, 150.0, 285.0], [330.0, DECK - 30.0, 255.0], tb_in];
+        let cold = [[290.0, -90.0, 605.0], [315.0, -60.0, 520.0], [325.0, -10.0, 420.0], [350.0, 40.0, 330.0], [350.0, 150.0, 285.0], [330.0, deck() - 30.0, 255.0], tb_in];
         b.pipe(&cold, 26.0, charge(), Some("intake"), "Charge pipe (cold side)", Sys::Intercooled);
         let mut f = shift(&[[70.0, 0.0, 0.0]]);
         f.extend(hot);
@@ -684,7 +687,7 @@ impl Engine {
         b.add(&along_x(cylinder_y(32.0, 32.0, 16.0, 32)), metal(0x40464e, 0.6, 0.4), None, "Water pump pulley", None, Sys::Cooling, Mover::PumpPulley(vec3(cyl_x(1) - 120.0, pump_at.y, pump_at.z)), id);
         let i = b.add(&boxed(30.0, 40.0, 30.0), metal(0x8a9098, 0.6, 0.45), None, "Thermostat housing", None, Sys::Cooling, Mover::Fixed, t(-245.0, 25.0, 152.0));
         b.parts[i].heat = Heat::Cold;
-        let i = b.add(&boxed(36.0, 44.0, 50.0), metal(0x8a9098, 0.6, 0.45), None, "Water outlet", None, Sys::Cooling, Mover::Fixed, t(230.0, DECK + 80.0, 40.0));
+        let i = b.add(&boxed(36.0, 44.0, 50.0), metal(0x8a9098, 0.6, 0.45), None, "Water outlet", None, Sys::Cooling, Mover::Fixed, t(230.0, deck() + 80.0, 40.0));
         b.parts[i].heat = Heat::Hot;
 
         // Radiator (crossflow: in at the top of the right tank, out the bottom of the left) and two fans behind it.
@@ -711,7 +714,7 @@ impl Engine {
         }
 
         // Hoses.
-        let upper = [[240.0, DECK + 90.0, 55.0], [300.0, 305.0, 140.0], [300.0, 290.0, 330.0], [255.0, 250.0, rad_z - 30.0], [250.0, 240.0, rad_z - 8.0]];
+        let upper = [[240.0, deck() + 90.0, 55.0], [300.0, 305.0, 140.0], [300.0, 290.0, 330.0], [255.0, 250.0, rad_z - 30.0], [250.0, 240.0, rad_z - 8.0]];
         let i = b.pipe(&upper, 18.0, hose(), None, "Upper radiator hose", Sys::Cooling);
         b.parts[i].heat = Heat::Hot;
         let lower = [[-250.0, -80.0, rad_z - 8.0], [-255.0, -90.0, 380.0], [-290.0, -40.0, 250.0], [-275.0, 10.0, 185.0], [-245.0, 25.0, 160.0]];
@@ -719,7 +722,7 @@ impl Engine {
         b.parts[i].heat = Heat::Cold;
         let i = b.add(&boxed(220.0, 140.0, 60.0), metal(0x7a6a55, 0.4, 0.6), None, "Heater core (behind the firewall)", None, Sys::Cooling, Mover::Fixed, t(60.0, 390.0, -420.0));
         b.parts[i].heat = Heat::Core;
-        let heater_out = [[235.0, DECK + 96.0, 30.0], [250.0, 380.0, -60.0], [180.0, 400.0, -300.0], [150.0, 392.0, -395.0]];
+        let heater_out = [[235.0, deck() + 96.0, 30.0], [250.0, 380.0, -60.0], [180.0, 400.0, -300.0], [150.0, 392.0, -395.0]];
         let i = b.pipe(&heater_out, 9.0, hose(), None, "Heater hose (supply)", Sys::Cooling);
         b.parts[i].heat = Heat::Hot;
         let heater_back = [[-30.0, 392.0, -395.0], [-180.0, 400.0, -300.0], [-290.0, 330.0, -100.0], [-300.0, 150.0, 40.0], [-235.0, 55.0, 112.0]];
@@ -736,17 +739,17 @@ impl Engine {
         for (y, name) in [(110.0, "Block water jacket (lower)"), (175.0, "Block water jacket (upper)")] {
             b.passage(&racetrack(y, 55.0), true, 7.0, coolant(150), name, Sys::CoolPassage, Heat::Hot);
         }
-        b.passage(&racetrack(DECK + 23.0, 50.0), true, 7.0, coolant(150), "Head water passage", Sys::CoolPassage, Heat::Hot);
+        b.passage(&racetrack(deck() + 23.0, 50.0), true, 7.0, coolant(150), "Head water passage", Sys::CoolPassage, Heat::Hot);
         for x in [-96.0, 0.0, 96.0] {
             for z in [-55.0, 55.0] {
-                b.passage(&[[x, 110.0, z], [x, 175.0, z], [x, DECK + 23.0, z * 0.91]], false, 5.0, coolant(150), "Head gasket coolant hole", Sys::CoolPassage, Heat::Hot);
+                b.passage(&[[x, 110.0, z], [x, 175.0, z], [x, deck() + 23.0, z * 0.91]], false, 5.0, coolant(150), "Head gasket coolant hole", Sys::CoolPassage, Heat::Hot);
             }
         }
         let feed = [[pump_at.x, pump_at.y, pump_at.z], [-212.0, 70.0, 70.0], [-199.0, 110.0, 0.0]];
         b.passage(&feed, false, 8.0, coolant(150), "Water pump to block", Sys::CoolPassage, Heat::Cold);
-        let out = [[199.0, DECK + 23.0, 0.0], [215.0, DECK + 60.0, 25.0], [230.0, DECK + 80.0, 40.0]];
+        let out = [[199.0, deck() + 23.0, 0.0], [215.0, deck() + 60.0, 25.0], [230.0, deck() + 80.0, 40.0]];
         b.passage(&out, false, 8.0, coolant(150), "Head to water outlet", Sys::CoolPassage, Heat::Hot);
-        let bypass = [[230.0, DECK + 80.0, 40.0], [205.0, 60.0, 80.0], [0.0, 55.0, 82.0], [-205.0, 50.0, 85.0], [pump_at.x, pump_at.y, pump_at.z]];
+        let bypass = [[230.0, deck() + 80.0, 40.0], [205.0, 60.0, 80.0], [0.0, 55.0, 82.0], [-205.0, 50.0, 85.0], [pump_at.x, pump_at.y, pump_at.z]];
         b.passage(&bypass, false, 6.0, coolant(150), "Bypass (thermostat shut)", Sys::CoolPassage, Heat::Hot);
 
         // Coolant flow.
@@ -755,9 +758,9 @@ impl Engine {
         for z in [55.0, -55.0] {
             paths.push(cf(vec![[-199.0, 110.0, 0.0], [-144.0, 110.0, z], [0.0, 110.0, z], [144.0, 110.0, z], [199.0, 140.0, z * 0.3]], Fluid::Coolant));
             paths.push(cf(vec![[-199.0, 175.0, 0.0], [-144.0, 175.0, z], [0.0, 175.0, z], [144.0, 175.0, z], [199.0, 175.0, 0.0]], Fluid::Coolant));
-            paths.push(cf(vec![[-199.0, DECK + 23.0, 0.0], [-144.0, DECK + 23.0, z * 0.91], [0.0, DECK + 23.0, z * 0.91], [144.0, DECK + 23.0, z * 0.91], [199.0, DECK + 23.0, 0.0]], Fluid::Coolant));
+            paths.push(cf(vec![[-199.0, deck() + 23.0, 0.0], [-144.0, deck() + 23.0, z * 0.91], [0.0, deck() + 23.0, z * 0.91], [144.0, deck() + 23.0, z * 0.91], [199.0, deck() + 23.0, 0.0]], Fluid::Coolant));
             for x in [-96.0, 0.0, 96.0] {
-                paths.push(cf(vec![[x, 110.0, z], [x, 175.0, z], [x, DECK + 23.0, z * 0.91]], Fluid::Coolant));
+                paths.push(cf(vec![[x, 110.0, z], [x, 175.0, z], [x, deck() + 23.0, z * 0.91]], Fluid::Coolant));
             }
         }
         paths.push(cf(out.to_vec(), Fluid::Coolant));
@@ -798,17 +801,17 @@ impl Engine {
             b.passage(&feed, false, 4.0, oil(200), "Main bearing oil feed", Sys::Oil, Heat::Oil);
             oil_paths.push(feed.to_vec());
         }
-        let up = [[200.0, -20.0, 62.0], [200.0, 150.0, 62.0], [200.0, FOLLOWER_Y + 12.0, 58.0]];
+        let up = [[200.0, -20.0, 62.0], [200.0, 150.0, 62.0], [200.0, follower_y() + 12.0, 58.0]];
         b.passage(&up, false, 5.0, oil(200), "Oil feed to the head", Sys::Oil, Heat::Oil);
         oil_paths.push(up.to_vec());
         for z in [58.0, -58.0] {
-            let rocker = [[200.0, FOLLOWER_Y + 12.0, z], [-200.0, FOLLOWER_Y + 12.0, z]];
+            let rocker = [[200.0, follower_y() + 12.0, z], [-200.0, follower_y() + 12.0, z]];
             b.passage(&rocker, false, 4.0, oil(200), "Rocker shaft oil gallery (and VTEC pressure)", Sys::Oil, Heat::Oil);
             oil_paths.push(rocker.to_vec());
         }
-        b.passage(&[[200.0, FOLLOWER_Y + 12.0, 58.0], [200.0, FOLLOWER_Y + 12.0, -58.0]], false, 4.0, oil(200), "Head oil cross-drilling", Sys::Oil, Heat::Oil);
-        oil_paths.push(vec![[200.0, FOLLOWER_Y + 12.0, 58.0], [200.0, FOLLOWER_Y + 12.0, -58.0]]);
-        let drain = [[-200.0, FOLLOWER_Y, -60.0], [-200.0, 150.0, -70.0], [-195.0, -110.0, -70.0]];
+        b.passage(&[[200.0, follower_y() + 12.0, 58.0], [200.0, follower_y() + 12.0, -58.0]], false, 4.0, oil(200), "Head oil cross-drilling", Sys::Oil, Heat::Oil);
+        oil_paths.push(vec![[200.0, follower_y() + 12.0, 58.0], [200.0, follower_y() + 12.0, -58.0]]);
+        let drain = [[-200.0, follower_y(), -60.0], [-200.0, 150.0, -70.0], [-195.0, -110.0, -70.0]];
         b.passage(&drain, false, 6.0, oil(110), "Oil drain back", Sys::Oil, Heat::Oil);
         oil_paths.push(drain.to_vec());
         // Rotating assembly, as on the K20: each main bearing's feed fills the bearing shell, and a drilling through
@@ -832,7 +835,7 @@ impl Engine {
 
             // Squirter: off the main gallery, up beside the crank (clear of the counterweights and rod), to a nozzle
             // under the intake side of the bore.
-            let (sx, nozzle) = (x - 34.0, [x - 8.0, 72.0, 42.0]);
+            let (sx, nozzle) = (x - 34.0, [x - 8.0, r + 33.0, 42.0]);   // clear of the rod big end's sweep
             let jet = [[sx, -20.0, 62.0], [sx, 55.0, 72.0], nozzle];
             b.passage(&jet, false, 3.5, metal(0x8c939b, 0.7, 0.4), &format!("Piston oil squirter {c}"), Sys::Oil, Heat::Oil);
             oil_paths.push(jet.to_vec());
@@ -888,6 +891,7 @@ impl Engine {
         let transparent_states = PhysicalMaterial::new_transparent(ctx, &CpuMaterial { albedo: Srgba::new(255, 255, 255, 100), ..Default::default() }).render_states;
 
         Engine {
+            geometry: geometry(),
             parts: b.parts,
             valves,
             glows,
@@ -991,7 +995,7 @@ impl Engine {
                 }
                 Mover::Cam(side) => {
                     let a = if side == Side::Intake { (crank + vtc) / 2.0 } else { crank / 2.0 };
-                    t(0.0, CAM_Y, if side == Side::Intake { CAM_Z } else { -CAM_Z }) * Mat4::from_angle_x(degrees(a))
+                    t(0.0, cam_y(), if side == Side::Intake { CAM_Z } else { -CAM_Z }) * Mat4::from_angle_x(degrees(a))
                 }
                 Mover::Butterfly => Mat4::from_translation(self.tb_pos) * Mat4::from_angle_y(radians(0.12 + s.throttle.clamp(0.0, 1.0) * 1.38)),
                 Mover::Follower { cyl, side, secondary } => {
@@ -1103,7 +1107,7 @@ impl Engine {
                     let a = if burning && since < 30.0 { 1.0 - since / 30.0 } else { 0.0 };
                     let a = a * if internals_shown { 1.0 } else { 0.0 };     // additive: scale the colour itself
                     g.gm.material.color = Srgba::new((160.0 * a) as u8, (212.0 * a) as u8, (255.0 * a) as u8, 255);
-                    g.gm.geometry.set_transformation(world * t(cyl_x(c), ROOF - 4.0, 0.0));
+                    g.gm.geometry.set_transformation(world * t(cyl_x(c), roof() - 4.0, 0.0));
                 }
                 GlowKind::Flame(_) => {
                     let burn = if burning && since < 110.0 { (std::f32::consts::PI * since / 110.0).sin() } else { 0.0 };
@@ -1111,8 +1115,8 @@ impl Engine {
                     let color = if s.knock { [255, 40, 25] } else { [255, (115.0 + 100.0 * lean) as u8, (30.0 + 190.0 * lean) as u8] };
                     g.gm.material.color = Srgba::new((color[0] as f32 * a) as u8, (color[1] as f32 * a) as u8, (color[2] as f32 * a) as u8, 255);
                     let crown = pin + 30.0;
-                    let h = (ROOF - crown).max(1.0);
-                    g.gm.geometry.set_transformation(world * t(cyl_x(c), (crown + ROOF) / 2.0, 0.0) * Mat4::from_nonuniform_scale(1.0, h, 1.0));
+                    let h = (roof() - crown).max(1.0);
+                    g.gm.geometry.set_transformation(world * t(cyl_x(c), (crown + roof()) / 2.0, 0.0) * Mat4::from_nonuniform_scale(1.0, h, 1.0));
                 }
             }
         }

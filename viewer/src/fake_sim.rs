@@ -7,6 +7,8 @@ pub struct FakeSim {
     pub t: f32,
     pub turbo: bool,
     pub intercooler: bool,
+    /// Demo a K24A block (87 × 99 mm, 152 mm rods) instead of the K20Z3.
+    pub k24: bool,
     /// Warm-up: coolant and oil start cold, the thermostat opens, the fans cycle.
     pub coolant: f32,
     pub oil: f32,
@@ -26,7 +28,7 @@ pub struct ManualInput {
 
 impl FakeSim {
     pub fn new() -> Self {
-        FakeSim { t: 0.0, turbo: true, intercooler: true, coolant: 30.0, oil: 30.0, knock_until: 0.0, rpm: 800.0, boost: 0.0, vtc: 0.0, iat: 25.0, knock_retard: 0.0 }
+        FakeSim { t: 0.0, turbo: true, intercooler: true, k24: false, coolant: 30.0, oil: 30.0, knock_until: 0.0, rpm: 800.0, boost: 0.0, vtc: 0.0, iat: 25.0, knock_retard: 0.0 }
     }
 
     pub fn step(&mut self, dt: f32, input: Option<&ManualInput>, strength: &dyn Fn(&str) -> f32) -> SimState {
@@ -115,6 +117,11 @@ impl FakeSim {
             turbo: self.turbo,
             intercooler: self.intercooler,
             turbo_water_cooled: true,
+            block: Some(if self.k24 { "K24A" } else { "K20Z3" }.to_string()),
+            bore_mm: None,
+            stroke_mm: None,
+            rod_mm: None,
+            deck_mm: None,
             iat_c: self.iat,
             coolant_c: self.coolant,
             coolant_out_c: None,

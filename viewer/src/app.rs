@@ -4,7 +4,7 @@
 
 use crate::engine::{material_lookup, Castings, Engine, Mode};
 use crate::fake_sim::{FakeSim, ManualInput};
-use crate::kinematics::{cycle_angle, stroke_name, Side, VTC_MAX_DEG};
+use crate::kinematics::{cycle_angle, set_geometry, stroke_name, Geometry, Side, VTC_MAX_DEG};
 use crate::link::Link;
 use crate::materials;
 use crate::state::SimState;
@@ -92,6 +92,8 @@ pub struct Options {
     pub check_clearance: bool,
     /// The demo's starting build: (turbo, intercooler).
     pub demo_build: (bool, bool),
+    /// The demo starts on a K24A block.
+    pub demo_k24: bool,
     /// Starting camera: 0 exhaust side, 1 intake side, 2 front, 3 side, 4 top, 5 valvetrain.
     pub view: usize,
     /// Lets a host program (the native sim) draw its own egui panels around the 3D view. Called every frame,
@@ -105,7 +107,7 @@ pub struct Options {
 
 impl Default for Options {
     fn default() -> Self {
-        Options { link: Link::in_process(), mode: Mode::Full, title: "Honda Sim · K20Z3 engine viewer".to_string(), check_clearance: false, demo_build: (true, true), view: 0, host_panels: None, builtin_panels: true }
+        Options { link: Link::in_process(), mode: Mode::Full, title: "Honda Sim · K20Z3 engine viewer".to_string(), check_clearance: false, demo_build: (true, true), demo_k24: false, view: 0, host_panels: None, builtin_panels: true }
     }
 }
 
@@ -120,13 +122,19 @@ pub fn run(mut opts: Options) {
     let mut camera = Camera::new_perspective(window.viewport(), view_pos(&VIEWS[0], 1.6), TARGET, vec3(0.0, 1.0, 0.0), degrees(38.0), 0.05, 100.0);
     let mut control = OrbitControl::new(TARGET, 1.5, 30.0);
     let mut gui = three_d::GUI::new(&ctx);
-    let mut engine = Engine::new(&ctx);
     if opts.check_clearance {
-        let problems = engine.clearance_problems();
+        // Every build on every block.
+        let mut problems = Vec::new();
+        for (name, g) in [("K20Z3", Geometry::K20Z3), ("K24A", Geometry::K24A)] {
+            set_geometry(g);
+            problems.extend(Engine::new(&ctx).clearance_problems().into_iter().map(|p| format!("{name} {p}")));
+        }
+        set_geometry(Geometry::K20Z3);
         for p in &problems { println!("{p}"); }
         println!("{} clearance problem(s)", problems.len());
         std::process::exit(if problems.is_empty() { 0 } else { 1 });
     }
+    let mut engine = Engine::new(&ctx);
     let ambient = AmbientLight::new(&ctx, 0.55, Srgba::new(225, 232, 255, 255));
     let sun = DirectionalLight::new(&ctx, 2.2, Srgba::WHITE, vec3(-0.4, -0.8, -0.5));
     let fill = DirectionalLight::new(&ctx, 0.9, Srgba::new(200, 210, 255, 255), vec3(0.6, -0.3, 0.7));
@@ -137,6 +145,7 @@ pub fn run(mut opts: Options) {
     let mut source = Source::Auto;
     let mut demo = FakeSim::new();
     (demo.turbo, demo.intercooler) = opts.demo_build;
+    demo.k24 = opts.demo_k24;
     let mut manual = false;
     let mut manual_in = ManualInput { rpm: 3000.0, throttle: 0.4, boost_kpa: 110.0 };
     let mut choices: HashMap<String, String> = HashMap::new();
@@ -412,6 +421,11 @@ pub fn run(mut opts: Options) {
                             demo.turbo = build != 0;
                             demo.intercooler = build != 2;
                         });
+                        ui.horizontal(|ui| {
+                            ui.label("Block");
+                            ui.selectable_value(&mut demo.k24, false, "K20Z3");
+                            ui.selectable_value(&mut demo.k24, true, "K24A");
+                        });
                     }
                     heading(ui, "Playback");
                     let mut pct = slow_mo * 100.0;
@@ -483,6 +497,12 @@ pub fn run(mut opts: Options) {
 
         let lookup_state = state.clone();
         let lookup = material_lookup(&lookup_state, &choices);
+        // The sim swapped the block, crank or rods: rebuild the engine to the new dimensions.
+        let g = state.geometry();
+        if g != engine.geometry {
+            set_geometry(g);
+            engine = Engine::new(&ctx);
+        }
         engine.update(&state, dt, slow_mo, mode, castings, &lookup, selected.as_deref(), time);
 
         // Hover picking, every other frame.
