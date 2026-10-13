@@ -17,10 +17,7 @@ on:
 
 jobs:
   apk:
-    runs-permissions:
-  contents: write
-
-on: ubuntu-latest
+    runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
 
