@@ -11,7 +11,7 @@ on:
     inputs:
       version:
         description: Version tag to release (created on the chosen branch if it doesn't exist)
-        default: v0.10.0
+        default: v0.11.0
         required: true
 
 permissions:

@@ -84,6 +84,10 @@ pub struct Tune {
     pub rev_limit: f64,
     pub rev_limit_hyst: f64,
     pub octane: f64,
+    /// Fuel id from src/fuels.js ("pump91", "e85", ...); None = pump gas with `octane`.
+    pub fuel: Option<String>,
+    /// Fuel pump rating (l/h at the 50 psi rail); None = the stock pump.
+    pub fuel_pump_lph: Option<f64>,
     pub turbo: Turbo,
     pub injector_cc: f64,
     pub injector_dead_ms: f64,
@@ -125,6 +129,8 @@ impl Tune {
             rev_limit: 8000.0,
             rev_limit_hyst: 200.0,
             octane: 91.0,
+            fuel: None,
+            fuel_pump_lph: None,
             turbo: Turbo::default(),
             injector_cc: 310.0,
             injector_dead_ms: 0.7,

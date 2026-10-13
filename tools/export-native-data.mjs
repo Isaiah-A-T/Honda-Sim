@@ -26,6 +26,8 @@ for (const c of [
   { rpm: 2000, mapKpa: 40, iatC: 30, highCam: false, vtc: 10, ignDeg: 35, lambda: 1, fire: true, octane: 91 },
   { rpm: 6000, mapKpa: 180, iatC: 45, highCam: true, vtc: 35, ignDeg: 16, lambda: 0.78, fire: true, octane: 93, outKpa: 105.3, outAreaM2: 9.5e-4 },
   { rpm: 4000, mapKpa: 30, iatC: 25, highCam: false, vtc: 0, ignDeg: 20, lambda: 3, fire: false, octane: 91 },
+  // E85-like: more energy per kg of air (energy factor) and more charge cooling.
+  { rpm: 6000, mapKpa: 180, iatC: 45, highCam: true, vtc: 35, ignDeg: 20, lambda: 0.8, fire: true, octane: 96, outKpa: 105.3, outAreaM2: 9.5e-4, energy: 1.0236, coolK: 33.4 },
 ]) {
   const s = createGasflow(FLOW);
   gas.push({ cond: c, out: { ...settle(s, c, 40) } });
@@ -34,11 +36,14 @@ for (const c of [
 const wot = (tune, rpm) => {
   const e = createEngine(tune), st = createInternals();
   for (let t = 0; t < 1.5; t += 0.001) { e.rpm = rpm; stepEngine(e, 1, 0.001); stepInternals(st, e, 0.001); }
-  return { torqueNm: e.torqueNm, map: e.map, ign: e.ign, lambda: e.lambda, boost: e.boost, camF: e.camF, pmaxBar: st.pmaxBar, load: st.load };
+  return { torqueNm: e.torqueNm, map: e.map, ign: e.ign, lambda: e.lambda, boost: e.boost, camF: e.camF, pmaxBar: st.pmaxBar, load: st.load,
+    fuelPressureKpa: e.fuelPressureKpa, fuelPumpPct: e.fuelPumpPct };
 };
 const engine = [];
 const k24 = { ...placeholderTune(), parts: { crank: 'honda-k24-99-hybrid', piston: 'arias-k24k20-87-11.0' } };
-for (const [name, tune] of [['stock', placeholderTune()], ['turbo', turboSetup()], ['k24', k24]]) {
+// Fuels: E85 on the stock pump (runs out of pump at boost), race gas on a 450 l/h pump.
+const e85 = { ...turboSetup(), fuel: 'e85' }, c16 = { ...turboSetup(), fuel: 'c16', fuelPumpLph: 450 };
+for (const [name, tune] of [['stock', placeholderTune()], ['turbo', turboSetup()], ['k24', k24], ['e85', e85], ['c16', c16]]) {
   for (const rpm of [2500, 5000, 7500]) engine.push({ name, rpm, ...wot(tune, rpm) });
 }
 

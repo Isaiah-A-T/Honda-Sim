@@ -149,7 +149,11 @@ function volumeAt(s, thetaDeg) {
 }
 
 // Run one full cycle (overlap TDC to overlap TDC, firing TDC in the middle at 0°).
-// c: { rpm, mapKpa, iatC, highCam, vtc, ignDeg, lambda, fire, outKpa, outAreaM2 }
+// c: { rpm, mapKpa, iatC, highCam, vtc, ignDeg, lambda, fire, outKpa, outAreaM2, energy, coolK }
+// energy: the fuel's heat per kg of air at stoichiometric (LHV ÷ AFR) relative to the calibration fuel.
+// coolK: extra charge cooling from the fuel evaporating, relative to the calibration fuel (src/fuels.js);
+// a quarter of it cools the air in the port (denser charge), a quarter the trapped charge (end gas), and
+// the rest comes off the hot port walls and valve (port injection wets them; estimate).
 // outAreaM2 is the whole engine's exhaust outlet; this cylinder gets a quarter of it and a quarter
 // of the collector, which stands in for the other three cylinders sharing the manifold.
 export function runCycle(s, c, stepDeg = 1) {
@@ -158,7 +162,8 @@ export function runCycle(s, c, stepDeg = 1) {
   // Port walls heat the incoming air in proportion to how hot they are (head at coolant temperature,
   // calibrated at 90 °C), and cold walls take more heat out of combustion.
   const wallC = c.wallC ?? 90, wallF = Math.max(0, (wallC - 25) / 65), heatLoss = G.heatLoss * (1 + 0.004 * (90 - wallC));
-  const p0 = c.mapKpa * 1000, Tm = 273 + c.iatC, T0 = Tm + G.chargeHeatK * wallF * (3000 / rpm) ** 0.3, pOut = (c.outKpa ?? 101.3) * 1000;
+  const coolK = c.fire ? (c.coolK ?? 0) : 0;
+  const p0 = c.mapKpa * 1000, Tm = 273 + c.iatC, T0 = Tm + G.chargeHeatK * wallF * (3000 / rpm) ** 0.3 - 0.25 * coolK, pOut = (c.outKpa ?? 101.3) * 1000;
   const outArea = (c.outAreaM2 ?? Math.PI / 4 * G.exhaustDiaM ** 2) / 4;
   const inCentre = -360 + G.intakeCentre0 - (c.vtc ?? 0), exCentre = 360 - G.exhaustCentre;
   // Economy i-VTEC heads open one intake valve only a crack on the low cam: cam.inValves counts the
@@ -229,7 +234,7 @@ export function runCycle(s, c, stepDeg = 1) {
     // Trapped charge, and the reference point the end gas is compressed from.
     if (!refTaken && (th >= -60 || (c.fire && th >= thetaS))) {
       refTaken = true; trappedFresh = mFresh; trappedTot = mTot;
-      pRef = p; tRef = s.T - (c.fire ? 30 * clamp((1 - (c.lambda ?? 1)) / 0.2, 0, 1) : 0);   // rich mixtures cool the charge as the fuel evaporates
+      pRef = p; tRef = s.T - (c.fire ? 30 * clamp((1 - (c.lambda ?? 1)) / 0.2, 0, 1) : 0) - 0.25 * coolK;   // rich mixtures cool the charge as the fuel evaporates
       residual = 1 - mFresh / Math.max(mTot, 1e-9);
     }
 
@@ -242,7 +247,7 @@ export function runCycle(s, c, stepDeg = 1) {
         // stoichiometric make the most power (charge cooling, more gas moles, less dissociation).
         const richGain = lam < 1 ? clamp(1 + 0.045 * (1 - ((lam - 0.87) / 0.13) ** 2), 0.85, 1.045) : 1;
         const misfire = lam > 1.35 ? clamp(1 - (lam - 1.35) * 4, 0, 1) : 1;
-        qTotal = Math.min(trappedFresh / (STOICH * lam), trappedFresh / STOICH) * LHV * (1 - heatLoss) * richGain * misfire;
+        qTotal = Math.min(trappedFresh / (STOICH * lam), trappedFresh / STOICH) * LHV * (c.energy ?? 1) * (1 - heatLoss) * richGain * misfire;
       }
       const x = clamp((th + stepDeg - thetaS) / burnDur, 0, 1), xb = 1 - Math.exp(-6.9 * x ** 3);
       dU += qTotal * (xb - xbPrev);

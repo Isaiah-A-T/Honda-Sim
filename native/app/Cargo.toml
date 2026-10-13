@@ -1,6 +1,6 @@
 [package]
 name = "honda-sim-app"
-version = "0.10.0"
+version = "0.11.0"
 edition = "2021"
 description = "Honda Sim: the K20Z3 sim with wheel input, tune panels and the 3D engine view in one program"
 license = "MIT"

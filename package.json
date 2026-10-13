@@ -1,6 +1,6 @@
 {
   "name": "honda-sim",
-  "version": "0.10.0",
+  "version": "0.11.0",
   "description": "Drive-it-yourself simulator for testing Honda (8th gen Civic Si, K20Z3) tunes with a wheel and pedals",
   "type": "module",
   "private": true,

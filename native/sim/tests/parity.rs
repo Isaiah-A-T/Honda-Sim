@@ -41,6 +41,7 @@ fn gas_exchange_cycle_matches() {
             rpm: f(c, "rpm"), map_kpa: f(c, "mapKpa"), iat_c: f(c, "iatC"), high_cam: c["highCam"].as_bool().unwrap(), vtc: f(c, "vtc"),
             ign_deg: f(c, "ignDeg"), lambda: f(c, "lambda"), fire: c["fire"].as_bool().unwrap(), octane: f(c, "octane"),
             out_kpa: c["outKpa"].as_f64().unwrap_or(101.3), wall_c: c["wallC"].as_f64().unwrap_or(90.0), out_area_m2: c["outAreaM2"].as_f64(),
+            energy: c["energy"].as_f64().unwrap_or(1.0), cool_k: c["coolK"].as_f64().unwrap_or(0.0),
         };
         let mut g = Gas::new(flow_defaults());
         let o = g.settle(&cond, 40);
@@ -56,6 +57,8 @@ fn tune_named(name: &str) -> Tune {
     match name {
         "turbo" => turbo_setup(&placeholder_tune()),
         "k24" => Tune { parts: Parts { crank: Some("honda-k24-99-hybrid".into()), piston: Some("arias-k24k20-87-11.0".into()), rod: None }, ..placeholder_tune() },
+        "e85" => Tune { fuel: Some("e85".into()), ..turbo_setup(&placeholder_tune()) },
+        "c16" => Tune { fuel: Some("c16".into()), fuel_pump_lph: Some(450.0), ..turbo_setup(&placeholder_tune()) },
         _ => placeholder_tune(),
     }
 }
@@ -79,6 +82,9 @@ fn engine_at_full_throttle_matches() {
         close(&format!("map {tag}"), e.map, f(case, "map"), 1e-6, 1e-6);
         close(&format!("boost {tag}"), e.boost, f(case, "boost"), 1e-6, 1e-6);
         close(&format!("pmax {tag}"), s.pmax_bar, f(case, "pmaxBar"), 1e-6, 1e-6);
+        close(&format!("lambda {tag}"), e.lambda, f(case, "lambda"), 1e-6, 1e-6);
+        close(&format!("rail {tag}"), e.fuel_pressure_kpa, f(case, "fuelPressureKpa"), 1e-6, 1e-6);
+        close(&format!("pump {tag}"), e.fuel_pump_pct, f(case, "fuelPumpPct"), 1e-6, 1e-6);
         for k in ["piston", "rod", "bearing", "sleeve", "gasket", "block", "valvetrain"] {
             close(&format!("load {k} {tag}"), s.load_of(k), f(&case["load"], k), 1e-6, 1e-6);
         }

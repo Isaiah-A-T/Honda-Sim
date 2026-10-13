@@ -1,6 +1,6 @@
 [package]
 name = "honda-sim-core"
-version = "0.10.0"
+version = "0.11.0"
 edition = "2021"
 description = "Honda Sim engine, drivetrain and internals model (K20Z3), native port of src/*.js"
 license = "MIT"

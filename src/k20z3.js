@@ -5,7 +5,7 @@
 // not measurements. The placeholder tune below is generic and is not Honda's or Hondata's calibration;
 // it is only there so the sim runs before real tables are pasted in.
 
-import { clamp, lookup1 } from './tables.js';
+import { clamp, lookup1, guessFuelUnits } from './tables.js';
 
 export const CAR = {
   name: '2006–2011 Civic Si (K20Z3)',
@@ -127,11 +127,29 @@ export const TURBO_6262 = {
   turbineEff: 0.70, compressorEff: 0.75, maxBoostKpa: 200, springKpa: 48,
 };
 
+// Boost cells for a table that stops at atmospheric pressure. Without them the ECU holds the 100 kPa
+// values under boost: full non-boost timing (so knock control maxes out and octane stops mattering) and
+// non-boost mixture. Ignition falls 0.15° per kPa (about 1° per psi), the slope of the knock limit;
+// mixture goes to lambda 0.80 (AFR 11.8), a common pump-gas boost target; a pulse-width table grows with
+// manifold pressure and 10% richer. Tables that already have boost columns are left as they are.
+export const BOOST_MAP_COLS = [120, 140, 160, 180, 200, 220, 250];
+export function withBoostColumns(tbl, kind, units = 'lambda') {
+  if (!tbl || Math.max(...tbl.cols) >= 110) return tbl;
+  const last = tbl.cols[tbl.cols.length - 1];
+  const cell = (v, m) => (kind === 'ign' ? v - 0.15 * (m - last)
+    : units === 'ms' ? v * (m / last) * 1.1 : units === 'afr' ? Math.min(v, 11.8) : Math.min(v, 0.8));
+  return { rows: tbl.rows, cols: [...tbl.cols, ...BOOST_MAP_COLS],
+    data: tbl.data.map(row => [...row, ...BOOST_MAP_COLS.map(m => Math.round(cell(row[row.length - 1], m) * 100) / 100)]) };
+}
+
 // Turbo build on stock internals: GT35-class turbo, 1000 cc injectors, 4-bar MAP, overboost cut and a torque
 // warning for the stock rods. Tables still come from the user's tune.
 export function turboSetup(tune = placeholderTune()) {
+  const units = tune.fuelUnits || guessFuelUnits(tune.fuelLow);
   return {
     ...tune,
+    fuelLow: withBoostColumns(tune.fuelLow, 'fuel', units), fuelHigh: withBoostColumns(tune.fuelHigh, 'fuel', units),
+    ignLow: withBoostColumns(tune.ignLow, 'ign'), ignHigh: withBoostColumns(tune.ignHigh, 'ign'),
     turbo: { ...TURBO_GT35, enabled: true },
     injectorCc: 1000,
     injectorDeadMs: 1.0,

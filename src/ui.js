@@ -7,6 +7,7 @@ import { PARTS, MATERIALS, partStatus, materialsFor, partMaterial } from './inte
 import { FLOW } from './gasflow.js';
 import { bottomEnd, CRANKS, PISTONS, RODS, pistonProblem, rodProblem } from './parts.js';
 import { createBridge } from './bridge.js';
+import { FUELS, pumpLphOf, PUMP_LPH_MIN, PUMP_LPH_MAX, PUMP_LPH_STEP, STOCK_PUMP_LPH } from './fuels.js';
 import { createViewerLink } from './viewer-link.js';
 import { createInput, attachKeyboard, readInput, startLearn, AXES, BUTTONS } from './input.js';
 
@@ -101,7 +102,8 @@ function renderSettings() {
   $('setVtec').value = tune.vtecRpm;
   $('setVtecMap').value = tune.vtecMinMap;
   $('setRev').value = tune.revLimit;
-  $('setOct').value = tune.octane ?? 91;
+  $('setFuel').value = FUELS.some(f => f.id === tune.fuel) ? tune.fuel : '';
+  $('setPump').value = String(pumpLphOf(tune));
   $('setFuelUnits').value = tune.fuelUnits || guessFuelUnits(tune.fuelLow);
   const T = tune.turbo || {};
   $('setTurbo').checked = !!T.enabled;
@@ -122,12 +124,20 @@ function applyTune(t) {
   renderBottomEnd();
 }
 
-for (const [id, key] of [['setVtec', 'vtecRpm'], ['setVtecMap', 'vtecMinMap'], ['setRev', 'revLimit'], ['setOct', 'octane']]) {
+for (const [id, key] of [['setVtec', 'vtecRpm'], ['setVtecMap', 'vtecMinMap'], ['setRev', 'revLimit']]) {
   $(id).addEventListener('change', ev => {
     const v = Number(ev.target.value);
     if (Number.isFinite(v)) { tune[key] = v; saveTune(tune); }
   });
 }
+$('setFuel').innerHTML = '<option value="">pump gas at the tune\'s octane</option>' + FUELS.map(f => `<option value="${f.id}">${f.name}</option>`).join('');
+for (let v = PUMP_LPH_MIN; v <= PUMP_LPH_MAX; v += PUMP_LPH_STEP)
+  $('setPump').insertAdjacentHTML('beforeend', `<option value="${v}">${v} l/h${v === STOCK_PUMP_LPH ? ' (stock)' : ''}</option>`);
+$('setFuel').addEventListener('change', ev => {
+  const f = FUELS.find(x => x.id === ev.target.value);
+  if (f) { tune.fuel = f.id; tune.octane = f.octane; saveTune(tune); }
+});
+$('setPump').addEventListener('change', ev => { tune.fuelPumpLph = Number(ev.target.value); saveTune(tune); });
 for (const [id, key] of [['setInjCc', 'injectorCc'], ['setDead', 'injectorDeadMs'], ['setOverboost', 'overboostKpa'], ['setTorqueLim', 'torqueLimitNm'], ['setClutch', 'clutchNm']]) {
   $(id).addEventListener('change', ev => {
     const v = ev.target.value === '' ? undefined : Number(ev.target.value);

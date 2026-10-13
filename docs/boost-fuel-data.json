@@ -1,0 +1,611 @@
+{
+  "_meta": {
+    "title": "K20/K24 boost and fuel-system calibration data",
+    "compiled": "2026-10-13",
+    "rules": "Every number below was read from the page listed in its 'sources'. Nothing is estimated or filled from memory. null means not found; see 'note'. 'sourceType' is one of manufacturer, magazine, shop/vendor, forum, reference.",
+    "units": "whp/wtq = wheel horsepower / wheel lb-ft; boost in psi gauge unless noted; injector flow in cc/min; pump flow in L/h.",
+    "blockedOrUnreadable": [
+      "k20a.org, clubrsx.com, boostedk20.com, charm.li and injectordynamics.com refused fetching (robots or client error).",
+      "Garrett compressor maps (efficiency islands, choke flow) are images only on garrettmotion.com; the proxy also blocked direct download, so map points are null.",
+      "Real Street Performance pump flow-bench results (enginelabs.com article) are images only."
+    ],
+    "headlineConflicts": [
+      "Stock K20Z3 Civic Si on a Dynojet: DSPORT measured 195.7 whp (part 1) and 205.0 whp (part 2), not the 170-180 whp suggested in the task.",
+      "Walbro F90000267 is the 450 L/h E85 pump, not the 255 L/h pump. The 255 L/h pump is the GSS342.",
+      "Garrett lists GTX2867R Gen II at 550 hp; Full-Race lists 49 lb/min max flow. Garrett states its hp figures come from choke flow, but the lb/min value itself is only on the map image."
+    ]
+  },
+
+  "dynos": [
+    {
+      "id": "dsport-06si-stock-p1",
+      "engine": "K20Z3 (2006 Civic Si), stock",
+      "induction": "NA",
+      "boost_psi": 0,
+      "fuel": null,
+      "injectors_cc": null,
+      "intercooler": null,
+      "peak_whp": 195.7, "peak_whp_rpm": 8100,
+      "peak_wtq": 143.5, "peak_wtq_rpm": 6160,
+      "dyno": "Dynojet 248C",
+      "sourceType": "magazine",
+      "note": "Stock baseline. Same article: oil change 198.1 whp @ 7800; +Injen SRI 204.7 whp @ 7900 / 147.2 lb-ft @ 6300; +Skunk2 exhaust 208.3 whp @ 7850 / 153.4 lb-ft @ 6200.",
+      "sources": ["https://dsportmag.com/the-tech/test-n-tune/2006-honda-civic-si-part-1/2/"]
+    },
+    {
+      "id": "dsport-06si-stock-p2",
+      "engine": "K20Z3 (2006 Civic Si), stock",
+      "induction": "NA",
+      "boost_psi": 0,
+      "fuel": null,
+      "injectors_cc": null,
+      "intercooler": null,
+      "peak_whp": 205.0, "peak_whp_rpm": 7772,
+      "peak_wtq": 151.0, "peak_wtq_rpm": 6143,
+      "dyno": "Dynojet (MD Automotive)",
+      "sourceType": "magazine",
+      "note": "Baseline for part 2. The article's body text gives 143.5 lb-ft, which conflicts with the 151.0 lb-ft results block. Same article: Vibrant header (catless) 217.6 whp @ 7855 / 153.9 lb-ft @ 6050; header with cat 213.9 whp @ 8056 / 150.7 lb-ft @ 5981; + Drag Cartel cams + FlashPro 222.8 whp @ 8080 / 164.0 lb-ft @ 5805.",
+      "sources": ["https://dsportmag.com/the-tech/test-n-tune/2006-honda-civic-si-part-2/2/"]
+    },
+    {
+      "id": "kpower-k24a2-na",
+      "engine": "K24A2 (TSX), stock internals, 50-deg VTC gear, upgraded valve springs, 4-1 header, Skunk2 Ultra Street manifold, in a Miata",
+      "induction": "NA",
+      "boost_psi": 0,
+      "fuel": null,
+      "injectors_cc": null,
+      "intercooler": null,
+      "peak_whp": 222, "peak_whp_rpm": null,
+      "peak_wtq": 182, "peak_wtq_rpm": null,
+      "dyno": null,
+      "sourceType": "shop/vendor",
+      "note": "Revving to 8000 rpm. The author says an RPM-signal loss inflated the torque figure. 3.2 cams added 13 whp at the top; torque stayed around 180.",
+      "sources": ["https://kpower.industries/blogs/news/k24a2-dyno-testing"]
+    },
+    {
+      "id": "hondata-forum-k24a4-6266",
+      "engine": "K24A4, forged internals",
+      "induction": "turbo: Precision 6266 (sidewinder)",
+      "boost_psi": 15,
+      "fuel": "93 pump",
+      "injectors_cc": 1200,
+      "intercooler": null,
+      "peak_whp": 340, "peak_whp_rpm": null,
+      "peak_wtq": null, "peak_wtq_rpm": null,
+      "dyno": "Dynojet",
+      "sourceType": "forum (Hondata forum user, not staff)",
+      "note": "Knock-limited at about 12 deg (MBT past peak torque), below 11.5 AFR, 65% injector duty. On E85 (~E82) at the same 15 psi, only +2 deg was usable: +~20 hp midrange, +~15 hp top. At 20 psi on E85: ~10 deg total timing, but no power figure is given. See logs[] entry.",
+      "sources": ["https://www.hondata.mobi/forum/viewtopic.php?p=88034", "https://hondata.mobi/forum/viewtopic.php?p=88059"]
+    },
+    {
+      "id": "ipg-k24-gt35r-93",
+      "engine": "K24 block, stock sleeves, CP pistons, H-beam rods, stock K20A2 head",
+      "induction": "turbo: Garrett GT35R",
+      "boost_psi": 18,
+      "fuel": "93 pump",
+      "injectors_cc": null,
+      "intercooler": null,
+      "peak_whp": 475, "peak_whp_rpm": null,
+      "peak_wtq": null, "peak_wtq_rpm": null,
+      "dyno": null,
+      "sourceType": "shop/vendor",
+      "note": "Boost is given as 'approximately 18 PSI'. Posted 2010.",
+      "sources": ["https://ipgparts.com/blogs/blog/turbo-k-series-tune-475-whp-on-93-octane-pump-gas"]
+    },
+    {
+      "id": "dsport-rsx-gt3582r",
+      "engine": "K20A2, Darton sleeves (+0.5 mm overbore), Wiseco pistons, Crower rods, 9.0:1 CR (stock 11.0:1), ported head, Supertech valvetrain",
+      "induction": "turbo: Garrett GT3582R",
+      "boost_psi": 26,
+      "fuel": "93 pump",
+      "injectors_cc": 1000,
+      "injector_model": "Injector Dynamics 1000",
+      "fuelPump": "Walbro in-tank plus Bosch inline",
+      "intercooler": "custom front-mount",
+      "peak_whp": 566.9, "peak_whp_rpm": null,
+      "peak_wtq": 397.1, "peak_wtq_rpm": null,
+      "dyno": "Land and Sea Dynomite",
+      "ecu": "Hondata KPro",
+      "sourceType": "magazine",
+      "note": "Boost limited to 26 psi with a Blitz SBC ID controller.",
+      "sources": ["https://dsportmag.com/the-cars/turbocharged-567-whp-rhd-acura-rsx/"]
+    },
+    {
+      "id": "racinggreed-si-gt4094r",
+      "engine": "K20Z3, ERL Superdeck I 89 mm sleeves, JE pistons, BC Pro rods, stock crank",
+      "induction": "turbo: Garrett GT4094R, twin Tial 44 mm wastegates",
+      "boost_psi": 25.5,
+      "fuel": "VP C16",
+      "injectors_cc": 1600,
+      "injector_model": "RC 1600",
+      "fuelPump": "twin external Walbro with surge tank",
+      "intercooler": null,
+      "peak_whp": 535, "peak_whp_rpm": 9300,
+      "peak_wtq": null, "peak_wtq_rpm": null,
+      "dyno": "Mustang",
+      "ecu": "AEM EMS",
+      "sourceType": "shop/vendor",
+      "note": "Also has Aquamist methanol injection and a Zex wet nitrous kit; the page does not say whether either was active on the dyno run. Full boost by 5000 rpm.",
+      "sources": ["https://racinggreed.com/portfolios/07-civic-si-turbo/"]
+    },
+    {
+      "id": "esd-miata-k24z3-g25",
+      "engine": "K24Z3, stock internals (time-attack Miata)",
+      "induction": "turbo: Garrett G25-660",
+      "boost_psi": 12,
+      "fuel": "E85",
+      "injectors_cc": null,
+      "intercooler": "Bell core",
+      "peak_whp": 470, "peak_whp_rpm": null,
+      "peak_wtq": 385, "peak_wtq_rpm": null,
+      "dyno": null,
+      "sourceType": "magazine (swap news site)",
+      "note": "12 psi is wastegate-spring pressure.",
+      "sources": ["https://engineswapdepot.com/?p=71371"]
+    },
+    {
+      "id": "kpower-gt2-miata-g25",
+      "engine": "K24A/K24Z hybrid",
+      "induction": "turbo: Garrett G25-660, internal wastegate",
+      "boost_psi": null,
+      "fuel": null,
+      "injectors_cc": null,
+      "intercooler": null,
+      "peak_whp": 420, "peak_whp_rpm": null,
+      "peak_wtq": null, "peak_wtq_rpm": null,
+      "dyno": null,
+      "sourceType": "shop/vendor",
+      "note": "'Capable of 420 whp on wastegate', detuned to 377 whp for GT2 competition. Boost was not stated.",
+      "sources": ["https://kpower.industries/blogs/news/davids-turbo-kmiata-takes-the-gt2-win-at-autobahn"]
+    },
+    {
+      "id": "hpa-k24-6767-awd",
+      "engine": "K24, stock internals (Type S oil pump, ARP head studs), 25-deg VTC",
+      "induction": "turbo: 6767",
+      "boost_psi": null,
+      "boost_bar": 1.2,
+      "fuel": "E50 flex",
+      "injectors_cc": null,
+      "intercooler": null,
+      "peak_whp": 503, "peak_whp_rpm": null,
+      "peak_wtq": null, "peak_wtq_rpm": null,
+      "dyno": null,
+      "sourceType": "forum (HP Academy)",
+      "note": "Stated as 503 AWHP (all-wheel drive). Lambda 0.80, 15 deg ignition after peak torque, 7500 rpm limit, MaxxECU. A reply cites 580 whp on 'Prohub' from stock-bottom-end K24s at 17.8 psi on E78.",
+      "sources": ["https://www.hpacademy.com/forum/practical-dyno-tuning/show/k24-turbo-with-toyota-awd-503-awhp-from-pakistan"]
+    },
+    {
+      "id": "dsport-si-kraftwerks-390",
+      "engine": "K20Z3, stock displacement",
+      "induction": "supercharger: Kraftwerks (Rotrex)",
+      "boost_psi": 12.8,
+      "fuel": "93 pump",
+      "injectors_cc": 1000,
+      "injector_model": "Grams 1000",
+      "fuelPump": "Walbro 255",
+      "intercooler": null,
+      "peak_whp": 390, "peak_whp_rpm": 8400,
+      "peak_wtq": 258, "peak_wtq_rpm": 8400,
+      "dyno": null,
+      "ecu": "Hondata FlashPro",
+      "sourceType": "magazine",
+      "note": "Centrifugal supercharger: peak torque at the same rpm as peak power (8400).",
+      "sources": ["https://dsportmag.com/the-cars/features/390-whp-honda-civic-si/"]
+    },
+    {
+      "id": "kraftwerks-si-kit-claim",
+      "engine": "K20Z3 (06-11 Civic Si)",
+      "induction": "supercharger: Rotrex C30-94, 110 mm pulley",
+      "boost_psi": 10,
+      "fuel": null,
+      "injectors_cc": 1000,
+      "injector_model": "Grams 1000",
+      "intercooler": null,
+      "peak_whp": null,
+      "peak_whp_range": [340, 380],
+      "peak_wtq_range": [215, 240],
+      "dyno": null,
+      "sourceType": "shop/vendor (kit marketing)",
+      "note": "Vendor range '340-380 hp / 215-240 lb-ft' with a Skunk2 header and 76 mm exhaust, '+150-190 HP'. The text does not say whether this is crank or wheel. A customer review on the same page claims 361 whp at 6 psi with bolt-ons and an upgraded fuel system (unverified).",
+      "sources": ["https://hardmotion.com/shop/boost/06-11-honda-civic-si-kraftwerks-supercharger-rotrex-kit/"]
+    },
+    {
+      "id": "dsport-exige-k24-rotrex",
+      "engine": "K24A8 block, K20A2 head",
+      "induction": "supercharger: Rotrex C30-94",
+      "boost_psi": 14,
+      "fuel": "91 pump",
+      "injectors_cc": 750,
+      "injector_model": "RC Engineering 750",
+      "fuelPump": "factory Lotus in-tank plus Bosch inline",
+      "intercooler": "PWR air-to-water",
+      "peak_whp": 412, "peak_whp_rpm": 7900,
+      "peak_wtq": 290, "peak_wtq_rpm": 5800,
+      "dyno": "Dynojet 248C",
+      "ecu": "Hondata KPro",
+      "sourceType": "magazine",
+      "sources": ["https://dsportmag.com/the-cars/400-whp-exige-s1-supercharged-honda-k24k20/"]
+    },
+    {
+      "id": "hr-rsx-k24a2-jr",
+      "engine": "K24A2 (2007)",
+      "induction": "supercharger: Jackson Racing with a 3.2 in Pulley Boys pulley",
+      "boost_psi": 12,
+      "fuel": null,
+      "injectors_cc": 750,
+      "injector_model": "RC 750",
+      "fuelPump": "Walbro 255",
+      "fpr": "AEM adjustable FPR with -6AN feed and return",
+      "intercooler": "Noribilt aftercooler core with Frozenboost heat exchanger",
+      "peak_whp": 319, "peak_whp_rpm": null,
+      "peak_wtq": null, "peak_wtq_rpm": null,
+      "dyno": null,
+      "ecu": "Hondata KPro",
+      "sourceType": "shop/vendor (customer feature)",
+      "note": "Torque is given as 'a hair under 250 ft-lb', so it is not recorded as a number here.",
+      "sources": ["https://www.hybrid-racing.com/blogs/hybrid-racing/hr-feature-car-friday-issue-1-zack-s-blown-big-block-rsx"]
+    },
+    {
+      "id": "dsport-civic-k24-570",
+      "engine": "K24A2",
+      "induction": "turbo: Comp Turbo 6767, Turbosmart 45 mm wastegate",
+      "boost_psi": null,
+      "fuel": "E85",
+      "injectors_cc": 1600,
+      "injector_model": "Grams 1600",
+      "fuelPump": "Magnafuel ProTuner 750",
+      "intercooler": "custom Makspeed front-mount",
+      "peak_whp": 570, "peak_whp_rpm": null,
+      "peak_wtq": null, "peak_wtq_rpm": null,
+      "dyno": "Dynapack (Makspeed)",
+      "ecu": "Hondata FlashPro",
+      "sourceType": "magazine",
+      "sources": ["https://dsportmag.com/the-cars/features/570-whp-honda-civic-si/"]
+    },
+    {
+      "id": "dsport-eg-k24-kraftwerks-555",
+      "engine": "K24 block with LA Sleeve sleeves, K20 head",
+      "induction": "supercharger: Kraftwerks",
+      "boost_psi": 15,
+      "fuel": "E85",
+      "injectors_cc": null,
+      "intercooler": "SpeedFactory (upsized after the first was too small)",
+      "peak_whp": 555, "peak_whp_rpm": 9300,
+      "peak_wtq": 313, "peak_wtq_rpm": null,
+      "dyno": null,
+      "sourceType": "magazine",
+      "sources": ["https://dsportmag.com/the-cars/features/555-whp-supercharged-honda-civic/"]
+    },
+    {
+      "id": "dsport-cx-k24-711",
+      "engine": "K24A1, AEBS T-sleeves, Wiseco 10.2:1 pistons, Pauter rods",
+      "induction": "turbo: Precision 6776",
+      "boost_psi": 32,
+      "fuel": "VP C16",
+      "injectors_cc": 1200,
+      "injector_model": "Precision T&E 1200",
+      "fuelPump": "2x Walbro 255 in-tank",
+      "intercooler": "BMPC 4 in front-mount",
+      "peak_whp": 711, "peak_whp_rpm": null,
+      "peak_wtq": 517, "peak_wtq_rpm": null,
+      "dyno": "Dynojet 248C",
+      "ecu": "Hondata KPro",
+      "sourceType": "magazine",
+      "note": "Redline raised to 9000 rpm.",
+      "sources": ["https://dsportmag.com/the-cars/711-whp-k24-powered-turbo-honda-civic-cx/"]
+    },
+    {
+      "id": "dsport-civic-k20-786",
+      "engine": "K20Z1 block, Darton MID sleeves, Manley rods, CP 9.0:1 pistons, ported K20A2 head, stage-2 cams",
+      "induction": "turbo: Precision PT6768 single scroll",
+      "boost_psi": 29,
+      "fuel": "VP C16",
+      "injectors_cc": 2000,
+      "injector_model": "Injector Dynamics ID2000",
+      "intercooler": null,
+      "peak_whp": 786, "peak_whp_rpm": null,
+      "peak_wtq": 504, "peak_wtq_rpm": null,
+      "dyno": "Dynapack (hub)",
+      "ecu": "Hondata KPro",
+      "sourceType": "magazine",
+      "note": "Measured at the hubs on a Dynapack.",
+      "sources": ["https://dsportmag.com/the-cars/786-hp-turbocharged-k-series-honda-civic-aims-at-eights/2/"]
+    },
+    {
+      "id": "dsport-si-k20-874",
+      "engine": "K20A (Type R) sleeved, aftermarket internals, stock crank",
+      "induction": "turbo: Garrett GTX3586RS",
+      "boost_psi": 40,
+      "fuel": "E85",
+      "injectors_cc": 2000,
+      "injector_model": "Injector Dynamics 2000",
+      "fuelPump": "Walbro Hellcat 525 L/h",
+      "intercooler": null,
+      "peak_whp": 874, "peak_whp_rpm": null,
+      "peak_wtq": 615, "peak_wtq_rpm": null,
+      "dyno": null,
+      "ecu": "Hondata KPro 4",
+      "sourceType": "magazine",
+      "note": "Revs to 9200 rpm. A 2600 cc injector upgrade was planned, which implies these injectors are near their limit (the article states no duty cycle).",
+      "sources": ["https://dsportmag.com/the-cars/features/874-whp-honda-civic-si/"]
+    }
+  ],
+
+  "rulesOfThumb": [
+    {
+      "claim": "Turbo K-series on stock internals: about 400 whp is 'safe'; with pistons and rods, 600-700 whp.",
+      "sourceType": "magazine/education (HP Academy blog)",
+      "sources": ["https://www.hpacademy.com/blog/everything-you-need-to-know-about-the-honda-k20/"]
+    },
+    {
+      "claim": "400-500 whp on 93 octane is very reliable on a turbo K without internal upgrades. E85 adds 30-50 whp at the same boost once tuned. A returnless system with upgraded injectors and in-tank pump tops out at about 450 hp on forced induction. A return-style conversion gives 100-150 more hp on the same injector. A 1:1 referenced FPR raises fuel pressure 1 psi per psi of boost. An aftermarket liquid intercooler on a supercharger adds 20-30 whp with tuning.",
+      "sourceType": "shop (Evans Tuning)",
+      "sources": ["https://www.evans-tuning.com/k-series-pretuning-checklist"]
+    },
+    {
+      "claim": "Injector power bands on E85: ID1050X 300-400 hp, ID1300X 400-550 hp, ID1700X 550-850 hp. AEM 340 L/h pump: 300-500 hp single. Walbro Hellcat: 500-800 hp single. A stock K-series makes 400-600 whp with quality parts.",
+      "sourceType": "shop (Brewed Motorsports)",
+      "sources": ["https://www.brewedmotorsports.com/turbo-k24-tuning-guide/"]
+    },
+    {
+      "claim": "Factory K20 ratings: K20A2 11:1, 200 hp @ 7400, 139-142 lb-ft @ 6000; K20Z1 210 hp @ 7800; K20Z3 11:1, 198 hp @ 7800, 139 lb-ft @ 6200, 8300 rpm limit; K20A (JDM) 11.5:1, 212-221 hp @ 8000.",
+      "sourceType": "magazine/education (HP Academy blog)",
+      "sources": ["https://www.hpacademy.com/blog/everything-you-need-to-know-about-the-honda-k20/"]
+    }
+  ],
+
+  "logs": [
+    {
+      "id": "hondata-forum-k24a4-6266-timing",
+      "engine": "K24A4 forged, Precision 6266, 1200 cc injectors",
+      "points": [
+        {"fuel": "93 pump", "boost_psi": 15, "ignition_deg": 12, "afr": "<11.5", "injector_duty_pct": 65, "knock": "none at MBT", "whp": 340},
+        {"fuel": "E85 (~E82)", "boost_psi": 15, "ignition_deg_delta_vs_pump": 2, "whp_delta": "+~15 top, +~20 midrange"},
+        {"fuel": "E85 (~E82)", "boost_psi": 20, "ignition_deg": 10, "whp": null}
+      ],
+      "map_kPa": null, "iat_pre_ic": null, "iat_post_ic": null, "fuel_pressure": null,
+      "sourceType": "forum (Hondata forum user)",
+      "sources": ["https://www.hondata.mobi/forum/viewtopic.php?p=88034", "https://hondata.mobi/forum/viewtopic.php?p=88059"]
+    },
+    {
+      "id": "hpa-k24-stock-e85-timing",
+      "engine": "K24A stock except fuel system (2200 cc injectors, 450 L/h pump), 6662 journal-bearing turbo, KPro v4",
+      "points": [
+        {"fuel": "pump E85 (~E70)", "boost_psi": 20, "ignition_deg": 18, "comment": "A reply says 18 deg at 20 psi is 'already pushing it' on a stock motor"},
+        {"fuel": null, "boost_psi": 18, "ignition_deg_range": [14, 15], "whp": null, "comment": "A different engine cited by a reply: 580 hp at 18 psi with only 14-15 deg"}
+      ],
+      "sourceType": "forum (HP Academy)",
+      "sources": ["https://www.hpacademy.com/forum/flex-fuel-tuning/show/k24-street-tuning-timing/"]
+    },
+    {
+      "id": "hpa-k24-6767-e50",
+      "points": [{"fuel": "E50", "boost_bar": 1.2, "lambda": 0.80, "ignition_deg": 15, "comment": "after peak torque; 503 AWHP"}],
+      "sourceType": "forum (HP Academy)",
+      "sources": ["https://www.hpacademy.com/forum/practical-dyno-tuning/show/k24-turbo-with-toyota-awd-503-awhp-from-pakistan"]
+    },
+    {
+      "id": "kpro-tuning-guide-afr",
+      "points": [
+        {"region": "part throttle (KPro cols 1-6)", "afr": 14.7},
+        {"region": "col 7", "afr_range": [13.8, 14.0]},
+        {"region": "NA WOT (cols 8-10)", "afr": 13},
+        {"region": "boost (cols 11-16)", "afr_range": [11.5, 12.0]}
+      ],
+      "notes": "KPro boost columns 11-13 are supported by the stock MAP sensor; 14-16 need a 3-bar MAP sensor. VTEC point: turbo about 5000-6000 rpm, supercharged under 3000-4000 rpm.",
+      "sourceType": "reference (Pen Computing KPro guides, third party)",
+      "sources": ["https://pencomputing.com/rsx/tuning_from_calibration.html", "http://www.pencomputing.com/rsx/kpro_advanced_tuning.htm"]
+    },
+    {
+      "id": "hptuners-lambda-targets",
+      "points": [
+        {"case": "NA gasoline WOT", "afr_range": [12.8, 13.0], "lambda_range": [0.83, 0.85]},
+        {"case": "forced induction gasoline", "afr": 11.5, "lambda_range": [0.78, 0.80]}
+      ],
+      "sourceType": "manufacturer (HP Tuners blog, generic not K-specific)",
+      "sources": ["https://www.hptuners.com/?p=1181002"]
+    },
+    {
+      "id": "hpa-e85-timing-guidance",
+      "notes": "Target peak cylinder pressure at 16-18 deg ATDC. Adding a blanket +5 deg for E85 is called a mistake: E85 allows more timing at high load and boost but may want less at light load because it burns faster. No K-specific numbers.",
+      "sourceType": "education (HP Academy)",
+      "sources": ["https://www.hpacademy.com/q-and-a/e85-vs-gasoline-ignition-tuning/"]
+    },
+    {
+      "id": "hpa-k20a2-turbo-fuel-pressure",
+      "points": [{"fuel_pressure_psi": 50, "injectors_cc": [1000, 850], "comment": "dead times set to match 60 psi with the vacuum line connected (forum user, KPro)"}],
+      "sourceType": "forum (HP Academy)",
+      "sources": ["https://www.hpacademy.com/forum/boost-control/show/hondatakpro-k20a2-fixed-angle-cam-map-tuning-on-the-road/"]
+    }
+  ],
+  "logsMissingNote": "No source found that publishes a K-series log with MAP, IAT before and after the intercooler, and fuel pressure together. Hondata's blog has no K-series turbo tuning posts (checked the hondata.com/blog index).",
+
+  "fuelSystem": {
+    "stockInjectors": {
+      "K20Z3_06_11_CivicSi": {"cc_min": 310, "pressure": null},
+      "K20A2_RSX_TypeS_02_04": {"cc_min": 310, "pressure": null},
+      "K20Z1_RSX_TypeS_05_06": {"cc_min": 310, "pressure": null},
+      "K24A2_TSX_04_08": {"cc_min": 310, "pressure": null},
+      "K20A3_RSX_base_EP3_Si": {"cc_min": 270, "pressure": null},
+      "K24A1_K24A4_K24A8_K24Z1": {"cc_min": 270, "pressure": null},
+      "K23A1_RDX_07_12": {"cc_min": 410, "pressure": null, "partNumber": "16450-RWC-A01"},
+      "decapped": "RC Engineering testing, relayed by a forum member: 270 cc decapped to 490 cc, 310 cc to 520 cc.",
+      "note": "Sizes are from ff-squad.com (an enthusiast tech page; no test pressure). PRL also calls the Type-S injector 310 cc.",
+      "sourceType": "reference (enthusiast) + shop",
+      "sources": ["https://ff-squad.com/technet2/factory-k-series-injector-sizes/", "https://prlmotorsports.com/products/oem-honda-rdx-410cc-fuel-injector"]
+    },
+    "rdx410": {
+      "flow": [{"cc_min": 410, "psi": 38}, {"cc_min": 550, "psi": 70}],
+      "sourceType": "shop (PRL)",
+      "sources": ["https://prlmotorsports.com/products/oem-honda-rdx-410cc-fuel-injector"]
+    },
+    "stockFuelPressure": {
+      "kPa_range": [380, 430],
+      "psi_range": [55, 63],
+      "appliesTo": "2006 Civic L4-1.8L (R18, same FA/FG chassis) service-manual spec",
+      "note": "The K20Z3-specific page was not reachable (charm.li blocked, workshop-manuals 2.0L path errored), so this is the same-chassis R18 figure, not a K20Z3 figure. Lotus K-swap writeup: the stock pump is 'capable of about 55 lbs'. Hybrid Racing recommends setting about 50-52 psi when a K is converted to a return system.",
+      "sources": [
+        "https://workshop-manuals.com/honda/civic/l4-1.8l/powertrain_management/fuel_delivery_and_air_induction/fuel_pump/fuel_pressure/system_information/specifications/page_3998/",
+        "https://www.lotustalk.com/threads/honda-k-series-swap-fuel-system.230409/",
+        "https://www.hybrid-racing.com/products/hybrid-racing-k-series-swap-standard-fuel-system-package-92-00-civic-94-01-integra"
+      ]
+    },
+    "returnless": {
+      "value": true,
+      "referencedToManifold": false,
+      "detail": "K-series ships with a returnless system: the regulator and return are inside the tank. Rail pressure is therefore fixed and does not rise with boost. Hybrid Racing says its FPR 'DOES NOT WORK WITH OEM RETURNLESS FUEL SYSTEMS' and needs a return conversion. Evans Tuning says a 1:1 referenced FPR raises fuel pressure 1 psi per psi of boost and that returnless tops out at about 450 hp on forced induction.",
+      "sources": [
+        "https://www.hybrid-racing.com/products/hybrid-racing-k-series-swap-standard-fuel-system-package-92-00-civic-94-01-integra",
+        "https://www.lotustalk.com/threads/honda-k-series-swap-fuel-system.230409/",
+        "https://www.hybrid-racing.com/products/hybrid-racing-unibody-fuel-pressure-regulator",
+        "https://www.evans-tuning.com/k-series-pretuning-checklist"
+      ]
+    },
+    "fprUpgrades": [
+      {"name": "Hybrid Racing unibody FPR", "range_psi": [30, 100], "reference": "vacuum port (10/32 UNF)", "requiresReturn": true, "sources": ["https://www.hybrid-racing.com/products/hybrid-racing-unibody-fuel-pressure-regulator"]},
+      {"name": "AEM adjustable FPR with -6AN feed and return (customer K24A2 supercharged build)", "sources": ["https://www.hybrid-racing.com/blogs/hybrid-racing/hr-feature-car-friday-issue-1-zack-s-blown-big-block-rsx"]}
+    ],
+    "stockPump": {"flow_lph": null, "note": "No source found that publishes the OEM K20Z3, RSX or TSX in-tank pump flow.", "sources": []},
+    "pumps": [
+      {"name": "Walbro/TI GSS342 (the '255')", "flow_lph": 255, "at_psi": 40, "volts": 12, "amps": 8.9, "max_psi": 120, "hpRating": 550, "e85": null, "sourceType": "shop (Quantum/highflowfuel)", "sources": ["https://www.highflowfuel.com/genuine-walbro-ti-gss342-255lph-fuel-pump-qfs-766-kit/"]},
+      {"name": "Walbro/TI F90000267 (450 L/h)", "flow_lph": 450, "at_psi": null, "pressureRange_psi": [15, 120], "e85": true, "hpRating": ">800 with larger lines", "note": "The page has no flow-by-pressure table. This is NOT the 255.", "sourceType": "shop", "sources": ["https://www.highflowfuel.com/genuine-walbro-ti-f90000267-450lph-e85-compatible-intank-fuel-pump-wal-f90000267"]},
+      {"name": "AEM 50-1000 / 50-1200 ('340' in title)", "flow_lph": 320, "at_psi": 43, "amps": {"40psi_13.5V": 12, "80psi_13.5V": 15}, "e85": "50-1200 rated E100/M100; 50-1000 reduced life on E85", "hpRating": ">1000 hp at 43 psi (50-1000, BSFC 0.5, 13.5 V)", "note": "The page's title says 340 L/h but its body says 320 L/h at 43 psi.", "sourceType": "shop", "sources": ["https://www.3sx.com/aem-fuel-pump-320lph-high-flow-50-1000-and-50-1200-alcohol-e85-compatible"]},
+      {"name": "DeatschWerks DW200 (9-201)", "curve": [[30,265],[40,255],[50,240],[60,225],[70,210],[80,190],[90,170],[100,155]], "curveUnits": "[psig, L/h]", "amps": [[30,8.6],[40,9.2],[50,9.7],[60,10.4],[70,10.9],[80,11.6],[90,11.9],[100,12.7]], "volts": "13.5 implied (9 A @ 13.5 V); the table's voltage is not stated", "sourceType": "manufacturer tech sheet (via distributor)", "sources": ["https://www.tomei-p.co.jp/dealing_brands/dw/9-201-0847 Tech Sheet.pdf"]},
+      {"name": "DeatschWerks DW300 (9-301)", "curve": [[30,360],[40,340],[50,325],[60,305],[70,290],[80,275],[90,255],[100,235]], "curveUnits": "[psig, L/h]", "amps": [[30,11.4],[40,12.0],[50,12.5],[60,13.0],[70,13.7],[80,14.4],[90,15.1],[100,15.9]], "volts": "12 A @ 40 psi @ 13.5 V stated", "e85": "described as a popular E85 choice", "sourceType": "manufacturer tech sheet (via distributor)", "sources": ["https://www.tomei-p.co.jp/dealing_brands/dw/9-301-1023 Tech Sheet.pdf", "https://www.realstreetperformance.com/deatschwerks-dw300-320lph-in-tank-fuel-pump-w-install-kit-2006-2009-honda-s2000-ap2-2-2l-f22c.html"]},
+      {"name": "Hybrid Racing RSX high-flow E85 pump", "flow_lph": 335, "at_psi": 40, "sourceType": "shop", "sources": ["https://prestigeautolab.com/products/hybrid-racing-02-06-rsx-high-flow-e85-fuel-pump"]},
+      {"name": "Generic 255 L/h pump example (RSR test article)", "hp_gas_at_40psi": 776, "hp_e85_at_40psi": 517, "hp_gas_at_105psi": 455, "hp_e85_at_105psi": 304, "testVolts": 13.2, "note": "Shows the flow drop at high rail pressure (e.g. boost-referenced). Per-pump flow results are images only.", "sourceType": "magazine (EngineLabs/Real Street Performance)", "sources": ["https://www.enginelabs.com/?p=267145"]}
+    ],
+    "injectors": [
+      {"name": "Injector Dynamics ID1050x (K-series 48 mm)", "flow_cc_min": 1065, "ref": "3.0 bar (43.5 psi), gasoline, 52 C", "maxDiffPressure_bar": 10.0, "deadTimes": null, "sourceType": "shop (Nippon Power, ID data)", "sources": ["https://nipponpower.com/products/injector-dynamics-1050cc-injectors-rsx-02-11-civic-si-06-09-s2000-04-08-tsx-k20a-k20z-k24a-neon-caliber-srt-4-00-06-sentra-se-r-spec-v-set-of-4-1050-48-14-14-4"]},
+      {"name": "Injector Dynamics ID1300x (TSX/K-series)", "flow_cc_min": 1335, "ref": "3.0 bar (43.5 psi), iso-octane, 52 C", "maxDiffPressure_bar": 7.0, "hpEstimate": {"gasoline": 907.8, "e85": 587.4}, "deadTimes": null, "sourceType": "shop (Real Street Performance)", "sources": ["https://www.realstreetperformance.com/injector-dynamics-id1300x-1300cc-injectors-k24-k24a-acura-tsx-04-10-accord-14mm.html"]},
+      {"name": "Injector Dynamics ID1700x (48 mm)", "flow_cc_min": 1725, "ref": "3.0 bar (43.5 psi), iso-octane, 52 C", "maxDiffPressure_bar": 7.0, "deadTimes": null, "sourceType": "shop (RallySport Direct)", "sources": ["https://www.rallysportdirect.com/products/1700-48-14-14-injector-dynamics-id1700x-top-feed-fuel-injector-single"]},
+      {"name": "DeatschWerks 1000 cc (17U-08-1000-4, Civic Si 06-11)", "curve_cc_min": [[29.0,732],[43.5,919],[58.7,1079],[72.5,1237]], "curveUnits": "[psi, cc/min]", "impedance_ohm": 12.5, "maxNominal_psi": 72.5, "deadTimes": null, "note": "Nominal '1000 cc' is reached at about 50 psi, not 43.5 psi.", "sourceType": "shop (TRE, DW data)", "sources": ["https://treperformance.com/i-23902838-honda-civic-si-06-11-1000cc-deatschwerks-fuel-injectors.html"]},
+      {"name": "DeatschWerks 550 cc (17U-08-0550-4)", "flow_cc_min": 550, "ref": null, "deadTimes": null, "note": "The page gives no reference pressure.", "sourceType": "shop", "sources": ["https://nipponpower.com/products/deatschwerks-17u-08-0550-4-high-flow-550cc-fuel-injectors-for-honda-and-dodge-models"]},
+      {"name": "OEM RDX 410", "see": "fuelSystem.rdx410"}
+    ],
+    "deadTimesNote": "No fetched page published injector dead-time or offset tables. injectordynamics.com is robots-blocked, and DW data files are linked attachments that were not read."
+  },
+
+  "fuels": {
+    "gasoline": {
+      "stoichAFR": 14.7,
+      "LHV_btu_per_lb": 18676, "LHV_btu_per_gal": 116090,
+      "LHV_MJ_per_kg_alt": 43.4,
+      "HoV_btu_per_lb": 150, "HoV_btu_per_gal": 900, "HoV_note": "'~150' approximate in the source",
+      "RON_range": [88, 98], "MON_range": [80, 88],
+      "pumpOctane_AKI_range": [84, 93],
+      "specificGravity_range": [0.72, 0.78],
+      "sources": [
+        "https://www.BuildItSolar.com/References/EEREfueltable.pdf",
+        "https://www.engineeringtoolbox.com/fuels-higher-calorific-values-d_169.html",
+        "https://afdc.energy.gov/fuels/properties",
+        "https://www.hptuners.com/?p=1181002"
+      ],
+      "note": "The EERE/API 'Properties of Fuels' table gives 18,676 Btu/lb (= about 43.4 MJ/kg, consistent with Engineering ToolBox). AFDC gives a gasoline/E10 LHV range of 112,114-116,090 Btu/gal. 91 vs 93 AKI are not separate in any source; treat AKI as the input."
+    },
+    "E10": {
+      "stoichAFR": 14.1,
+      "LHV_btu_per_gal_lower_bound": 112114,
+      "note": "The AFDC range 112,114-116,090 Btu/gal covers gasoline through E10. No separate E10 HoV or octane found.",
+      "sources": ["https://www.hptuners.com/?p=1181002", "https://afdc.energy.gov/fuels/properties"]
+    },
+    "E85": {
+      "stoichAFR": 9.7,
+      "energyVsGasoline_per_gal": "73-83% of 1 GGE",
+      "ethanolContentRange_pct": [51, 83],
+      "RON_min": 104, "MON_min": 88, "octaneNote": "Minimum spec limits from a 2018 E85 standard (IEA-AMF), not measured values.",
+      "density_kg_m3_range": [755, 800],
+      "LHV": null, "HoV": null,
+      "note": "No source gave a direct E85 LHV or HoV. Use a blend of the gasoline and E100 values (the sim must compute it; the source gives only the components).",
+      "sources": [
+        "https://www.hptuners.com/?p=1181002",
+        "https://afdc.energy.gov/fuels/properties",
+        "https://en.wikipedia.org/wiki/E85",
+        "https://iea-amf.org/content/fuel_information/ethanol/fuel_properties"
+      ]
+    },
+    "ethanol_E100": {
+      "stoichAFR": 9.0,
+      "LHV_btu_per_lb": 11585, "LHV_btu_per_gal": 76330,
+      "LHV_MJ_per_kg": 26.7,
+      "HoV_btu_per_lb": 396, "HoV_btu_per_gal": 2378,
+      "specificGravity": 0.794,
+      "pumpOctane": 110,
+      "blendingRON_range": [120, 135], "blendingMON_range": [100, 106],
+      "sources": [
+        "https://www.BuildItSolar.com/References/EEREfueltable.pdf",
+        "https://en.wikipedia.org/wiki/Heat_of_combustion",
+        "https://www.engineeringtoolbox.com/fuels-higher-calorific-values-d_169.html",
+        "https://afdc.energy.gov/fuels/properties",
+        "https://iea-amf.org/content/fuel_information/ethanol/fuel_properties"
+      ]
+    },
+    "methanol": {
+      "stoichAFR": 6.45, "LHV_btu_per_lb": 8637, "LHV_btu_per_gal": 57250, "HoV_btu_per_lb": 506, "HoV_btu_per_gal": 3340, "specificGravity": 0.796,
+      "sources": ["https://www.BuildItSolar.com/References/EEREfueltable.pdf"]
+    },
+    "VP_C16": {
+      "MON": 116, "RON": ">120", "AKI": ">118",
+      "specificGravity": 0.7350, "stoichAFR": 14.70, "oxygen_pct": 0, "leaded": true,
+      "LHV": null,
+      "sources": ["https://vpracingfuels.com/product/c16/"]
+    },
+    "Sunoco_260_GT": {
+      "AKI": 100, "RON": 105, "MON": 95,
+      "specificGravity": 0.734, "stoichAFR": 14.1, "oxygen_wt_pct": 3.7,
+      "LHV_btu_per_lb": 17900, "LHV_btu_per_gal": 109200,
+      "note": "Unleaded, oxygenated street/race fuel.",
+      "sources": ["https://www.sunocoracefuels.com/fuels/260-gt"]
+    }
+  },
+
+  "turbos": {
+    "_note": "Garrett pages publish wheel sizes and an hp rating; efficiency and choke flow are only on map images (not readable). Max-flow lb/min values come from Full-Race (a distributor) product pages. No compressor map points could be extracted.",
+    "Garrett_GT2860RS": {"inducer_mm": 47, "exducer_mm": 60, "trim": 76, "compAR": 0.60, "turbineInducer_mm": 54, "turbineExducer_mm": 47, "hp_range": [250, 360], "maxFlow_lbmin": null, "peakEff": null, "turbineAR_options": [0.57, 0.64, 0.72, 0.86], "sources": ["https://www.garrettmotion.com/racing-and-performance/performance-catalog/turbo/gt2860rs/"]},
+    "Garrett_GTX2867R_GenII": {"inducer_mm": 50, "exducer_mm": 67, "turbineInducer_mm": 54, "turbineExducer_mm": 47, "hp_range": [275, 550], "maxFlow_lbmin": 49, "peakEff": null, "turbineAR_options": [0.57, 0.64, 0.72, 0.86], "sources": ["https://www.garrettmotion.com/racing-and-performance/performance-catalog/turbo/gtx2867r-gen-ii/", "https://www.full-race.com/garrett-gtx2867r-gen-ii-turbo"]},
+    "Garrett_GT3076R": {"inducer_mm": 57, "exducer_mm": 76, "trim": 56, "compAR": 0.60, "turbineInducer_mm": 60, "turbineExducer_mm": 55, "turbineTrim": 84, "hp_range": [310, 525], "maxFlow_lbmin": null, "peakEff": null, "sources": ["https://www.garrettmotion.com/racing-and-performance/performance-catalog/turbo/gt3076r/"]},
+    "Garrett_GTX3076R_GenII": {"inducer_mm": 58, "exducer_mm": 76, "turbineInducer_mm": 60, "turbineExducer_mm": 55, "hp_range": [400, 750], "maxFlow_lbmin": 67, "peakEff": null, "sources": ["https://www.garrettmotion.com/racing-and-performance/performance-catalog/turbo/gtx3076r-gen-ii/", "https://www.full-race.com/garrett-gtx3076r-gen-ii-turbo"]},
+    "Garrett_GTX3582R_GenII": {"inducer_mm": 66, "exducer_mm": 82, "turbineInducer_mm": 68, "turbineExducer_mm": 62, "hp_range": [450, 900], "maxFlow_lbmin": 82, "peakEff": null, "sources": ["https://www.garrettmotion.com/racing-and-performance/performance-catalog/turbo/gtx3582r-gen-ii/", "https://www.full-race.com/garrett-gtx3582r-gen-ii-turbo"]},
+    "Garrett_GT3582R": {"inducer_mm": null, "note": "Not fetched separately; used in the DSPORT 567 whp RSX (dynos[]).", "sources": []},
+    "Precision_5858_CEA": {"inducer_mm": 58, "exducer_mm": 76.2, "turbineInducer_mm": 64.9, "turbineExducer_mm": 57.91, "hp": 620, "maxFlow_lbmin": null, "peakEff": null, "sources": ["https://www.full-race.com/58mm-precision-pte-5858-cea-turbo"]},
+    "Precision_5862_Gen2": {"inducer_mm": 58.0, "hp": 700, "turbineWheel_mm_options": [62.0, 66.0], "sources": ["https://www.precisionturbo.com/p372175-turbochargers-street-race-gen-2-gen-2-pt5862-s-20704207189"]},
+    "Precision_6266_CEA": {"inducer_mm": 62.23, "exducer_mm": 81.99, "turbineInducer_mm": 74.17, "turbineExducer_mm": 66, "hp": 800, "maxFlow_lbmin": null, "peakEff": null, "sources": ["https://www.full-race.com/62mm-precision-pte-6266-cea-turbo"]},
+    "BorgWarner_EFR_7163": {"inducer_mm": 57, "exducer_mm": 71, "turbineOD_mm": 63, "maxFlow_lbmin": 60, "peakEff": null, "housings": ["0.85 A/R T25 IWG", "0.85 A/R V-band IWG", "0.80 A/R T4 twin-scroll EWG"], "sources": ["https://www.full-race.com/borgwarner-efr-7163-turbo"]},
+    "BorgWarner_EFR_6758": {"inducer_mm": null, "note": "Not found in the time available.", "sources": []}
+  },
+
+  "intercoolers": [
+    {
+      "id": "mishimoto-evo9-fmic",
+      "vehicle": "2006 Mitsubishi Evo IX (not K-series; vendor test)",
+      "effectiveness_pct": {"oem": 79, "mishimoto": 86},
+      "outletTemp_F": {"oem_peak": 137.7, "mishimoto_peak": 109.5, "oem_avg": 113.6, "mishimoto_avg": 99.4},
+      "pressureDrop": "Mishimoto averaged 0.4 psi more drop than OEM",
+      "ambient_F": 83,
+      "sources": ["https://www.mishimoto.com/mwdownloads/download/link/id/794"]
+    },
+    {
+      "id": "mishimoto-11gen-si-fmic",
+      "vehicle": "2024 Civic Si (L15B7 turbo, not K-series), Mustang dyno",
+      "pressureDrop_psi": {"oem": 1.11, "mishimoto": 0.88},
+      "outletTempReduction_F": 18.1,
+      "coreSize_in": {"oem": [26.18, 4.39, 2.52], "mishimoto": [25.98, 6.04, 4.53]},
+      "gain": "+6.7 hp / +2.5 lb-ft peak (IC only); up to +8.1 hp / +8.1 lb-ft with piping",
+      "ambient_F_range": [73.3, 77.2],
+      "sources": ["https://www.mishimoto.com/engineering/2026/02/cold-front-performance-intercooler-kit-for-the-2022-honda-civic-si"]
+    },
+    {
+      "id": "corksport-skyactiv-25t",
+      "vehicle": "Mazda SkyActiv-G 2.5T (not K-series)",
+      "pressureDrop_psi": {"oem_low_rpm": 0.5, "oem_high_rpm": 2.4},
+      "tempDrop_F": {"oem": [100, 110], "coreA": [150, 180], "coreB": [140, 170], "coreC": [140, 150]},
+      "note": "No absolute inlet/outlet temperatures or effectiveness % given.",
+      "sources": ["https://corksport.com/blog/?p=11322"]
+    },
+    {
+      "id": "dsport-l15-si-ic",
+      "vehicle": "2019 Civic Si (L15B7 turbo, not K-series), Dynojet",
+      "note": "Intercooler alone gave no peak power gain but lowered boost by 1 psi (the stock ECU targets boost). Stock 189.81 whp @ 18.87 psi (91); FlashPro 203.88 whp @ 22.49 psi; E85 (E76) 240.59 whp @ 24.37 or 26.27 psi (the article gives both).",
+      "sources": ["https://dsportmag.com/the-tech/test-n-tune/honda-civic-si-test-tune/"]
+    }
+  ]
+}

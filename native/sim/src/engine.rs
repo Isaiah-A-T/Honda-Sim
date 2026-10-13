@@ -6,6 +6,7 @@ use crate::gasflow::{flow_defaults, valve_lift_m, vtc_for, Cond, Flow, Gas, GasO
 use crate::internals::{engine_geometry, Geometry};
 use crate::k20z3::{friction_nm, mbt, ve_correction, ENGINE};
 use crate::engines::{balancer_nm, head_lobes};
+use crate::fuels::{extra_cooling_k, fuel_of, injector_g_per_ms, pump_gs, pump_lph_of, ref_fuel, RAIL_KPA};
 use crate::parts::{bottom_end, BottomEnd};
 use crate::tables::{clamp, guess_fuel_units, lookup2};
 use crate::thermal::{oil_pressure_kpa, visc_ratio, Thermal};
@@ -13,9 +14,7 @@ use crate::tune::Tune;
 use std::f64::consts::PI;
 
 const AIR_DENSITY_G_PER_L: f64 = 1.184;
-const STOICH: f64 = 14.7;
 const DECEL_AIR: f64 = 4.5;
-const FUEL_DENSITY_G_PER_CC: f64 = 0.745;
 const GAS_EVERY_S: f64 = 0.01;
 const P_AMB: f64 = 101.3;
 const DOWNPIPE_KPA: f64 = 4.0;
@@ -84,6 +83,10 @@ pub struct Engine {
     pub afr: f64,
     pub ipw: f64,
     pub inj_duty: f64,
+    /// Fuel asked of the pump, % of what it can deliver.
+    pub fuel_pump_pct: f64,
+    /// Rail pressure (kPa gauge): 50 psi until the pump runs out.
+    pub fuel_pressure_kpa: f64,
     pub torque_nm: f64,
     pub pumping_nm: f64,
     pub air_gs: f64,
@@ -132,6 +135,7 @@ impl Engine {
         let geometry = engine_geometry(&tune, &bottom);
         let g = flow_geom(&tune, &bottom);
         let thermal = Thermal::new(tune.ambient_c.unwrap_or(25.0), true, tune.cooling());
+        let stoich = fuel_of(&tune).stoich;
         let mut e = Engine {
             disp_l: bottom.displacement_l,
             bottom,
@@ -161,7 +165,9 @@ impl Engine {
             knock_acc: 0.0,
             lambda: 1.0,
             lambda_target: 1.0,
-            afr: STOICH,
+            afr: stoich,
+            fuel_pump_pct: 0.0,
+            fuel_pressure_kpa: RAIL_KPA,
             ipw: 2.0,
             inj_duty: 0.0,
             torque_nm: 0.0,
@@ -239,6 +245,8 @@ impl Engine {
         let vtc = vtc_for(&self.tune, self.rpm, self.map, self.high_cam);
         self.vtc = vtc;
         let (out_kpa, out_area) = self.exhaust_outlet();
+        let fuel = fuel_of(&self.tune);
+        let rf = ref_fuel();
         Cond {
             rpm: self.rpm.max(300.0),
             map_kpa: self.map,
@@ -248,7 +256,9 @@ impl Engine {
             ign_deg: self.ign,
             lambda: self.lambda.min(3.0),
             fire: !cut && self.rpm > 200.0,
-            octane: self.tune.octane,
+            octane: fuel.octane,
+            energy: fuel.lhv_mj / fuel.stoich / (rf.lhv_mj / rf.stoich),
+            cool_k: extra_cooling_k(&fuel, self.lambda.min(3.0)),
             wall_c: self.ect,
             out_kpa,
             out_area_m2: Some(out_area),
@@ -342,7 +352,7 @@ impl Engine {
             } else {
                 let g = self.gas_out;
                 let air_kg_s = self.air_delivered_gs / 1000.0;
-                let exh_kg_s = air_kg_s * (1.0 + if self.lambda < 5.0 { 1.0 / (STOICH * self.lambda) } else { 0.0 });
+                let exh_kg_s = air_kg_s * (1.0 + if self.lambda < 5.0 { 1.0 / (fuel_of(&self.tune).stoich * self.lambda) } else { 0.0 });
                 let share = tb.turbine_area_cm2 / (tb.turbine_area_cm2 + tb.wastegate_area_cm2 * self.wg_open);
                 let p4 = P_AMB + DOWNPIPE_KPA;
                 let er = if g.exh_kpa > p4 { 1.0 - (p4 / g.exh_kpa).powf(0.248) } else { 0.0 };
@@ -421,10 +431,12 @@ impl Engine {
 
         // Fuel the ECU commands.
         let t = &self.tune;
+        let fuel_type = fuel_of(t);
+        let stoich = fuel_type.stoich;
         let fuel_table = if self.high_cam { t.fuel_high.as_ref().unwrap_or(&t.fuel_low) } else { &t.fuel_low };
         let units = t.fuel_units.clone().filter(|u| !u.is_empty()).unwrap_or_else(|| guess_fuel_units(fuel_table).to_string());
         let fuel_val = lookup2(fuel_table, rpm, self.map);
-        let inj_g_per_ms = t.injector_cc * FUEL_DENSITY_G_PER_CC / 60000.0;
+        let inj_g_per_ms = injector_g_per_ms(t.injector_cc, &fuel_type, self.map);
         let dead_ms = t.injector_dead_ms;
         let mut fuel_per_cyl;
         if units == "ms" {
@@ -432,8 +444,8 @@ impl Engine {
             fuel_per_cyl = (fuel_val - dead_ms).max(0.0) * inj_g_per_ms;
             self.lambda_target = f64::NAN;
         } else {
-            self.lambda_target = if units == "afr" { fuel_val / STOICH } else { fuel_val };
-            fuel_per_cyl = air_per_cycle / ENGINE.cylinders / (STOICH * self.lambda_target);
+            self.lambda_target = if units == "afr" { fuel_val / stoich } else { fuel_val };
+            fuel_per_cyl = air_per_cycle / ENGINE.cylinders / (stoich * self.lambda_target);
             self.ipw = fuel_per_cyl / inj_g_per_ms + dead_ms;
         }
         let cycle_ms = 120000.0 / rpm;
@@ -444,10 +456,17 @@ impl Engine {
         if self.rev_cut || self.dfco || self.boost_cut {
             fuel_per_cyl = 0.0;
         }
+        let pump_max = pump_gs(pump_lph_of(t), &fuel_type);
+        let want_gs = fuel_per_cyl * ENGINE.cylinders * rpm / 120.0;
+        self.fuel_pump_pct = 100.0 * want_gs / pump_max;
+        self.fuel_pressure_kpa = RAIL_KPA * (pump_max / want_gs.max(1e-9)).min(1.0).powi(2);
+        if want_gs > pump_max {
+            fuel_per_cyl *= pump_max / want_gs;
+        }
         let fuel = fuel_per_cyl * ENGINE.cylinders;
         self.fuel_gs = fuel * rpm / 120.0;
-        self.lambda = if fuel > 0.0 { air_per_cycle / (fuel * STOICH) } else { 9.99 };
-        self.afr = self.lambda * STOICH;
+        self.lambda = if fuel > 0.0 { air_per_cycle / (fuel * stoich) } else { 9.99 };
+        self.afr = self.lambda * stoich;
 
         // Ignition and knock.
         let ign_tab = if self.high_cam { t.ign_high.as_ref().unwrap_or(&t.ign_low) } else { &t.ign_low };

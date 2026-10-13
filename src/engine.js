@@ -11,13 +11,12 @@ import { clamp, lookup2, guessFuelUnits } from './tables.js';
 import { ENGINE, TURBO_GT35, veCorrection, mbt, frictionNm } from './k20z3.js';
 import { bottomEnd, flowGeometry } from './parts.js';
 import { balancerNm } from './engines.js';
+import { fuelOf, REF_FUEL, injectorGPerMs, pumpGs, pumpLphOf, extraCoolingK, RAIL_KPA } from './fuels.js';
 import { createThermal, oilPressureKpa, viscRatio, COOLING } from './thermal.js';
 import { FLOW, createGasflow, runCycle, settle, vtcFor, valveLiftM } from './gasflow.js';
 
 const AIR_DENSITY_G_PER_L = 1.184;   // 25 °C, sea level
-const STOICH = 14.7;
 const DECEL_AIR = 4.5;                 // % opening the idle valve holds on decel so the manifold doesn't go to near-vacuum
-const FUEL_DENSITY_G_PER_CC = 0.745;
 const GAS_EVERY_S = 0.01;              // run one gas exchange cycle this often (results change slowly)
 const P_AMB = 101.3, DOWNPIPE_KPA = 4;
 
@@ -32,11 +31,12 @@ function exhaustOutlet(e) {
   return { outKpa: P_AMB, outAreaM2: Math.PI / 4 * G.exhaustDiaM ** 2 };
 }
 function gasConditions(e, high) {
-  const t = e.tune, cut = e.revCut || e.dfco || e.boostCut;
+  const t = e.tune, fuel = fuelOf(t), cut = e.revCut || e.dfco || e.boostCut;
   const vtc = vtcFor(t, e.rpm, e.map, e.highCam);
   e.vtc = vtc;
   return { rpm: Math.max(e.rpm, 300), mapKpa: e.map, iatC: e.iat, highCam: high, vtc, ignDeg: e.ign,
-    lambda: Math.min(e.lambda, 3), fire: !cut && e.rpm > 200, octane: t.octane ?? 91, wallC: e.ect, ...exhaustOutlet(e) };
+    lambda: Math.min(e.lambda, 3), fire: !cut && e.rpm > 200, octane: fuel.octane, wallC: e.ect, ...exhaustOutlet(e),
+    energy: fuel.lhvMJ / fuel.stoich / (REF_FUEL.lhvMJ / REF_FUEL.stoich), coolK: extraCoolingK(fuel, Math.min(e.lambda, 3)) };
 }
 const blend = (a, b, f) => Object.fromEntries(Object.keys(a).map(k => [k, Number.isFinite(a[k]) && Number.isFinite(b[k]) ? a[k] + (b[k] - a[k]) * f : (f < 0.5 ? a[k] : b[k])]));
 // One gas state per cam lobe set. While VTEC is switching, some cylinders are on each, so both run and
@@ -100,7 +100,7 @@ export function createEngine(tune) {
     gasHi: null, gasLoOut: null, gasHiOut: null, loIdle: 0, hiIdle: 1,
     revCut: false, dfco: false,
     ign: 10, ignTable: 10, knockRetard: 0, knockLimit: 30, knocking: false, knockCount: 0, knockAcc: 0,
-    lambda: 1, lambdaTarget: 1, afr: STOICH, ipw: 2,
+    lambda: 1, lambdaTarget: 1, afr: fuelOf(tune).stoich, ipw: 2, fuelPumpPct: 0, fuelPressureKpa: RAIL_KPA,
     torqueNm: 0, airGs: 0, airDeliveredGs: 0,
     iat: 25, ect: 90, oilC: 100, fuelGs: 0, frictionNm: 0,
     thermal: createThermal(tune.ambientC ?? 25, true, tune.cooling),
@@ -143,7 +143,7 @@ export function stepEngine(e, pedal, dt) {
       e.boost += (want - e.boost) * Math.min(1, dt * 20);
     } else {
       const g = e.gasOut, airKgS = e.airDeliveredGs / 1000;
-      const exhKgS = airKgS * (1 + (e.lambda < 5 ? 1 / (STOICH * e.lambda) : 0));
+      const exhKgS = airKgS * (1 + (e.lambda < 5 ? 1 / (fuelOf(t).stoich * e.lambda) : 0));
       const share = tb.turbineAreaCm2 / (tb.turbineAreaCm2 + tb.wastegateAreaCm2 * e.wgOpen);
       const p4 = P_AMB + DOWNPIPE_KPA, er = g.exhKpa > p4 ? 1 - (p4 / g.exhKpa) ** 0.248 : 0;
       const turbineW = tb.turbineEff * exhKgS * share * 1150 * g.exhTempK * er;
@@ -205,11 +205,15 @@ export function stepEngine(e, pedal, dt) {
   e.airDeliveredGs = Math.max(g.veDelivered * corr, ve) * density * rpm / 120;
   e.pmepKpa = g.pmepKpa; e.exhKpa = g.exhKpa; e.egtC = g.egtC; e.residual = g.residual;
 
-  // Fuel the ECU commands from the tune.
+  // Fuel the ECU commands from the tune. Injector flow follows the pressure across the injectors (a fixed
+  // 50 psi rail minus manifold pressure, src/fuels.js); in lambda or AFR mode the ECU knows that and sizes the
+  // pulse to hit its target, in pulse-width mode the table's milliseconds go straight to the injectors. The
+  // pump caps what reaches the rail: ask for more and the rail sags and the mixture goes lean.
+  const fuelType = fuelOf(t), stoich = fuelType.stoich;
   const fuelTable = (e.highCam && t.fuelHigh) || t.fuelLow;
   const units = t.fuelUnits || guessFuelUnits(fuelTable);
   const fuelVal = lookup2(fuelTable, rpm, e.map);
-  const injGPerMs = (t.injectorCc ?? ENGINE.injectorCcMin) * FUEL_DENSITY_G_PER_CC / 60000;
+  const injGPerMs = injectorGPerMs(t.injectorCc ?? ENGINE.injectorCcMin, fuelType, e.map);
   const deadMs = t.injectorDeadMs ?? ENGINE.injectorDeadMs;
   let fuelPerCyl;
   if (units === 'ms') {
@@ -217,18 +221,22 @@ export function stepEngine(e, pedal, dt) {
     fuelPerCyl = Math.max(0, fuelVal - deadMs) * injGPerMs;
     e.lambdaTarget = NaN;
   } else {
-    e.lambdaTarget = units === 'afr' ? fuelVal / STOICH : fuelVal;
-    fuelPerCyl = airPerCycle / ENGINE.cylinders / (STOICH * e.lambdaTarget);
+    e.lambdaTarget = units === 'afr' ? fuelVal / stoich : fuelVal;
+    fuelPerCyl = airPerCycle / ENGINE.cylinders / (stoich * e.lambdaTarget);
     e.ipw = fuelPerCyl / injGPerMs + deadMs;
   }
   const cycleMs = 120000 / rpm;
   e.injDuty = clamp(e.ipw / cycleMs * 100, 0, 100);
   if (e.ipw > cycleMs) fuelPerCyl = (cycleMs - deadMs) * injGPerMs;   // injectors maxed out
   if (e.revCut || e.dfco || e.boostCut) fuelPerCyl = 0;
+  const pumpMax = pumpGs(pumpLphOf(t), fuelType), wantGs = fuelPerCyl * ENGINE.cylinders * rpm / 120;
+  e.fuelPumpPct = 100 * wantGs / pumpMax;
+  e.fuelPressureKpa = RAIL_KPA * Math.min(1, pumpMax / Math.max(wantGs, 1e-9)) ** 2;
+  if (wantGs > pumpMax) fuelPerCyl *= pumpMax / wantGs;
   const fuel = fuelPerCyl * ENGINE.cylinders;
   e.fuelGs = fuel * rpm / 120;
-  e.lambda = fuel > 0 ? airPerCycle / (fuel * STOICH) : 9.99;
-  e.afr = e.lambda * STOICH;
+  e.lambda = fuel > 0 ? airPerCycle / (fuel * stoich) : 9.99;
+  e.afr = e.lambda * stoich;
 
   // Ignition from the tune, minus knock retard. Timing works through the gas exchange model: it sets
   // when the burn starts, so it decides combustion phasing, peak pressure, exhaust temperature, torque

@@ -1,7 +1,7 @@
 //! 2006–2011 Civic Si (K20Z3, 6-speed): car and engine constants, calibration corrections and the
 //! placeholder tune (src/k20z3.js). See the JS file for where each number comes from.
 
-use crate::tables::{clamp, lookup1, Table};
+use crate::tables::{clamp, guess_fuel_units, lookup1, Table};
 use crate::tune::{Tune, Turbo};
 
 pub struct Car {
@@ -154,9 +154,34 @@ pub fn placeholder_tune() -> Tune {
     }
 }
 
+/// Boost cells for a table that stops at atmospheric pressure (src/k20z3.js withBoostColumns).
+pub const BOOST_MAP_COLS: [f64; 7] = [120., 140., 160., 180., 200., 220., 250.];
+pub fn with_boost_columns(t: &Table, ign: bool, units: &str) -> Table {
+    if t.cols.iter().cloned().fold(f64::MIN, f64::max) >= 110.0 {
+        return t.clone();
+    }
+    let last = *t.cols.last().unwrap();
+    let cell = |v: f64, m: f64| {
+        if ign { v - 0.15 * (m - last) } else if units == "ms" { v * (m / last) * 1.1 } else if units == "afr" { v.min(11.8) } else { v.min(0.8) }
+    };
+    Table {
+        rows: t.rows.clone(),
+        cols: t.cols.iter().cloned().chain(BOOST_MAP_COLS).collect(),
+        data: t.data.iter().map(|row| {
+            let v = *row.last().unwrap();
+            row.iter().cloned().chain(BOOST_MAP_COLS.iter().map(|&m| js_round2(cell(v, m)))).collect()
+        }).collect(),
+    }
+}
+
 /// Turbo build on stock internals (GT35-class, 1000 cc injectors, overboost cut, torque warning).
 pub fn turbo_setup(tune: &Tune) -> Tune {
+    let units = tune.fuel_units.clone().unwrap_or_else(|| guess_fuel_units(&tune.fuel_low).to_string());
     Tune {
+        fuel_low: with_boost_columns(&tune.fuel_low, false, &units),
+        fuel_high: tune.fuel_high.as_ref().map(|t| with_boost_columns(t, false, &units)),
+        ign_low: with_boost_columns(&tune.ign_low, true, &units),
+        ign_high: tune.ign_high.as_ref().map(|t| with_boost_columns(t, true, &units)),
         turbo: Turbo { enabled: true, ..turbo_gt35() },
         injector_cc: 1000.0,
         injector_dead_ms: 1.0,

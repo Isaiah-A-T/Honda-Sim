@@ -3,6 +3,7 @@
 
 pub mod engine;
 pub mod engines;
+pub mod fuels;
 pub mod gasflow;
 pub mod internals;
 pub mod k20z3;

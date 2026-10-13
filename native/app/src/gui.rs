@@ -9,6 +9,7 @@ use honda_sim_core::internals::{part_material_id, part_status, PARTS};
 use honda_sim_core::k20z3::{placeholder_tune, turbo_6262, turbo_gt35, turbo_setup};
 use honda_sim_core::materials::{material, materials_for};
 use honda_sim_core::engines::{engines, head_fit, pump_fit};
+use honda_sim_core::fuels::{fuel_of, fuels, pump_lph_of, PUMP_LPH_MAX, PUMP_LPH_MIN, PUMP_LPH_STEP, RAIL_KPA, STOCK_PUMP_LPH};
 use honda_sim_core::parts::{catalog, crank_problem, cranks_for, piston_problem, pistons_for, rod_problem};
 use honda_sim_core::sim::log_to_csv;
 use honda_sim_core::thermal::{boiling_c, viscosity_cst, Cooling};
@@ -249,6 +250,41 @@ fn lamp(ui: &mut egui::Ui, text: &str, on: bool, color: Color32) {
     ui.painter().text(rect.center(), egui::Align2::CENTER_CENTER, text, egui::FontId::proportional(11.0), fg);
 }
 
+/// Fuel, fuel pump and the (fixed) rail pressure, as grid rows.
+fn fuel_fields(ui: &mut egui::Ui, t: &mut Tune) -> bool {
+    let mut c = false;
+    let cur = fuel_of(t);
+    ui.label("Fuel");
+    egui::ComboBox::from_id_salt("fuel").width(260.0).selected_text(&cur.name).show_ui(ui, |ui| {
+        for f in fuels() {
+            if ui.selectable_label(cur.id == f.id, &f.name).clicked() {
+                t.fuel = Some(f.id.to_string());
+                t.octane = f.octane;
+                c = true;
+            }
+        }
+    });
+    ui.end_row();
+    ui.label("Fuel pump");
+    let lph = pump_lph_of(t);
+    let name = |v: f64| if v == STOCK_PUMP_LPH { format!("{v:.0} l/h (stock)") } else { format!("{v:.0} l/h") };
+    egui::ComboBox::from_id_salt("fuel-pump").width(260.0).selected_text(name(lph)).show_ui(ui, |ui| {
+        let mut v = PUMP_LPH_MIN;
+        while v <= PUMP_LPH_MAX {
+            if ui.selectable_label(v == lph, name(v)).clicked() {
+                t.fuel_pump_lph = Some(v);
+                c = true;
+            }
+            v += PUMP_LPH_STEP;
+        }
+    });
+    ui.end_row();
+    ui.label("Fuel pressure");
+    ui.label(format!("{:.0} psi, fixed (returnless rail)", RAIL_KPA / 6.895));
+    ui.end_row();
+    c
+}
+
 fn num_field(ui: &mut egui::Ui, label: &str, v: &mut f64, speed: f64, range: std::ops::RangeInclusive<f64>, suffix: &str) -> bool {
     ui.label(label);
     let r = ui.add(egui::DragValue::new(v).speed(speed).range(range).suffix(suffix)).changed();
@@ -430,6 +466,7 @@ impl Gui {
                 ("Ignition table", format!("{:.1}° (best torque {:.1}°, knock limit {:.1}°)", e.ign_table, e.mbt, e.knock_limit)),
                 ("Lambda", format!("{:.3} (target {})", e.lambda, if e.lambda_target.is_finite() { format!("{:.2}", e.lambda_target) } else { "–".into() })),
                 ("Injectors", format!("{:.2} ms, {:.0}% duty", e.ipw, e.inj_duty)),
+                ("Fuel pump", format!("{:.0}% of its flow, rail {:.0} psi", e.fuel_pump_pct, e.fuel_pressure_kpa / 6.895)),
                 ("Volumetric eff.", format!("{:.1}%", e.ve * 100.0)),
                 ("Air flow", format!("{:.0} g/s", e.air_gs)),
                 ("VTEC pins", format!("{:?}", e.vtec_pins.map(|p| (p * 100.0).round() / 100.0))),
@@ -626,7 +663,7 @@ impl Gui {
             c |= num_field(ui, "VTEC point", &mut t.vtec_rpm, 25.0, 2000.0..=9000.0, " rpm");
             c |= num_field(ui, "VTEC minimum MAP", &mut t.vtec_min_map, 1.0, 0.0..=250.0, " kPa");
             c |= num_field(ui, "Rev limit", &mut t.rev_limit, 25.0, 3000.0..=9500.0, " rpm");
-            c |= num_field(ui, "Fuel octane (AKI)", &mut t.octane, 0.5, 85.0..=110.0, "");
+            c |= fuel_fields(ui, t);
             c |= num_field(ui, "Injector size", &mut t.injector_cc, 5.0, 100.0..=2500.0, " cc/min");
             c |= num_field(ui, "Injector dead time", &mut t.injector_dead_ms, 0.01, 0.0..=3.0, " ms");
             c |= num_field(ui, "Clutch capacity", &mut t.clutch_nm, 5.0, 100.0..=1500.0, " Nm");
