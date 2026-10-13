@@ -4,7 +4,7 @@ use crate::engine::Engine;
 use crate::materials::{material, Material};
 use crate::parts::BottomEnd;
 use crate::tables::{clamp, lookup1};
-use crate::thermal::visc_ratio;
+use crate::thermal::{rotating_oil, RotatingOil};
 use crate::tune::Tune;
 use serde::Serialize;
 
@@ -149,11 +149,13 @@ pub struct Internals {
     pub damage: [f64; N],
     /// Name of the part that broke.
     pub failed: Option<&'static str>,
+    /// Oil to the main and rod bearings and squirters on the last step.
+    pub lube: Option<RotatingOil>,
 }
 
 impl Default for Internals {
     fn default() -> Self {
-        Internals { pmax_bar: 0.0, piston_c: 120.0, rod_comp_n: 0.0, rod_tension_n: 0.0, knock_spike: 1.0, sleeve_mpa: 0.0, gasket_lift_bar: 160.0, load: [0.0; N], damage: [0.0; N], failed: None }
+        Internals { pmax_bar: 0.0, piston_c: 120.0, rod_comp_n: 0.0, rod_tension_n: 0.0, knock_spike: 1.0, sleeve_mpa: 0.0, gasket_lift_bar: 160.0, load: [0.0; N], damage: [0.0; N], failed: None, lube: None }
     }
 }
 
@@ -234,7 +236,11 @@ impl Internals {
         let piston_bar = self.pmax_bar / self.knock_spike * (1.0 + (self.knock_spike - 1.0) * brittle);
         let mut load = [0.0; N];
         // Oil film strength scales with viscosity: thin hot oil carries less load.
-        let film = clamp(visc_ratio(e.oil_c, &e.thermal.g).powf(0.3), 0.5, 1.6);
+        // Rod bearing oil film: fed through the crank from the mains, thinned by shear heating and by a
+        // starved supply when oil pressure can't keep up with rpm.
+        let lube = rotating_oil(rpm, e.oil_kpa, e.oil_c, &e.thermal.g, clamp(self.load[3], 0.0, 1.5));
+        let film = lube.rods[0].film;
+        self.lube = Some(lube);
         load[0] = g.piston_stress_per_bar * piston_bar / (mp.fatigue() * derate(mp, self.piston_c));
         load[1] = (self.rod_comp_n / (g.rod_beam_area_m2 * mr.yld() * 1e6 * 0.75)).max(self.rod_tension_n / (g.rod_beam_area_m2 * 1e6) / mr.fatigue());
         load[2] = (0.25 * self.rod_tension_n / g.rod_bolt_stress_area_m2 / 2.0 / 1e6) / mrb.thread_fatigue_mpa.unwrap_or(1.0);

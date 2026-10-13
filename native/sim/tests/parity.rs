@@ -175,6 +175,8 @@ fn cold_start_matches() {
             close(&format!("{tag} oil"), sim.eng.oil_c, f(js, "oilC"), 1e-6, 1e-6);
             close(&format!("{tag} oil pressure"), sim.eng.oil_kpa, f(js, "oilKpa"), 1e-5, 1e-4);
             close(&format!("{tag} friction"), sim.eng.friction_nm, f(js, "frictionNm"), 1e-5, 1e-5);
+            close(&format!("{tag} bearing load"), sim.internals.load[3], f(js, "bearingLoad"), 1e-5, 1e-6);
+            close(&format!("{tag} piston"), sim.internals.piston_c, f(js, "pistonC"), 1e-6, 1e-6);
             k += 1;
         }
     }
@@ -221,4 +223,23 @@ fn turbo_lines_and_heat_soak_match() {
         }
     }
     assert_eq!(k, rows.len());
+}
+
+#[test]
+fn rotating_assembly_oil_matches() {
+    let g = Cooling::default();
+    for case in data()["lube"].as_array().unwrap() {
+        let got = serde_json::to_value(honda_sim_core::thermal::rotating_oil(f(case, "rpm"), f(case, "oilKpa"), f(case, "oilC"), &g, f(case, "loadRatio"))).unwrap();
+        let js = &case["out"];
+        for k in ["feedLpm", "rodNeedKpa", "supply", "splashLpm"] {
+            close(k, f(&got, k), f(js, k), 1e-9, 1e-9);
+        }
+        for (part, keys) in [("mains", &["feedLpm", "filmC", "film"][..]), ("rods", &["feedLpm", "filmC", "film", "fromMain"][..]), ("jets", &["flowLpm"][..])] {
+            for (a, b) in got[part].as_array().unwrap().iter().zip(js[part].as_array().unwrap()) {
+                for k in keys {
+                    close(&format!("{part} {k}"), f(a, k), f(b, k), 1e-9, 1e-9);
+                }
+            }
+        }
+    }
 }

@@ -48,6 +48,7 @@ pub fn render_state(sim: &Sim) -> Value {
             "oilFeedLpm": th.turbo_oil_lpm, "oilKw": th.turbo_oil_kw, "waterKw": th.turbo_water_kw, "waterCooled": tl.water_cooled,
             "housingC": th.turbo_housing_c, "bearingC": th.turbo_bearing_c, "cokingS": th.turbo_coke_s,
         }), None => Value::Null },
+        "rotating": match (&sim.internals.lube, sim.running) { (Some(l), true) => json!(l), _ => json!(crate::thermal::rotating_oil(0.0, 0.0, th.oil_c, tg, 0.5)) },
         "coolantCircuit": c.coolant, "oilCircuit": c.oil,
     });
     let induction = if !t.turbo.enabled { "na" } else if t.turbo.fixed { "supercharger" } else { "turbo" };

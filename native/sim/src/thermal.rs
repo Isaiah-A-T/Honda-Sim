@@ -320,6 +320,78 @@ impl Thermal {
     }
 }
 
+const MAIN_KEYS: [&str; 5] = ["main1", "main2", "main3", "main4", "main5"];
+const ROD_KEYS: [&str; 4] = ["rod1", "rod2", "rod3", "rod4"];
+const JET_KEYS: [&str; 4] = ["jet1", "jet2", "jet3", "jet4"];
+const MAIN_FEED: [&str; 5] = ["Main bearing 1 feed", "Main bearing 2 feed", "Main bearing 3 feed", "Main bearing 4 feed", "Main bearing 5 feed"];
+const ROD_FEED: [&str; 4] = ["Crank oil hole, main 1 to rod journal 1", "Crank oil hole, main 2 to rod journal 2", "Crank oil hole, main 3 to rod journal 3", "Crank oil hole, main 4 to rod journal 4"];
+const JET_FEED: [&str; 4] = ["Piston oil squirter 1 (opens at 200 kPa)", "Piston oil squirter 2 (opens at 200 kPa)", "Piston oil squirter 3 (opens at 200 kPa)", "Piston oil squirter 4 (opens at 200 kPa)"];
+
+#[derive(Serialize, Clone, Debug, PartialEq)]
+#[serde(rename_all = "camelCase")]
+pub struct Journal {
+    pub n: usize,
+    pub feed_lpm: f64,
+    pub film_c: f64,
+    pub film: f64,
+}
+
+#[derive(Serialize, Clone, Debug, PartialEq)]
+#[serde(rename_all = "camelCase")]
+pub struct RodJournal {
+    pub n: usize,
+    pub from_main: usize,
+    pub feed_lpm: f64,
+    pub film_c: f64,
+    pub film: f64,
+}
+
+#[derive(Serialize, Clone, Debug, PartialEq)]
+#[serde(rename_all = "camelCase")]
+pub struct Jet {
+    pub n: usize,
+    pub flow_lpm: f64,
+    pub open: bool,
+}
+
+/// Rotating assembly lubrication (src/thermal.js rotatingOil): main gallery to the five mains, crank oil
+/// holes to the four rod journals (rod n from main n, inferred), four piston squirters, splash back to the pan.
+#[derive(Serialize, Clone, Debug, PartialEq)]
+#[serde(rename_all = "camelCase")]
+pub struct RotatingOil {
+    pub feed_lpm: f64,
+    pub rod_need_kpa: f64,
+    pub supply: f64,
+    pub mains: Vec<Journal>,
+    pub rods: Vec<RodJournal>,
+    pub jets: Vec<Jet>,
+    pub splash_lpm: f64,
+}
+
+pub fn rotating_oil(rpm: f64, oil_kpa: f64, oil_c: f64, g: &Cooling, load_ratio: f64) -> RotatingOil {
+    let rpm = rpm.max(0.0);
+    let lpm = if rpm > 0.0 { (4.0 + g.pump_lpm_per_krpm * rpm / 1000.0 * 0.25).min(60.0) } else { 0.0 };
+    let mains_lpm = lpm * 0.5;
+    let main_lpm = mains_lpm / 5.0;
+    let rod_lpm = main_lpm * 0.6;
+    let rod_need_kpa = 50.0 + 0.03 * rpm;
+    let supply = if rpm > 0.0 { clamp(oil_kpa / rod_need_kpa, 0.0, 1.0).powf(0.5) } else { 0.0 };
+    let shear = (rpm / 8000.0).powf(1.5);
+    let main_film_c = oil_c + 8.0 + 15.0 * shear;
+    let rod_film_c = oil_c + 10.0 + 30.0 * shear * (0.5 + load_ratio) + 40.0 * (1.0 - supply) * shear;
+    let film = |c: f64, sup: f64| clamp(visc_ratio(c, g).powf(0.3), 0.5, 1.6) * (0.4 + 0.6 * sup);
+    let jet_lpm = if oil_kpa >= g.oil_jet_kpa { lpm * 0.1 / 4.0 } else { 0.0 };
+    RotatingOil {
+        feed_lpm: lpm,
+        rod_need_kpa,
+        supply,
+        mains: (1..=5).map(|n| Journal { n, feed_lpm: main_lpm, film_c: main_film_c, film: film(main_film_c, 1.0) }).collect(),
+        rods: (1..=4).map(|n| RodJournal { n, from_main: n, feed_lpm: rod_lpm * supply, film_c: rod_film_c, film: film(rod_film_c, supply) }).collect(),
+        jets: (1..=4).map(|n| Jet { n, flow_lpm: jet_lpm, open: jet_lpm > 0.0 }).collect(),
+        splash_lpm: mains_lpm + jet_lpm * 4.0,
+    }
+}
+
 /// One stretch of hose, passage or line between two components, with what flows in it now.
 #[derive(Serialize, Clone, Debug, PartialEq)]
 #[serde(rename_all = "camelCase")]
@@ -360,12 +432,21 @@ pub fn circuits(th: &Thermal, oil_kpa: f64, turbo: Option<TurboLines>) -> Circui
         seg("sump", "oilPump", "Pickup", oil_lpm, Some(th.oil_c)),
         seg("oilPump", "filter", "Pump to filter", oil_lpm, Some(th.oil_c)),
         seg("filter", "mainGallery", "Filter to main gallery", oil_lpm, Some(th.oil_c)),
-        seg("mainGallery", "mainBearings", "Main bearings, then through the crank to the rod bearings", oil_lpm * 0.5, Some(th.oil_c)),
-        seg("mainGallery", "pistonJets", "Piston oil jets (open above 200 kPa)", if oil_kpa >= g.oil_jet_kpa { oil_lpm * 0.1 } else { 0.0 }, Some(th.oil_c)),
         seg("mainGallery", "head", "Up to the head: cam journals, rocker shafts, VTEC spool and pins", oil_lpm * 0.3, Some(th.oil_c)),
         seg("mainGallery", "vtc", "VTC actuator and chain tensioner", oil_lpm * 0.1, Some(th.oil_c)),
         seg("head", "sump", "Drain back", oil_lpm * 0.4, Some(th.oil_c)),
     ];
+    let rot = rotating_oil(th.pump_lpm / g.pump_lpm_per_krpm * 1000.0, oil_kpa, th.oil_c, g, 0.5);
+    for m in &rot.mains {
+        oil.push(seg("mainGallery", MAIN_KEYS[m.n - 1], MAIN_FEED[m.n - 1], m.feed_lpm, Some(th.oil_c)));
+    }
+    for r in &rot.rods {
+        oil.push(seg(MAIN_KEYS[r.from_main - 1], ROD_KEYS[r.n - 1], ROD_FEED[r.n - 1], r.feed_lpm, Some(r.film_c)));
+    }
+    for j in &rot.jets {
+        oil.push(seg("mainGallery", JET_KEYS[j.n - 1], JET_FEED[j.n - 1], j.flow_lpm, Some(th.oil_c)));
+    }
+    oil.push(seg("mainBearings", "sump", "Splash off the crank, rods and piston undersides, back to the pan", rot.splash_lpm, Some(th.oil_c)));
     if g.oil_cooler != "none" {
         let water = g.oil_cooler == "water";
         oil.splice(1..2, [
@@ -429,9 +510,22 @@ pub const COMPONENTS: &[Component] = &[
     comp!("filter", "oil", "Oil filter", [-0.05, 0.02, -0.16], [0.08, 0.09, 0.08]),
     comp!("oilCooler", "oil", "Water-to-oil cooler (15500-RBC-004), sandwiched under the filter", [-0.05, 0.02, -0.12], [0.09, 0.04, 0.09]),
     comp!("mainGallery", "oil", "Main oil gallery along the block", [0.0, 0.03, -0.08], [0.40, 0.012, 0.012]),
-    comp!("mainBearings", "oil", "Main and rod bearings", [0.0, 0.0, 0.0], [0.40, 0.06, 0.06]),
-    comp!("pistonJets", "oil", "Piston oil jets (15280-PRB-A00), one per cylinder", [0.0, 0.06, -0.05], [0.36, 0.02, 0.02]),
+    comp!("mainBearings", "oil", "Crankshaft and its bearings (the splash zone)", [0.0, 0.0, 0.0], [0.40, 0.12, 0.12]),
     comp!("head", "oil", "Cam journals, rocker shafts, VTEC spool valve and pressure switch", [0.0, 0.32, 0.0], [0.42, 0.06, 0.18]),
     comp!("turbo", "oil", "Turbo centre section (oil feed and drain, water ports), on the exhaust side (turbo builds)", [0.05, 0.22, -0.32], [0.20, 0.18, 0.20]),
     comp!("vtc", "oil", "VTC oil control valve (15830-RBB-003) and intake cam actuator", [0.22, 0.32, 0.06], [0.05, 0.10, 0.10]),
+    // Bore spacing 98 mm, cylinder 1 at +x. Rod journals shown on the crank axis.
+    comp!("main1", "oil", "Main bearing 1", [0.196, 0.0, 0.0], [0.02, 0.06, 0.06]),
+    comp!("main2", "oil", "Main bearing 2", [0.098, 0.0, 0.0], [0.02, 0.06, 0.06]),
+    comp!("main3", "oil", "Main bearing 3", [0.0, 0.0, 0.0], [0.02, 0.06, 0.06]),
+    comp!("main4", "oil", "Main bearing 4", [-0.098, 0.0, 0.0], [0.02, 0.06, 0.06]),
+    comp!("main5", "oil", "Main bearing 5", [-0.196, 0.0, 0.0], [0.02, 0.06, 0.06]),
+    comp!("rod1", "oil", "Rod bearing 1 (big end)", [0.147, 0.0, 0.0], [0.02, 0.05, 0.05]),
+    comp!("jet1", "oil", "Piston oil squirter 1 (15280-PRB-A00)", [0.147, 0.07, -0.045], [0.015, 0.03, 0.015]),
+    comp!("rod2", "oil", "Rod bearing 2 (big end)", [0.049, 0.0, 0.0], [0.02, 0.05, 0.05]),
+    comp!("jet2", "oil", "Piston oil squirter 2 (15280-PRB-A00)", [0.049, 0.07, -0.045], [0.015, 0.03, 0.015]),
+    comp!("rod3", "oil", "Rod bearing 3 (big end)", [-0.049, 0.0, 0.0], [0.02, 0.05, 0.05]),
+    comp!("jet3", "oil", "Piston oil squirter 3 (15280-PRB-A00)", [-0.049, 0.07, -0.045], [0.015, 0.03, 0.015]),
+    comp!("rod4", "oil", "Rod bearing 4 (big end)", [-0.147, 0.0, 0.0], [0.02, 0.05, 0.05]),
+    comp!("jet4", "oil", "Piston oil squirter 4 (15280-PRB-A00)", [-0.147, 0.07, -0.045], [0.015, 0.03, 0.015]),
 ];

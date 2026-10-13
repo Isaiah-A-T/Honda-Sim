@@ -11,7 +11,7 @@ import { createEngine, stepEngine } from '../src/engine.js';
 import { createInternals, stepInternals } from '../src/internals.js';
 import { bottomEnd } from '../src/parts.js';
 import { createSim, step, shift, coldEngine } from '../src/sim.js';
-import { createThermal, stepThermal } from '../src/thermal.js';
+import { createThermal, stepThermal, rotatingOil } from '../src/thermal.js';
 
 const out = p => new URL(`../native/sim/data/${p}`, import.meta.url);
 writeFileSync(out('materials.json'), JSON.stringify(MATERIALS, null, 1));
@@ -80,7 +80,7 @@ const coldStart = [];
 for (let i = 0; i < 4000; i++) {
   if (i === 2000) shift(cold, 1);
   step(cold, { throttle: i < 2000 ? 0 : 0.3, brake: 0, clutch: null }, 0.01);
-  if (i % 250 === 249) coldStart.push({ t: cold.t, rpm: cold.eng.rpm, speedMs: cold.car.speedMs, ectC: cold.eng.ect, oilC: cold.eng.oilC, oilKpa: cold.eng.oilKpa, frictionNm: cold.eng.frictionNm });
+  if (i % 250 === 249) coldStart.push({ t: cold.t, rpm: cold.eng.rpm, speedMs: cold.car.speedMs, ectC: cold.eng.ect, oilC: cold.eng.oilC, oilKpa: cold.eng.oilKpa, frictionNm: cold.eng.frictionNm, bearingLoad: cold.internals.load.bearing, pistonC: cold.internals.pistonC });
 }
 
 // A turbo build pulling hard, then switched off hot: the turbo's oil and water lines and heat soak.
@@ -93,5 +93,8 @@ for (let i = 0; i < 6000; i++) {
   if (i % 250 === 249) { const th = tsim.eng.thermal; turboSoak.push({ t: tsim.t, rpm: tsim.eng.rpm, housingC: th.turboHousingC, bearingC: th.turboBearingC, oilLpm: th.turboOilLpm, oilC: th.oilC, ectC: th.coolantC }); }
 }
 
-writeFileSync(out('parity.json'), JSON.stringify({ veCorrLow: VE_CORR_LOW, veCorrHigh: VE_CORR_HIGH, gas, engine, parts, drive, thermal, coldStart, turboSoak }, null, 1));
+const lube = [[800, 150, 25, 0.2], [3000, 390, 90, 0.5], [7000, 500, 100, 0.6], [7000, 100, 100, 0.6], [8000, 600, 140, 1.2], [0, 0, 80, 0.5]]
+  .map(([rpm, oilKpa, oilC, loadRatio]) => ({ rpm, oilKpa, oilC, loadRatio, out: rotatingOil(rpm, oilKpa, oilC, undefined, loadRatio) }));
+
+writeFileSync(out('parity.json'), JSON.stringify({ veCorrLow: VE_CORR_LOW, veCorrHigh: VE_CORR_HIGH, gas, engine, parts, drive, thermal, coldStart, turboSoak, lube }, null, 1));
 console.log(`gas ${gas.length}, engine ${engine.length}, parts ${parts.length}, drive ${drive.length}`);
