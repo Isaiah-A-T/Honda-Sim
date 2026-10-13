@@ -1,0 +1,47 @@
+# Builds HondaSim.exe (one Windows program, no installer) and publishes it as a GitHub release when a
+# version tag is pushed: git tag v0.9.0 && git push origin v0.9.0
+# Release notes come from .github/release-notes/<tag>.md when that file exists.
+name: Release
+
+on:
+  push:
+    tags: ['v*']
+
+permissions:
+  contents: write
+
+jobs:
+  windows-exe:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Install the Windows cross-compiler
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y mingw-w64
+          rustup target add x86_64-pc-windows-gnu
+
+      - name: Test the sim against the JavaScript model
+        working-directory: native
+        run: |
+          sudo apt-get install -y libudev-dev pkg-config
+          cargo test --release -p honda-sim-core
+
+      - name: Build HondaSim.exe
+        working-directory: native
+        run: cargo build --release --target x86_64-pc-windows-gnu
+
+      - name: Publish the release
+        env:
+          GH_TOKEN: ${{ github.token }}
+          TAG: ${{ github.ref_name }}
+        run: |
+          exe=native/target/x86_64-pc-windows-gnu/release/HondaSim.exe
+          notes=.github/release-notes/$TAG.md
+          if [ -f "$notes" ]; then
+            sed -i "s/^SHA-256 of .*$/SHA-256 of \`HondaSim.exe\`: \`$(sha256sum "$exe" | cut -d' ' -f1)\`/" "$notes"
+          else
+            notes=$(mktemp); echo "Honda Sim $TAG for Windows." > "$notes"
+          fi
+          gh release create "$TAG" "$exe" --title "Honda Sim ${TAG#v} (Windows)" --notes-file "$notes" --prerelease
