@@ -81,7 +81,8 @@
         <label class="inline"><input type="checkbox" id="setTurbo"> Turbo</label>
         <label>Wastegate spring kPa <input type="number" id="setSpring" step="1"></label>
         <label>Turbo max boost kPa <input type="number" id="setMaxBoost" step="5"></label>
-        <label>Spool rpm <input type="number" id="setSpool" step="100"></label>
+        <label>Boost starts at g/s <input type="number" id="setSpool" step="5" title="Engine airflow where the turbo starts making boost"></label>
+        <label>Full boost at g/s <input type="number" id="setFullBoost" step="5" title="Engine airflow where the turbo can hold its full boost"></label>
         <label>WG duty gain <input type="number" id="setWgGain" step="0.05" title="How strongly solenoid duty raises boost above the spring. 1 means 100% duty reaches max boost. Match it to a real datalog."></label>
         <label>Fuel table units
           <select id="setFuelUnits"><option value="lambda">Lambda target</option><option value="afr">AFR target</option><option value="ms">Injector ms</option></select></label>

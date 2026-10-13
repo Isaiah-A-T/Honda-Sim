@@ -29,7 +29,7 @@ const boostedTune = (octane, injCc) => {
   return { ...turboSetup(), octane, injectorCc: injCc, fuelUnits: 'lambda', fuelLow: lam, fuelHigh: lam, ignLow: ign, ignHigh: ign, revLimit: 9000, overboostKpa: 400, torqueLimitNm: Infinity };
 };
 // Fixed boost from a given rpm up: wastegate spring = target boost, turbo big enough to hold it.
-const fixedBoost = (tune, psi, fullAtRpm) => ({ ...tune, turbo: { enabled: true, maxBoostKpa: psi / 0.145, springKpa: psi / 0.145, spoolRpm: fullAtRpm / 1.4 } });
+const fixedBoost = (tune, psi) => ({ ...tune, turbo: { enabled: true, maxBoostKpa: psi / 0.145, springKpa: psi / 0.145, spoolStartGs: 0, fullBoostGs: 1, responsePerS: 20 } });
 
 const fmt = (x, d = 0) => x.toFixed(d);
 const rows = [];
@@ -46,12 +46,12 @@ rows.push(['Hondata reflash VTEC 4,500 on stock hardware', 'Hondata: loses power
 
 // 3. PRL kit with Precision 6262, stock internals, 93 octane, 1200 cc: 335 whp @ 5.6 psi, 357 whp @ 7 psi.
 for (const [psi, pub] of [[5.6, 335], [7, 357]]) {
-  const r = sweep(fixedBoost(boostedTune(93, 1200), psi, 4500), 3000, 8000);
+  const r = sweep(fixedBoost(boostedTune(93, 1200), psi), 3000, 8000);
   rows.push([`Precision 6262 @ ${psi} psi, 93 octane`, `JD Tuning: ${pub} whp`, `${fmt(r.pHp.whp)} whp @ ${r.pHp.rpm}, ${fmt(r.pTq.wtq)} lb-ft @ ${r.pTq.rpm}`]);
 }
 
 // 4. Kraftwerks supercharger, 12.8 psi at 8,400, 93 octane, 1000 cc: 390 whp and 258 lb-ft @ 8,400.
-const sc = fixedBoost(boostedTune(93, 1000), 12.8, 4000);
+const sc = fixedBoost(boostedTune(93, 1000), 12.8);
 const sc84 = wot(sc, 8400);
 rows.push(['Kraftwerks supercharger @ 12.8 psi, 93 octane', 'DSPORT: 390 whp and 258 lb-ft @ 8,400',
   `${fmt(hp(sc84.torqueNm, 8400) * eff)} whp and ${fmt(sc84.torqueNm * NM_LBFT * eff)} lb-ft @ 8,400 (before supercharger drive losses)`]);

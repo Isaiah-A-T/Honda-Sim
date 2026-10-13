@@ -44,8 +44,8 @@ export const TORQUE_TARGETS = {
 
 // Volumetric efficiency at wide-open throttle, solved from TORQUE_TARGETS (run tools/calibrate.mjs).
 export const VE_RPM = TORQUE_TARGETS.low.map(([r]) => r);
-export const VE_LOW = [0.5898, 0.6983, 0.7825, 0.8206, 0.8606, 0.8933, 0.9093, 0.9135, 0.9088, 0.8866, 0.7883, 0.7152, 0.679];
-export const VE_HIGH = [0.3867, 0.6028, 0.7213, 0.8115, 0.8739, 0.9379, 1.031, 1.0405, 1.0304, 1.0188, 0.9873, 0.9516, 0.9119];
+export const VE_LOW = [0.5811, 0.6877, 0.7699, 0.8068, 0.8455, 0.877, 0.892, 0.8952, 0.8899, 0.8663, 0.7657, 0.6901, 0.6528];
+export const VE_HIGH = [0.3812, 0.5927, 0.7079, 0.7949, 0.8558, 0.9192, 1.0125, 1.0216, 1.0108, 0.9986, 0.9658, 0.9287, 0.8874];
 
 export function trueVE(rpm, highCam) {
   return highCam ? lookup1(VE_HIGH_RPM, VE_HIGH, rpm) : lookup1(VE_RPM, VE_LOW, rpm);
@@ -87,22 +87,25 @@ export function placeholderTune() {
     revLimit: 8000,
     revLimitHyst: 200,
     octane: 91,
-    turbo: { ...TURBO_GT3582R, enabled: false },
+    turbo: { ...TURBO_GT35, enabled: false },
     injectorCc: ENGINE.injectorCcMin,
     injectorDeadMs: ENGINE.injectorDeadMs,
     clutchNm: CAR.clutchCapacityNm,
   };
 }
 
-// Garrett GT3582R on a 2.0 L: full boost around 4,500–5,000 rpm. Values are kPa of boost (gauge).
-export const TURBO_GT3582R = { name: 'Garrett GT3582R', maxBoostKpa: 165, spoolRpm: 3400, springKpa: 48 };
+// A GT35-class ball-bearing turbo on a 2.0 L, described by airflow: it starts making boost at about
+// 50 g/s through the engine (≈3,000 rpm at full throttle) and can hold full boost from about 105 g/s.
+// maxBoostKpa is what the compressor can push at this engine's airflow. All estimates; adjust them to
+// match a boost log from the car.
+export const TURBO_GT35 = { name: 'GT35-class turbo (estimated)', spoolStartGs: 50, fullBoostGs: 105, maxBoostKpa: 160, springKpa: 48, responsePerS: 2.5 };
 
-// Turbo build on stock internals: GT3582R, 1000 cc injectors, 4-bar MAP, overboost cut and a torque
+// Turbo build on stock internals: GT35-class turbo, 1000 cc injectors, 4-bar MAP, overboost cut and a torque
 // warning for the stock rods. Tables still come from the user's tune.
 export function turboSetup(tune = placeholderTune()) {
   return {
     ...tune,
-    turbo: { ...TURBO_GT3582R, enabled: true },
+    turbo: { ...TURBO_GT35, enabled: true },
     injectorCc: 1000,
     injectorDeadMs: 1.0,
     overboostKpa: 200,

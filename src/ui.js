@@ -99,7 +99,7 @@ function renderSettings() {
   const T = tune.turbo || {};
   $('setTurbo').checked = !!T.enabled;
   for (const [id, v] of [['setInjCc', tune.injectorCc], ['setDead', tune.injectorDeadMs], ['setOverboost', tune.overboostKpa], ['setTorqueLim', tune.torqueLimitNm],
-    ['setClutch', tune.clutchNm], ['setSpring', T.springKpa], ['setMaxBoost', T.maxBoostKpa], ['setSpool', T.spoolRpm], ['setWgGain', T.wgGain ?? 1]]) $(id).value = v ?? '';
+    ['setClutch', tune.clutchNm], ['setSpring', T.springKpa], ['setMaxBoost', T.maxBoostKpa], ['setSpool', T.spoolStartGs], ['setFullBoost', T.fullBoostGs], ['setWgGain', T.wgGain ?? 1]]) $(id).value = v ?? '';
 }
 
 function applyTune(t) {
@@ -122,7 +122,7 @@ for (const [id, key] of [['setInjCc', 'injectorCc'], ['setDead', 'injectorDeadMs
     if (v === undefined || Number.isFinite(v)) { tune[key] = v; saveTune(tune); }
   });
 }
-for (const [id, key] of [['setSpring', 'springKpa'], ['setMaxBoost', 'maxBoostKpa'], ['setSpool', 'spoolRpm'], ['setWgGain', 'wgGain']]) {
+for (const [id, key] of [['setSpring', 'springKpa'], ['setMaxBoost', 'maxBoostKpa'], ['setSpool', 'spoolStartGs'], ['setFullBoost', 'fullBoostGs'], ['setWgGain', 'wgGain']]) {
   $(id).addEventListener('change', ev => {
     const v = Number(ev.target.value);
     if (Number.isFinite(v)) { tune.turbo = { ...tune.turbo, [key]: v }; saveTune(tune); }

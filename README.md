@@ -39,9 +39,9 @@ Keyboard: W/↑ throttle, S/↓ brake, C or Space clutch, E/Q shift up/down, 1�
 
 ## Turbo builds
 
-**Turbo build preset** switches on a Garrett GT3582R, 1000 cc injectors, a 200 kPa overboost cut, an upgraded clutch,
+**Turbo build preset** switches on a GT35-class turbo (spool and boost limits are estimates you can adjust), 1000 cc injectors, a 200 kPa overboost cut, an upgraded clutch,
 and a torque warning (RODS lamp) at 350 Nm for stock connecting rods. Your tables stay as they are.
-Boost comes from the wastegate spring plus the wastegate duty table. How much boost a given duty makes depends on your
+Boost builds with airflow through the engine and is held by the wastegate spring plus the wastegate duty table. How much boost a given duty makes depends on your
 solenoid and wastegate, so set **WG duty gain** until the sim's boost matches a real datalog.
 
 ## Engine internals

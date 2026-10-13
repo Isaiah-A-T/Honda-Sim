@@ -13,6 +13,7 @@ const AIR_DENSITY_G_PER_L = 1.184;   // 25 °C, sea level
 const FUEL_LHV_J_PER_G = 44000;
 const INDICATED_EFF = 0.40;
 const STOICH = 14.7;
+const DECEL_AIR = 4.5;                 // % opening the idle valve holds on decel so the manifold doesn't go to near-vacuum
 const FUEL_DENSITY_G_PER_CC = 0.745;
 
 export function createEngine(tune) {
@@ -42,30 +43,31 @@ export function stepEngine(e, pedal, dt) {
   if (pedal < 0.02 && rpm < ENGINE.idleRpm + 600) {
     e.idleI = clamp(e.idleI + idleErr * 0.004 * dt, 0, 10);
     e.idleAir = clamp(e.idleI + idleErr * 0.006, 0, 15);
-  } else e.idleAir += (e.idleI - e.idleAir) * Math.min(1, dt * 2);
+  } else e.idleAir += ((pedal < 0.02 ? DECEL_AIR : e.idleI) - e.idleAir) * Math.min(1, dt * 2);
   e.tps = clamp(pedal * 100 + (pedal < 0.02 ? e.idleAir : 0), 0, 100);
 
-  // Turbo: what it can make at this rpm and throttle, held back by the wastegate. The wastegate opens at
-  // its spring pressure; the boost solenoid duty from the tune lets boost climb above the spring.
+  // Turbo: exhaust flow drives the turbine, so the boost it can make grows with airflow through the
+  // engine (more boost → more air → more boost). The wastegate opens at its spring pressure; solenoid
+  // duty from the tune holds it shut longer and lets boost rise above the spring.
   const tb = t.turbo;
   e.boostTarget = t.boostTarget ? lookup2(t.boostTarget, rpm, e.map) : NaN;
   e.wgDuty = 0;
   let boostT = 0;
   if (tb?.enabled) {
-    const spool = clamp((rpm - tb.spoolRpm * 0.6) / (tb.spoolRpm * 0.8), 0, 1) ** 1.6 * clamp((e.tps - 30) / 60, 0, 1);
+    const drive = clamp((e.airGs - tb.spoolStartGs) / (tb.fullBoostGs - tb.spoolStartGs), 0, 1);
     const spring = Math.min(tb.springKpa, tb.maxBoostKpa);
     e.wgDuty = t.wgDuty ? clamp(lookup2(t.wgDuty, rpm, e.map), 0, 100) : 0;
     // Duty → boost depends on the solenoid and wastegate; wgGain scales it (1 = full duty reaches max boost).
-    boostT = Math.min(tb.maxBoostKpa * spool, spring + clamp(e.wgDuty / 100 * (tb.wgGain ?? 1), 0, 1) * (tb.maxBoostKpa - spring));
-    if (e.boostCut || e.revCut) boostT *= 0.3;                       // fuel cut: no exhaust energy to drive the turbo
+    const wastegateLimit = spring + clamp(e.wgDuty / 100 * (tb.wgGain ?? 1), 0, 1) * (tb.maxBoostKpa - spring);
+    boostT = Math.min(tb.maxBoostKpa * drive, wastegateLimit);
+    if (e.boostCut || e.revCut || e.dfco) boostT = 0;                 // no fuel, no exhaust energy
   }
-  e.boost += (boostT - e.boost) * Math.min(1, dt * (boostT > e.boost ? 2.5 : 8));
+  e.boost += (boostT - e.boost) * Math.min(1, dt * (boostT > e.boost ? (tb?.responsePerS ?? 2.5) : 6));
   e.iat += ((25 + e.boost * 0.12) - e.iat) * Math.min(1, dt * 0.3);   // intercooled: some heat soak on boost
 
-  // Manifold pressure follows throttle and rpm (more rpm pulls the manifold down at part throttle), plus boost.
-  const k = 0.06 * Math.sqrt(3000 / Math.max(rpm, 600));
-  const mapTarget = 12 + 88 * (1 - Math.exp(-e.tps * k)) + e.boost;
-  e.map += (mapTarget - e.map) * Math.min(1, dt * (mapTarget > e.map ? 6 : 9));
+  // Manifold pressure: where airflow through the throttle balances what the engine pumps out.
+  const mapTarget = manifoldPressure(e.tps, rpm, trueVE(rpm, e.highCam), 101.3 + e.boost, e.iat);
+  e.map += (mapTarget - e.map) * Math.min(1, dt * 12);
 
   // VTEC: switch to high cam above the set rpm at load, with a little hysteresis.
   if (!e.highCam && rpm >= t.vtecRpm && e.map >= t.vtecMinMap) e.highCam = true;
@@ -132,6 +134,34 @@ export function stepEngine(e, pedal, dt) {
   e.sparkEff = sparkEff;
   e.mbt = best;
   return e.torqueNm;
+}
+
+// Throttle body: 62 mm bore (estimate), plate closed at 7°, discharge coefficient 0.75, plus a small
+// leak past the closed plate. Flow through it is compressible orifice flow, choked below ~53% of the
+// upstream pressure. The engine pumps VE × displacement × rpm/120 of manifold air.
+const THROTTLE_D_M = 0.062, PLATE_CLOSED_DEG = 7, THROTTLE_CD = 0.75, LEAK_M2 = 8e-6, R_AIR = 287, GAMMA = 1.4;
+export function throttleAreaM2(tps) {
+  const full = Math.PI / 4 * THROTTLE_D_M ** 2;
+  const a = (PLATE_CLOSED_DEG + clamp(tps, 0, 100) / 100 * (90 - PLATE_CLOSED_DEG)) * Math.PI / 180;
+  return LEAK_M2 + full * (1 - Math.cos(a) / Math.cos(PLATE_CLOSED_DEG * Math.PI / 180));
+}
+function orificeFlow(areaM2, upKpa, downKpa, tempK) {
+  const pr = clamp(downKpa / upKpa, 0, 1);
+  const crit = (2 / (GAMMA + 1)) ** (GAMMA / (GAMMA - 1));
+  const psi = pr <= crit
+    ? Math.sqrt(GAMMA * (2 / (GAMMA + 1)) ** ((GAMMA + 1) / (GAMMA - 1)))
+    : Math.sqrt(2 * GAMMA / (GAMMA - 1) * (pr ** (2 / GAMMA) - pr ** ((GAMMA + 1) / GAMMA)));
+  return THROTTLE_CD * areaM2 * upKpa * 1000 / Math.sqrt(R_AIR * tempK) * psi;     // kg/s
+}
+export function manifoldPressure(tps, rpm, ve, upstreamKpa, iatC = 25) {
+  const T = 273 + iatC, area = throttleAreaM2(tps);
+  const pumped = p => ve * ENGINE.displacementL / 1000 * Math.max(rpm, 1) / 120 * p * 1000 / (R_AIR * T);
+  let lo = 0.5, hi = upstreamKpa;
+  for (let i = 0; i < 40; i++) {
+    const mid = (lo + hi) / 2;
+    if (orificeFlow(area, upstreamKpa, mid, T) > pumped(mid)) lo = mid; else hi = mid;
+  }
+  return (lo + hi) / 2;
 }
 
 export const hp = (torqueNm, rpm) => torqueNm * rpm / 7120.9;   // metric Nm·rpm → hp
