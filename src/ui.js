@@ -284,20 +284,27 @@ function updateInternals() {
   if (s.failed) $('failBanner').textContent = `Engine failure: ${s.failed}. Press Rebuild engine to fit fresh parts.`;
 }
 
-// ------------------------------------------------------------------ 3D view (loaded on demand so the rest works without WebGL)
-let r3d = null, r3dVisible = true;
-import('./render3d.js').then(({ createRenderer }) => {
-  try {
-    r3d = createRenderer($('r3d'));
-    r3d.setTimeScale(Number($('r3dSpeed').value));
-  } catch (err) {
-    $('r3d').textContent = `3D view unavailable: ${err.message}`;
-  }
-}).catch(err => { $('r3d').textContent = `3D view unavailable: ${err.message}`; });
-$('r3dSpeed').addEventListener('change', ev => r3d?.setTimeScale(Number(ev.target.value)));
-$('r3dStress').addEventListener('change', ev => r3d?.setStress(ev.target.checked));
-$('r3dCut').addEventListener('change', ev => r3d?.setCutaway(ev.target.checked));
-new IntersectionObserver(([en]) => { r3dVisible = en.isIntersecting; }).observe($('r3d'));
+// ------------------------------------------------------------------ 3D view (renderer/ module, loaded on demand so the rest works without WebGL)
+// The view gets everything through renderer/src/sim-adapter.js, so the sim and the renderer can change independently.
+const MATERIAL_FAMILY = { pistonAl: 'aluminum', rodPM: 'steel', rodBolt: 'steel', bearing: 'aluminum', crank: 'steel', gasket: 'steel', valveSpring: 'steel' };
+const VIEW_PART = { pistons: 'piston', rods: 'rod', crank: 'crank', head: 'gasket', valves: 'valvetrain' };   // view part → internals part
+const partMaterials = Object.fromEntries(Object.entries(VIEW_PART).map(([view, key]) => {
+  const p = PARTS.find(x => x.key === key), m = MATERIALS[p.material];
+  return [view, { part: p.name, label: m.name, family: MATERIAL_FAMILY[p.material] ?? 'steel', detail: `Yield ${m.yieldMPa} MPa, tensile ${m.utsMPa} MPa` }];
+}));
+let r3d = null, r3dVisible = true, stateFromSim = null;
+Promise.all([import('../renderer/src/engine-renderer.js'), import('../renderer/src/gui.js'), import('../renderer/src/sim-adapter.js')])
+  .then(([{ createEngineRenderer }, { createEngineGui }, adapter]) => {
+    try {
+      r3d = createEngineRenderer($('r3d'), { slowMo: Number($('r3dSpeed').value) });
+      createEngineGui(r3d, { partMaterials });
+      stateFromSim = adapter.stateFromSim;
+    } catch (err) {
+      $('r3d').textContent = `3D view unavailable: ${err.message}`;
+    }
+  }).catch(err => { $('r3d').textContent = `3D view unavailable: ${err.message}`; });
+$('r3dSpeed').addEventListener('change', ev => r3d?.setOptions({ slowMo: Number(ev.target.value) }));
+new IntersectionObserver(([en]) => { r3dVisible = en.isIntersecting; r3d?.pause(!en.isIntersecting); }).observe($('r3d'));
 
 // ------------------------------------------------------------------ main loop
 function handleEvents(events) {
@@ -370,7 +377,7 @@ function loop(now) {
   updateDash(input);
   highlightCell();
   if (frame++ % 6 === 0) { drawDyno(); updateInternals(); }
-  if (r3d && r3dVisible) r3d.update(sim, dt);
+  if (r3d && r3dVisible) r3d.setState(stateFromSim(sim));
   $('btnCsv').disabled = sim.logging || !sim.log.length;
   requestAnimationFrame(loop);
 }

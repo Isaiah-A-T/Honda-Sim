@@ -57,7 +57,7 @@ The **3D engine** panel draws the block, pistons, rods, crank, cams, valves and 
 with the sim at real time or slowed down (1/10, 1/50, 1/200). Parts are colored by the stress the internals model
 reports; a failed part flashes. Combustion shows as a glow on each power stroke, white when it knocks.
 Dimensions are to scale where known (86 mm bore and stroke, 139 mm rods, firing order 1-3-4-2); shapes are simplified.
-It uses [Three.js](https://threejs.org) r160, included in `vendor/` (MIT license) so the app still runs offline.
+It uses [Three.js](https://threejs.org) r169, included in `vendor/` (MIT license) so the app still runs offline.
 
 ## How it works
 
@@ -68,7 +68,7 @@ It uses [Three.js](https://threejs.org) r160, included in `vendor/` (MIT license
 | `src/engine.js` | Runs the tune like the ECU (fuel, low/high cam ignition, VTEC, rev limit, decel cut, idle) and works out torque |
 | `src/vehicle.js` | Clutch, gearbox and road load |
 | `src/internals.js` | Cylinder pressure, part loads, materials and fatigue |
-| `src/render3d.js` | Three.js engine model, animated from the sim and colored by stress |
+| `renderer/` | 3D engine view as its own module: models, animation, view modes (internals, block, airflow, stress, materials) and their panels. It reads the sim only through `renderer/src/sim-adapter.js`; see [renderer/README.md](renderer/README.md) |
 | `src/sim.js` | Ties it together: shifting, auto-clutch, stalling, datalog |
 | `src/input.js` | Gamepad API wheel/pedal mapping and keyboard |
 | `src/ui.js` | Dash, table view with the active cell highlighted, dyno chart |

@@ -1,0 +1,142 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<title>K20Z3 Engine View</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Barlow+Semi+Condensed:wght@500;700&family=Barlow:wght@400;500&family=JetBrains+Mono:wght@400;600&display=swap">
+<script type="importmap">
+{ "imports": { "three": "../vendor/three.module.min.js",
+  "three/addons/controls/OrbitControls.js": "../vendor/OrbitControls.js",
+  "three/addons/environments/RoomEnvironment.js": "../vendor/RoomEnvironment.js" } }
+</script>
+<style>
+/* Layout: one screen, 3D view fills the left, a narrow instrument rail on the right (stacks under it on phones). */
+:root {
+  --bg: #e9ecef; --panel: #f7f8f9; --line: #cfd5dc; --fg: #1b2026; --muted: #5d6874;
+  --accent: #c8102e;      /* Honda red, used for the VTEC lamp and the rpm bar */
+  --ok: #1f9d55; --warn: #d98a00; --bad: #d42a1f; --vtec: #1f9d55;
+  --view: radial-gradient(ellipse at 50% 40%, #fbfcfd 0%, #dfe4e9 70%);
+  --display: "Barlow Semi Condensed", "Arial Narrow", system-ui, sans-serif;
+  --body: "Barlow", system-ui, sans-serif;
+  --mono: "JetBrains Mono", ui-monospace, "SFMono-Regular", Menlo, monospace;
+}
+@media (prefers-color-scheme: dark) { :root:not([data-theme="light"]) {
+  --bg: #111417; --panel: #181c20; --line: #2b3239; --fg: #e8ecf0; --muted: #8b96a2;
+  --accent: #ff3b4f; --ok: #3fcf7f; --warn: #f2a93b; --bad: #ff5a4e; --vtec: #3fcf7f;
+  --view: radial-gradient(ellipse at 50% 40%, #252b31 0%, #0d1013 75%); color-scheme: dark; } }
+:root[data-theme="dark"] {
+  --bg: #111417; --panel: #181c20; --line: #2b3239; --fg: #e8ecf0; --muted: #8b96a2;
+  --accent: #ff3b4f; --ok: #3fcf7f; --warn: #f2a93b; --bad: #ff5a4e; --vtec: #3fcf7f;
+  --view: radial-gradient(ellipse at 50% 40%, #252b31 0%, #0d1013 75%); color-scheme: dark; }
+
+html, body { height: 100%; }
+[hidden] { display: none !important; }
+body { margin: 0; background: var(--bg); color: var(--fg); font: 14px/1.45 var(--body); }
+.app { height: 100%; display: grid; grid-template-columns: minmax(0, 1fr) 340px; }
+.stage { position: relative; min-width: 0; min-height: 0; background: var(--view); }
+#viewport { position: absolute; inset: 0; }
+.title h1 { margin: 0; font: 700 22px/1.1 var(--display); letter-spacing: .02em; text-wrap: balance; }
+.title p { margin: 2px 0 0; color: var(--muted); font-size: 12px; }
+button, select { font: 500 13px var(--body); color: var(--fg); background: var(--panel); border: 1px solid var(--line);
+  border-radius: 6px; padding: 6px 10px; cursor: pointer; }
+button:hover { border-color: var(--muted); }
+button:focus-visible, select:focus-visible, input:focus-visible { outline: 2px solid var(--accent); outline-offset: 2px; }
+.hint { position: absolute; right: 16px; bottom: 16px; text-align: right; color: var(--muted); font-size: 12px; pointer-events: none; }
+
+aside { background: var(--panel); border-left: 1px solid var(--line); overflow-y: auto; padding: 16px; display: grid; gap: 18px; align-content: start; }
+h2 { margin: 0 0 8px; font: 700 12px var(--display); text-transform: uppercase; letter-spacing: .1em; color: var(--muted); }
+.tach { display: grid; gap: 6px; }
+.tach .big { font: 600 40px/1 var(--mono); font-variant-numeric: tabular-nums; }
+.tach .big small { font: 500 13px var(--body); color: var(--muted); margin-left: 4px; }
+.rpmbar { height: 6px; border-radius: 3px; background: var(--line); overflow: hidden; position: relative; }
+.rpmbar i { display: block; height: 100%; width: 0; background: var(--accent); }
+.rpmbar::after { content: ""; position: absolute; left: calc(8000 / 8500 * 100%); top: 0; bottom: 0; width: 2px; background: var(--bad); }
+.lamps { display: flex; gap: 6px; }
+.lamp { font: 700 11px var(--display); letter-spacing: .08em; padding: 3px 8px; border-radius: 4px; border: 1px solid var(--line); color: var(--muted); }
+.lamp.on { color: #fff; border-color: transparent; }
+#hVtec.on { background: var(--vtec); } #hKnock.on { background: var(--bad); } #hCut.on { background: var(--warn); }
+.readouts { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 8px 12px; margin: 0; }
+.readouts div { display: grid; gap: 0; border-bottom: 1px solid var(--line); padding-bottom: 4px; }
+.readouts dt { color: var(--muted); font-size: 12px; } .readouts dd { margin: 0; font: 500 13px var(--mono); font-variant-numeric: tabular-nums; }
+#modePanel { border-top: 1px solid var(--line); border-bottom: 1px solid var(--line); padding-block: 14px; }
+#cyls { list-style: none; margin: 0; padding: 0; display: grid; grid-template-columns: repeat(4, 1fr); gap: 4px; }
+#cyls li { text-align: center; font-size: 11px; padding: 4px 0; border-radius: 4px; background: var(--bg); color: var(--muted); }
+#cyls li b { display: block; font: 600 15px var(--mono); color: var(--fg); }
+#cyls li.power { box-shadow: inset 0 -3px 0 var(--warn); }
+#stressList { list-style: none; margin: 0; padding: 0; display: grid; gap: 6px; }
+#stressList li { display: grid; grid-template-columns: 104px minmax(0, 1fr) 44px; align-items: center; gap: 8px; font-size: 13px; }
+#stressList b { font: 500 12px var(--mono); text-align: right; font-variant-numeric: tabular-nums; }
+.meter { height: 6px; background: var(--bg); border-radius: 3px; overflow: hidden; }
+.meter i { display: block; height: 100%; width: 0; transition: width .1s linear; background: var(--ok); }
+.meter i[data-level=mid] { background: #e3c22a; } .meter i[data-level=high] { background: var(--warn); } .meter i[data-level=over] { background: var(--bad); }
+.note { color: var(--muted); font-size: 12px; margin: 6px 0 0; }
+.ctrl { display: grid; gap: 10px; }
+.ctrl label { display: grid; grid-template-columns: 104px minmax(0, 1fr) 54px; align-items: center; gap: 8px; font-size: 13px; }
+.ctrl label output { font: 500 12px var(--mono); text-align: right; }
+.ctrl .check { display: flex; gap: 8px; }
+.seg { display: flex; gap: 0; border: 1px solid var(--line); border-radius: 6px; overflow: hidden; }
+.seg label { flex: 1; display: block; text-align: center; padding: 6px; cursor: pointer; }
+.seg input { position: absolute; opacity: 0; }
+.seg label:has(input:checked) { background: var(--fg); color: var(--panel); }
+.seg label:has(input:focus-visible) { outline: 2px solid var(--accent); outline-offset: -2px; }
+input[type=range] { width: 100%; accent-color: var(--accent); }
+
+@media (max-width: 760px) {
+  .app { grid-template-columns: 1fr; grid-template-rows: 58vh auto; height: auto; }
+  .stage { height: 58vh; }
+  aside { border-left: 0; border-top: 1px solid var(--line); overflow: visible; }
+  .hint { display: none; }
+}
+@media (prefers-reduced-motion: reduce) { .meter i { transition: none; } }
+</style>
+</head>
+<body>
+<div class="app">
+  <section class="stage">
+    <div id="viewport" aria-label="3D view of the K20Z3 engine"></div>
+    <div class="hint">Drag to orbit · scroll to zoom · hover a part</div>
+  </section>
+
+  <aside>
+    <header class="title"><h1>K20Z3 engine view</h1><p>Fake sim data · demo for Honda Sim</p></header>
+    <section class="tach">
+      <div class="big"><span id="hRpm">0</span><small>rpm</small></div>
+      <div class="rpmbar"><i id="rpmFill"></i></div>
+      <div class="lamps"><span class="lamp" id="hVtec">VTEC</span><span class="lamp" id="hKnock">KNOCK</span><span class="lamp" id="hCut">CUT</span></div>
+      <dl class="readouts">
+        <div><dt>Boost</dt><dd><span id="hBoost">0</span> psi</dd></div>
+        <div><dt>MAP</dt><dd><span id="hMap">0</span> kPa</dd></div>
+        <div><dt>Ignition</dt><dd><span id="hIgn">0</span>° BTDC</dd></div>
+      </dl>
+    </section>
+
+    <section id="modePanel"></section>
+
+    <section class="ctrl">
+      <h2>Drive</h2>
+      <div class="seg" role="radiogroup" aria-label="Data source">
+        <label><input type="radio" name="mode" value="pull" id="modePull" checked>Scripted pull</label>
+        <label><input type="radio" name="mode" value="manual" id="modeManual">Sliders</label>
+      </div>
+      <div id="manual" class="ctrl" hidden>
+        <label for="inRpm">Rpm <input type="range" id="inRpm" min="800" max="8200" step="50" value="3000"><output id="inRpmVal"></output></label>
+        <label for="inThrottle">Throttle % <input type="range" id="inThrottle" min="0" max="100" value="40"><output id="inThrottleVal"></output></label>
+        <label for="inBoost" id="boostRow">Boost kPa <input type="range" id="inBoost" min="0" max="200" value="110"><output id="inBoostVal"></output></label>
+      </div>
+      <button id="btnKnock">Make it knock</button>
+    </section>
+
+    <section class="ctrl">
+      <h2>Playback</h2>
+      <label for="inSlow">Speed <input type="range" id="inSlow" min="2" max="1000" value="20"><output id="slowVal"></output></label>
+      <div class="check"><input type="checkbox" id="inTurbo" checked><label for="inTurbo" style="display:block">Turbo build (GT3582R)</label></div>
+      <div class="check"><input type="checkbox" id="inSpin"><label for="inSpin" style="display:block">Slowly orbit</label></div>
+      <p class="note">Speed is a fraction of real crank speed. At real time the parts strobe, like under a timing light.</p>
+    </section>
+  </aside>
+</div>
+<script type="module" src="demo.js"></script>
+</body>
+</html>
