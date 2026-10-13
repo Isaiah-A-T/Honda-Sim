@@ -117,6 +117,7 @@ impl Default for Options {
 pub fn run(mut opts: Options) {
     let mut host_panels = opts.host_panels.take();
     let builtin_panels = opts.builtin_panels;
+    let hosted = host_panels.is_some();
     let window = Window::new(WindowSettings { title: opts.title.clone(), min_size: (900, 600), initial_size: Some((1400, 860)), ..Default::default() }).unwrap();
     let ctx = window.gl();
     let mut camera = Camera::new_perspective(window.viewport(), view_pos(&VIEWS[0], 1.6), TARGET, vec3(0.0, 1.0, 0.0), degrees(38.0), 0.05, 100.0);
@@ -207,6 +208,8 @@ pub fn run(mut opts: Options) {
             egui::Panel::top("modes").show_inside(ui, |ui| {
                 ui.horizontal_wrapped(|ui| {
                     for m in Mode::ALL {
+                        // A host with its own panels (the sim app) edits materials there, so it has no Materials mode.
+                        if hosted && m == Mode::Materials { continue; }
                         if ui.selectable_label(mode == m, m.label()).clicked() {
                             mode = m;
                             if m != Mode::Materials { selected = None; }

@@ -23,16 +23,15 @@ enum Tab {
     Tune,
     Settings,
     Parts,
-    Materials,
     Internals,
     Cooling,
     Wheel,
     Log,
 }
 
-const TABS: [(Tab, &str); 9] = [
+const TABS: [(Tab, &str); 8] = [
     (Tab::Drive, "Drive"), (Tab::Tune, "Tables"), (Tab::Settings, "Settings"), (Tab::Parts, "Parts"),
-    (Tab::Materials, "Materials"), (Tab::Internals, "Internals"), (Tab::Cooling, "Cooling"), (Tab::Wheel, "Wheel"), (Tab::Log, "Log"),
+    (Tab::Internals, "Internals"), (Tab::Cooling, "Cooling"), (Tab::Wheel, "Wheel"), (Tab::Log, "Log"),
 ];
 
 // Tables the tune can hold: key, label.
@@ -69,6 +68,44 @@ fn set_table(t: &mut Tune, key: &str, v: Table) {
     }
 }
 
+/// One part's alloy picker with its published properties, for the Parts tab.
+fn material_row(ui: &mut egui::Ui, tune: &mut Tune, b: &honda_sim_core::parts::BottomEnd, key: &str) -> bool {
+    let p = PARTS.iter().find(|p| p.key == key).expect("part key");
+    let id = part_material_id(tune, b, p);
+    let m = material(id).unwrap();
+    let mut c = false;
+    ui.horizontal(|ui| {
+        ui.add_sized([56.0, 18.0], egui::Label::new(RichText::new("Material").color(Color32::from_gray(160)).small()));
+        egui::ComboBox::from_id_salt(("material", p.key)).width(300.0).selected_text(&m.name).show_ui(ui, |ui| {
+            for opt in materials_for(p.category) {
+                if ui.selectable_label(opt == id, &material(opt).unwrap().name).clicked() {
+                    tune.materials.insert(p.key.to_string(), opt.to_string());
+                    c = true;
+                }
+            }
+        });
+    });
+    let est = |f: &str| if m.estimated.contains_key(f) { " est." } else { "" };
+    let mut line = vec![];
+    if let Some(v) = m.yield_mpa { line.push(format!("yield {v:.0}{} MPa", est("yieldMPa"))); }
+    if let Some(v) = m.uts_mpa { line.push(format!("tensile {v:.0}{} MPa", est("utsMPa"))); }
+    if let Some(v) = m.fatigue_mpa { line.push(format!("fatigue {v:.0}{} MPa", est("fatigueMPa"))); }
+    if let Some(v) = m.density_kg_m3 { line.push(format!("{v:.0} kg/m³")); }
+    if let Some(v) = m.elongation_pct { line.push(format!("elong. {v}%")); }
+    if let Some(v) = m.max_service_temp_c { line.push(format!("max {v:.0} °C")); }
+    let tip: Vec<String> = m.estimated.iter().map(|(k, v)| format!("{k}: {v}")).collect();
+    ui.horizontal_wrapped(|ui| {
+        let r = ui.label(RichText::new(line.join(", ")).small().color(Color32::from_gray(150)));
+        if !tip.is_empty() {
+            r.on_hover_text(tip.join("\n"));
+        }
+        if let Some(u) = m.sources.first() {
+            ui.hyperlink_to(RichText::new("source").small(), u);
+        }
+    });
+    c
+}
+
 fn load_color(v: f64) -> Color32 {
     if v >= 1.0 { Color32::from_rgb(0xff, 0x5a, 0x4e) }
     else if v >= 0.8 { Color32::from_rgb(0xf2, 0xa9, 0x3b) }
@@ -81,11 +118,22 @@ fn heat(v: f64, lo: f64, hi: f64) -> Color32 {
     Color32::from_rgb((40.0 + 150.0 * x) as u8, (70.0 + 60.0 * (1.0 - (2.0 * x - 1.0).abs())) as u8, (170.0 - 130.0 * x) as u8)
 }
 
-fn stat(ui: &mut egui::Ui, label: &str, value: String) {
-    ui.vertical(|ui| {
+/// A dash reading in a fixed-width slot, so nothing moves when values change.
+fn stat(ui: &mut egui::Ui, label: &str, value: String, width: f32) {
+    ui.allocate_ui_with_layout(egui::vec2(width, 36.0), egui::Layout::top_down(egui::Align::Min), |ui| {
+        ui.set_min_width(width);
+        ui.set_max_width(width);
         ui.label(RichText::new(label).small().color(Color32::from_gray(150)));
-        ui.label(RichText::new(value).monospace().strong());
+        ui.add(egui::Label::new(RichText::new(value).monospace().strong()).truncate());
     });
+}
+
+/// A warning lamp that always takes its place on the dash: lit when on, dim when off.
+fn lamp(ui: &mut egui::Ui, text: &str, on: bool, color: Color32) {
+    let (rect, _) = ui.allocate_exact_size(egui::vec2(64.0, 18.0), egui::Sense::hover());
+    let (fill, fg) = if on { (color, Color32::WHITE) } else { (Color32::from_gray(36), Color32::from_gray(95)) };
+    ui.painter().rect_filled(rect, 3.0, fill);
+    ui.painter().text(rect.center(), egui::Align2::CENTER_CENTER, text, egui::FontId::proportional(11.0), fg);
 }
 
 fn num_field(ui: &mut egui::Ui, label: &str, v: &mut f64, speed: f64, range: std::ops::RangeInclusive<f64>, suffix: &str) -> bool {
@@ -153,7 +201,6 @@ impl Gui {
                     Tab::Tune => self.tables(ui, sh),
                     Tab::Settings => self.settings(ui, sh),
                     Tab::Parts => self.parts(ui, sh),
-                    Tab::Materials => self.materials(ui, sh),
                     Tab::Internals => { self.internals(ui, sh); false }
                     Tab::Cooling => self.cooling(ui, sh),
                     Tab::Wheel => { self.wheel(ui, sh); false }
@@ -190,48 +237,48 @@ impl Gui {
         let sim = &sh.sim;
         let e = &sim.eng;
         let tq = if sim.running { e.torque_nm } else { 0.0 };
-        ui.horizontal_wrapped(|ui| {
-            ui.label(RichText::new(format!("{:>5.0}", e.rpm)).size(26.0).monospace().strong());
-            ui.label(RichText::new("rpm").color(Color32::from_gray(150)));
+        ui.horizontal(|ui| {
+            ui.allocate_ui_with_layout(egui::vec2(120.0, 36.0), egui::Layout::left_to_right(egui::Align::Center), |ui| {
+                ui.set_min_width(120.0);
+                ui.label(RichText::new(format!("{:>5.0}", e.rpm.max(0.0))).size(26.0).monospace().strong());
+                ui.label(RichText::new("rpm").color(Color32::from_gray(150)));
+            });
             ui.separator();
             let gear = match sim.car.gear { 0 => "N".into(), g if g < 0 => "R".into(), g => g.to_string() };
-            stat(ui, "Gear", gear);
-            stat(ui, "Speed", format!("{:.0} mph", sim.car.speed_ms * 2.23694));
-            stat(ui, if e.map > 101.3 { "Boost" } else { "MAP" }, if e.map > 101.3 { format!("{:.1} psi", (e.map - 101.3) * 0.145) } else { format!("{:.0} kPa", e.map) });
-            stat(ui, "AFR", if e.lambda > 5.0 { "cut".into() } else { format!("{:.1}", e.afr) });
-            stat(ui, "Timing", format!("{:.1}°", e.ign));
-            stat(ui, "Knock retard", format!("{:.1}°", e.knock_retard));
-            stat(ui, "VTC", format!("{:.0}°", e.vtc));
-            stat(ui, "Torque", format!("{:.0} Nm", tq));
-            stat(ui, "Power", format!("{:.0} hp", hp(tq, e.rpm)));
-            stat(ui, "IAT", format!("{:.0} °C", e.iat));
-            stat(ui, "Coolant", format!("{:.0} °C", e.ect));
-            stat(ui, "Oil", format!("{:.0} °C  {:.0} kPa", e.oil_c, e.oil_kpa));
-            stat(ui, "EGT", format!("{:.0} °C", e.egt_c));
-            let vtec = RichText::new(" VTEC ").strong().background_color(if e.high_cam { Color32::from_rgb(0xd0, 0x3a, 0x2e) } else { Color32::from_gray(50) });
-            ui.label(vtec);
-            if e.knocking {
-                ui.label(RichText::new(" KNOCK ").strong().background_color(Color32::from_rgb(0xc8, 0x6a, 0x10)));
-            }
-            if e.thermal.fan_on {
-                ui.label(RichText::new(" FANS ").strong().background_color(Color32::from_rgb(0x20, 0x60, 0xa0)));
-            }
-            if e.thermal.turbo_bearing_c > e.thermal.g.turbo_coke_c && e.tune.turbo.enabled && !e.tune.turbo.fixed {
-                ui.label(RichText::new(" TURBO HEAT SOAK ").strong().background_color(Color32::from_rgb(0xc8, 0x6a, 0x10)));
-            }
-            if e.thermal.boiling {
-                ui.label(RichText::new(" OVERHEATING ").strong().background_color(Color32::from_rgb(0xb0, 0x10, 0x10)));
-            } else if sim.running && e.ect < 60.0 {
-                ui.label(RichText::new(" COLD ").strong().background_color(Color32::from_rgb(0x30, 0x50, 0x90)));
-            }
-            if e.rev_cut {
-                ui.label(RichText::new(" REV LIMIT ").strong().background_color(Color32::from_rgb(0x80, 0x30, 0xa0)));
-            }
-            if let Some(f) = sim.internals.failed {
-                ui.label(RichText::new(format!(" {} FAILED ", f.to_uppercase())).strong().background_color(Color32::from_rgb(0xb0, 0x10, 0x10)));
-            } else if !sim.running {
-                ui.label(RichText::new(" ENGINE OFF (R to start) ").strong().background_color(Color32::from_gray(70)));
-            }
+            stat(ui, "Gear", gear, 34.0);
+            stat(ui, "Speed", format!("{:>3.0} mph", sim.car.speed_ms * 2.23694), 64.0);
+            stat(ui, "MAP", format!("{:>3.0} kPa", e.map), 64.0);
+            stat(ui, "Boost", format!("{:>4.1} psi", ((e.map - 101.3) * 0.145).max(0.0)), 64.0);
+            stat(ui, "AFR", if e.lambda > 5.0 { " cut".into() } else { format!("{:>4.1}", e.afr) }, 40.0);
+            stat(ui, "Timing", format!("{:>5.1}°", e.ign), 52.0);
+            stat(ui, "Knock ret.", format!("{:>4.1}°", e.knock_retard), 60.0);
+            stat(ui, "VTC", format!("{:>3.0}°", e.vtc), 36.0);
+            stat(ui, "Torque", format!("{:>4.0} Nm", tq + 0.0), 62.0);
+            stat(ui, "Power", format!("{:>4.0} hp", hp(tq, e.rpm) + 0.0), 58.0);
+            stat(ui, "IAT", format!("{:>3.0} °C", e.iat), 48.0);
+            stat(ui, "Coolant", format!("{:>3.0} °C", e.ect), 54.0);
+            stat(ui, "Oil", format!("{:>3.0} °C", e.oil_c), 48.0);
+            stat(ui, "Oil press.", format!("{:>3.0} kPa", e.oil_kpa), 62.0);
+            stat(ui, "EGT", format!("{:>4.0} °C", e.egt_c), 56.0);
+        });
+        ui.horizontal(|ui| {
+            let turbo = e.tune.turbo.enabled && !e.tune.turbo.fixed;
+            lamp(ui, "VTEC", e.high_cam, Color32::from_rgb(0xd0, 0x3a, 0x2e));
+            lamp(ui, "KNOCK", e.knocking, Color32::from_rgb(0xc8, 0x6a, 0x10));
+            lamp(ui, "REV LIM", e.rev_cut, Color32::from_rgb(0x80, 0x30, 0xa0));
+            lamp(ui, "FANS", e.thermal.fan_on, Color32::from_rgb(0x20, 0x60, 0xa0));
+            lamp(ui, "COLD", sim.running && e.ect < 60.0, Color32::from_rgb(0x30, 0x50, 0x90));
+            lamp(ui, "HOT", e.thermal.boiling, Color32::from_rgb(0xb0, 0x10, 0x10));
+            lamp(ui, "SOAK", turbo && e.thermal.turbo_bearing_c > e.thermal.g.turbo_coke_c, Color32::from_rgb(0xc8, 0x6a, 0x10));
+            let status = if let Some(f) = sim.internals.failed { Some((format!("{} FAILED", f.to_uppercase()), Color32::from_rgb(0xb0, 0x10, 0x10))) }
+                else if !sim.running { Some(("ENGINE OFF (R to start)".to_string(), Color32::from_gray(70))) } else { None };
+            ui.add_space(8.0);
+            ui.allocate_ui_with_layout(egui::vec2(220.0, 18.0), egui::Layout::left_to_right(egui::Align::Center), |ui| {
+                ui.set_min_width(220.0);
+                if let Some((t, c)) = status {
+                    ui.label(RichText::new(format!(" {t} ")).strong().small().color(Color32::WHITE).background_color(c));
+                }
+            });
         });
     }
 
@@ -549,6 +596,8 @@ impl Gui {
                 }
             }
         });
+        c |= material_row(ui, &mut sh.tune, &b, "crank");
+        ui.add_space(4.0);
         ui.label("Rods");
         if let Some(kr) = &crank.kit_rod {
             ui.label(format!("{kr} (comes with the kit)"));
@@ -565,6 +614,10 @@ impl Gui {
                 }
             });
         }
+        for k in ["rod", "rodBolt", "bearing"] {
+            c |= material_row(ui, &mut sh.tune, &b, k);
+        }
+        ui.add_space(4.0);
         ui.label("Pistons");
         if let Some(kp) = &crank.kit_piston {
             ui.label(format!("{} (comes with the kit)", kp.name));
@@ -584,6 +637,7 @@ impl Gui {
                 }
             });
         }
+        c |= material_row(ui, &mut sh.tune, &b, "piston");
         ui.add_space(6.0);
         egui::Grid::new("bottom").num_columns(2).show(ui, |ui| {
             for (k, v) in [
@@ -618,43 +672,12 @@ impl Gui {
                 }
             });
         }
-        c
-    }
-
-    fn materials(&mut self, ui: &mut egui::Ui, sh: &mut Shared) -> bool {
-        let mut c = false;
-        ui.heading("Materials");
+        ui.separator();
+        ui.heading("Head, block and valvetrain");
         ui.label(RichText::new("Pick an alloy per part. Values are published data unless marked est. (hover for why).").small());
-        let b = sh.sim.eng.bottom.clone();
-        for p in PARTS.iter() {
-            let id = part_material_id(&sh.tune, &b, p);
-            let m = material(id).unwrap();
-            ui.add_space(4.0);
-            ui.label(RichText::new(p.name).strong());
-            egui::ComboBox::from_id_salt(p.key).width(340.0).selected_text(&m.name).show_ui(ui, |ui| {
-                for opt in materials_for(p.category) {
-                    if ui.selectable_label(opt == id, &material(opt).unwrap().name).clicked() {
-                        sh.tune.materials.insert(p.key.to_string(), opt.to_string());
-                        c = true;
-                    }
-                }
-            });
-            let est = |f: &str| if m.estimated.contains_key(f) { " est." } else { "" };
-            let mut line = vec![];
-            if let Some(v) = m.yield_mpa { line.push(format!("yield {v:.0}{} MPa", est("yieldMPa"))); }
-            if let Some(v) = m.uts_mpa { line.push(format!("tensile {v:.0}{} MPa", est("utsMPa"))); }
-            if let Some(v) = m.fatigue_mpa { line.push(format!("fatigue {v:.0}{} MPa", est("fatigueMPa"))); }
-            if let Some(v) = m.density_kg_m3 { line.push(format!("{v:.0} kg/m³")); }
-            if let Some(v) = m.elongation_pct { line.push(format!("elong. {v}%")); }
-            if let Some(v) = m.max_service_temp_c { line.push(format!("max {v:.0} °C")); }
-            let tip: Vec<String> = m.estimated.iter().map(|(k, v)| format!("{k}: {v}")).collect();
-            let r = ui.label(RichText::new(line.join(", ")).small());
-            if !tip.is_empty() {
-                r.on_hover_text(tip.join("\n"));
-            }
-            if let Some(u) = m.sources.first() {
-                ui.hyperlink_to(RichText::new("source").small(), u);
-            }
+        for k in ["block", "sleeve", "gasket", "headBolt", "valvetrain"] {
+            c |= material_row(ui, &mut sh.tune, &b, k);
+            ui.add_space(2.0);
         }
         c
     }
