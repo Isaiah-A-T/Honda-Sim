@@ -284,6 +284,21 @@ function updateInternals() {
   if (s.failed) $('failBanner').textContent = `Engine failure: ${s.failed}. Press Rebuild engine to fit fresh parts.`;
 }
 
+// ------------------------------------------------------------------ 3D view (loaded on demand so the rest works without WebGL)
+let r3d = null, r3dVisible = true;
+import('./render3d.js').then(({ createRenderer }) => {
+  try {
+    r3d = createRenderer($('r3d'));
+    r3d.setTimeScale(Number($('r3dSpeed').value));
+  } catch (err) {
+    $('r3d').textContent = `3D view unavailable: ${err.message}`;
+  }
+}).catch(err => { $('r3d').textContent = `3D view unavailable: ${err.message}`; });
+$('r3dSpeed').addEventListener('change', ev => r3d?.setTimeScale(Number(ev.target.value)));
+$('r3dStress').addEventListener('change', ev => r3d?.setStress(ev.target.checked));
+$('r3dCut').addEventListener('change', ev => r3d?.setCutaway(ev.target.checked));
+new IntersectionObserver(([en]) => { r3dVisible = en.isIntersecting; }).observe($('r3d'));
+
 // ------------------------------------------------------------------ main loop
 function handleEvents(events) {
   for (const ev of events) {
@@ -355,6 +370,7 @@ function loop(now) {
   updateDash(input);
   highlightCell();
   if (frame++ % 6 === 0) { drawDyno(); updateInternals(); }
+  if (r3d && r3dVisible) r3d.update(sim, dt);
   $('btnCsv').disabled = sim.logging || !sim.log.length;
   requestAnimationFrame(loop);
 }
