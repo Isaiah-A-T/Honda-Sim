@@ -31,6 +31,12 @@ pub enum Sys {
     Intercooled,
     /// Turbo charge pipe straight to the throttle body.
     DirectCharge,
+    /// Cooling system outside the engine: radiator, fans, hoses, water pump, thermostat, oil filter.
+    Cooling,
+    /// Coolant passages inside the block and head (water jacket).
+    CoolPassage,
+    /// Oil passages inside the engine: pickup, galleries, main bearing feeds, head gallery, drain.
+    Oil,
 }
 
 /// Which builds a part or flow belongs to.
@@ -72,10 +78,11 @@ pub enum Mode {
     Airflow,
     Stress,
     Materials,
+    Cooling,
 }
 
 impl Mode {
-    pub const ALL: [Mode; 6] = [Mode::Full, Mode::Internals, Mode::Block, Mode::Airflow, Mode::Stress, Mode::Materials];
+    pub const ALL: [Mode; 7] = [Mode::Full, Mode::Internals, Mode::Block, Mode::Airflow, Mode::Cooling, Mode::Stress, Mode::Materials];
     pub fn label(self) -> &'static str {
         match self {
             Mode::Full => "Full engine",
@@ -84,13 +91,16 @@ impl Mode {
             Mode::Airflow => "Airflow",
             Mode::Stress => "Stress",
             Mode::Materials => "Materials",
+            Mode::Cooling => "Cooling & oil",
         }
     }
     fn shows(self, sys: Sys) -> bool {
         match self {
             Mode::Internals => sys == Sys::Internals,
             Mode::Block => sys == Sys::Casting,
-            _ => true,
+            Mode::Cooling => matches!(sys, Sys::Casting | Sys::Cooling | Sys::CoolPassage | Sys::Oil),
+            // The passages are inside the castings; only the cooling view shows them.
+            _ => !matches!(sys, Sys::CoolPassage | Sys::Oil),
         }
     }
 }
@@ -118,6 +128,10 @@ enum Mover {
     Follower { cyl: usize, side: Side, secondary: bool },
     /// The VTEC lock pin, sliding from the primary follower through the other two.
     Pin { cyl: usize, side: Side },
+    /// A radiator fan, spinning about z at its centre.
+    Fan(Vec3),
+    /// Water pump pulley, belt-driven from the crank.
+    PumpPulley(Vec3),
 }
 
 pub struct Part {
@@ -134,7 +148,36 @@ pub struct Part {
     opaque: bool,
     /// Glows green while this cylinder's rockers on this side are locked to the VTEC lobe.
     vtec_part: Option<(usize, Side)>,
+    /// What temperature this part shows in the cooling view.
+    heat: Heat,
     pub visible: bool,
+}
+
+/// Which temperature colours a cooling-system part.
+#[derive(Clone, Copy, PartialEq)]
+enum Heat {
+    None,
+    /// Coolant leaving the engine.
+    Hot,
+    /// Coolant back from the radiator.
+    Cold,
+    /// Radiator core: in between.
+    Core,
+    Oil,
+}
+
+/// What a stream of particles carries.
+#[derive(Clone, Copy, PartialEq)]
+enum Fluid {
+    Air,
+    Exhaust,
+    /// Coolant in the engine and heater loop, always moving while the pump turns.
+    Coolant,
+    /// Coolant through the radiator, only once the thermostat opens.
+    Radiator,
+    /// Coolant back to the pump through the bypass while the thermostat is shut.
+    Bypass,
+    Oil,
 }
 
 struct ValveInfo {
@@ -156,6 +199,7 @@ struct Glow {
 
 struct Flow {
     curve: Curve,
+    fluid: Fluid,
     intake: bool,
     cyl: Option<usize>,
     when: When,
@@ -194,6 +238,46 @@ pub struct Engine {
     pub pins: [[f32; 2]; 4],
     /// Valve lift (mm) per cylinder this frame, [intake, exhaust].
     pub lifts: [[f32; 2]; 4],
+    fan_angle: f32,
+}
+
+/// Temperatures the cooling view shows, with estimates for what the sim doesn't send.
+pub struct Temps {
+    pub hot: f32,
+    pub cold: f32,
+    pub oil: f32,
+    pub oil_kpa: f32,
+}
+
+impl Temps {
+    pub fn of(s: &SimState) -> Temps {
+        let open = s.thermostat.clamp(0.0, 1.0);
+        let cold = s.coolant_out_c.unwrap_or(s.coolant_c - open * (8.0 + 6.0 * s.fan.clamp(0.0, 1.0)));
+        // K-series: roughly 70 kPa at idle hot, 400+ at high rpm; thicker (higher) when cold.
+        let oil_kpa = s.oil_kpa.unwrap_or(if s.rpm > 100.0 { (60.0 + s.rpm * 0.055) * (1.0 + ((90.0 - s.oil_c) / 120.0).max(0.0)) } else { 0.0 });
+        Temps { hot: s.coolant_c, cold, oil: s.oil_c, oil_kpa }
+    }
+}
+
+/// Coolant colour: blue when cold, yellow around operating temperature, red when overheating.
+pub fn coolant_rgb(c: f32) -> [u8; 3] {
+    let stops = [(30.0, [60.0, 140.0, 255.0]), (75.0, [70.0, 200.0, 220.0]), (92.0, [250.0, 200.0, 60.0]), (110.0, [255.0, 60.0, 40.0])];
+    ramp(&stops, c)
+}
+
+/// Oil colour: dark brown when cold, bright amber when hot.
+pub fn oil_rgb(c: f32) -> [u8; 3] {
+    ramp(&[(30.0, [120.0, 70.0, 20.0]), (100.0, [235.0, 160.0, 40.0]), (140.0, [255.0, 90.0, 30.0])], c)
+}
+
+fn ramp(stops: &[(f32, [f32; 3])], x: f32) -> [u8; 3] {
+    let i = stops.iter().position(|(t, _)| x < *t).unwrap_or(stops.len());
+    let c = if i == 0 { stops[0].1 } else if i == stops.len() { stops[stops.len() - 1].1 } else {
+        let ((t0, a), (t1, b)) = (stops[i - 1], stops[i]);
+        let f = (x - t0) / (t1 - t0);
+        [a[0] + (b[0] - a[0]) * f, a[1] + (b[1] - a[1]) * f, a[2] + (b[2] - a[2]) * f]
+    };
+    [c[0] as u8, c[1] as u8, c[2] as u8]
 }
 
 fn srgba(hex: u32, a: u8) -> Srgba {
@@ -241,8 +325,8 @@ impl<'a> Builder<'a> {
         let material = if s.alpha < 255 { PhysicalMaterial::new_transparent(self.ctx, &cpu) } else { PhysicalMaterial::new_opaque(self.ctx, &cpu) };
         let gm = Gm::new(Mesh::new(self.ctx, mesh), material);
         // Parts that only spin about their own axis keep the same box; sliding ones don't get one.
-        let bound = matches!(mover, Mover::Fixed | Mover::Crank | Mover::Butterfly).then(|| {
-            let local = if matches!(mover, Mover::Butterfly) { Mat4::identity() } else { local };
+        let bound = matches!(mover, Mover::Fixed | Mover::Crank | Mover::Butterfly | Mover::Fan(_) | Mover::PumpPulley(_)).then(|| {
+            let local = match mover { Mover::Butterfly => Mat4::identity(), Mover::Fan(c) | Mover::PumpPulley(c) => Mat4::from_translation(c) * local, _ => local };
             let mut lo = vec3(f32::MAX, f32::MAX, f32::MAX);
             let mut hi = -lo;
             for p in mesh.positions.to_f32() {
@@ -266,9 +350,19 @@ impl<'a> Builder<'a> {
             base_alpha: s.alpha,
             opaque: s.alpha == 255,
             vtec_part: None,
+            heat: Heat::None,
             visible: true,
         });
         self.parts.len() - 1
+    }
+
+    /// A passage inside a casting: drawn like a pipe but not clearance-checked (it is meant to be inside).
+    fn passage(&mut self, pts: &[[f32; 3]], closed: bool, radius: f32, s: Spec, label: &str, sys: Sys, heat: Heat) -> usize {
+        let curve = Curve::new(pts, closed);
+        let steps = ((curve.length() / 6.0) as u32).clamp(16, 240);
+        let i = self.add(&tube(&curve, radius, steps, 10), s, None, label, None, sys, Mover::Fixed, Mat4::identity());
+        self.parts[i].heat = heat;
+        i
     }
 
     /// A round pipe along `pts`, recorded for the clearance check.
@@ -305,6 +399,7 @@ fn lobe_mesh(specs: &CamSpecs, side: Side, high: bool) -> CpuMesh {
 
 pub struct FlowPath {
     pts: Vec<[f32; 3]>,
+    fluid: Fluid,
     intake: bool,
     cyl: Option<usize>,
     when: When,
@@ -464,11 +559,11 @@ impl Engine {
             let x = cyl_x(c);
             b.pipe(&[[x, DECK + 70.0, 80.0], [x, DECK + 110.0, 150.0], [x, DECK + 70.0, 220.0], [x, DECK - 10.0, 235.0]], 19.0, intake(), Some("intake"), &format!("Intake runner {c}"), Sys::Intake);
             b.add(&transformed(cylinder_y(6.0, 4.0, 55.0, 10), Mat4::from_angle_x(radians(-0.6))), metal(0x24282e, 0.3, 0.6), None, &format!("Fuel injector {c}"), None, Sys::Intake, Mover::Fixed, t(x + 20.0, DECK + 100.0, 105.0));
-            paths.push(FlowPath { pts: vec![[x, DECK - 30.0, 250.0], [x, DECK - 10.0, 235.0], [x, DECK + 70.0, 220.0], [x, DECK + 110.0, 150.0], [x, DECK + 70.0, 80.0], [x, ROOF + 22.0, VALVE_SEAT_Z + 6.0], [x, ROOF - 10.0, 0.0]], intake: true, cyl: Some(c), when: When::Always, hot: false });
+            paths.push(FlowPath { fluid: Fluid::Air, pts: vec![[x, DECK - 30.0, 250.0], [x, DECK - 10.0, 235.0], [x, DECK + 70.0, 220.0], [x, DECK + 110.0, 150.0], [x, DECK + 70.0, 80.0], [x, ROOF + 22.0, VALVE_SEAT_Z + 6.0], [x, ROOF - 10.0, 0.0]], intake: true, cyl: Some(c), when: When::Always, hot: false });
         }
         let tb_pos = vec3(LEN / 2.0 + 40.0, DECK - 30.0, 250.0);
         let tb_in = [LEN / 2.0 + 70.0, DECK - 30.0, 250.0];
-        paths.push(FlowPath { pts: vec![tb_in, [LEN / 2.0 - 30.0, DECK - 30.0, 250.0], [-LEN / 2.0 + 30.0, DECK - 30.0, 250.0]], intake: true, cyl: None, when: When::Always, hot: false });
+        paths.push(FlowPath { fluid: Fluid::Air, pts: vec![tb_in, [LEN / 2.0 - 30.0, DECK - 30.0, 250.0], [-LEN / 2.0 + 30.0, DECK - 30.0, 250.0]], intake: true, cyl: None, when: When::Always, hot: false });
         b.add(&along_x(cylinder_y(55.0, 55.0, LEN - 20.0, 32)), intake(), Some("intake"), "Intake plenum", None, Sys::Intake, Mover::Fixed, t(0.0, DECK - 30.0, 250.0));
         b.add(&along_x(open_cylinder_y(36.0, 60.0, 32)), metal(0x9aa3ad, 0.6, 0.4), None, "Throttle body", None, Sys::Intake, Mover::Fixed, t(tb_pos.x, tb_pos.y, tb_pos.z));
         b.add(&along_x(cylinder_y(33.0, 33.0, 2.0, 32)), metal(0xc7ccd2, 0.6, 0.35), None, "Throttle plate", None, Sys::Intake, Mover::Butterfly, id);
@@ -480,7 +575,7 @@ impl Engine {
         b.add(&transformed(cylinder_y(48.0, 62.0, 140.0, 28), Mat4::from_angle_x(degrees(90.0))), metal(0xb3262b, 0.1, 0.9), None, "Air filter", None, Sys::NaIntake, Mover::Fixed, t(filter_at.x, filter_at.y, filter_at.z));
         let mut na_flow = vec![[filter_at.x, filter_at.y, filter_at.z + 60.0]];
         na_flow.extend(na.iter().rev());
-        paths.push(FlowPath { pts: na_flow, intake: true, cyl: None, when: When::Na, hot: false });
+        paths.push(FlowPath { fluid: Fluid::Air, pts: na_flow, intake: true, cyl: None, when: When::Na, hot: false });
 
         // ---------- Exhaust ----------
         let exh = || metal(0x4f4945, 0.45, 0.8);
@@ -488,10 +583,10 @@ impl Engine {
             let x = cyl_x(c);
             let runner = Curve::new(&[[x, DECK + 70.0, -80.0], [x, DECK + 60.0, -150.0], [x * 0.6, DECK - 10.0, -210.0], [x * 0.15, DECK - 80.0, -235.0]], false);
             b.add(&tube(&runner, 18.0, 48, 16), exh(), Some("exhaust"), &format!("Exhaust runner {c}"), None, Sys::Exhaust, Mover::Fixed, id);
-            paths.push(FlowPath { pts: vec![[x, ROOF - 10.0, 0.0], [x, ROOF + 22.0, -VALVE_SEAT_Z - 6.0], [x, DECK + 70.0, -80.0], [x, DECK + 60.0, -150.0], [x * 0.6, DECK - 10.0, -210.0], [x * 0.15, DECK - 80.0, -235.0], [0.0, DECK - 140.0, -240.0]], intake: false, cyl: Some(c), when: When::Always, hot: false });
+            paths.push(FlowPath { fluid: Fluid::Exhaust, pts: vec![[x, ROOF - 10.0, 0.0], [x, ROOF + 22.0, -VALVE_SEAT_Z - 6.0], [x, DECK + 70.0, -80.0], [x, DECK + 60.0, -150.0], [x * 0.6, DECK - 10.0, -210.0], [x * 0.15, DECK - 80.0, -235.0], [0.0, DECK - 140.0, -240.0]], intake: false, cyl: Some(c), when: When::Always, hot: false });
         }
         b.add(&cylinder_y(32.0, 40.0, 70.0, 24), exh(), Some("exhaust"), "Exhaust collector", None, Sys::Exhaust, Mover::Fixed, t(0.0, DECK - 110.0, -240.0));
-        paths.push(FlowPath { pts: vec![[0.0, DECK - 140.0, -240.0], [0.0, DECK - 260.0, -240.0]], intake: false, cyl: None, when: When::Na, hot: false });
+        paths.push(FlowPath { fluid: Fluid::Exhaust, pts: vec![[0.0, DECK - 140.0, -240.0], [0.0, DECK - 260.0, -240.0]], intake: false, cyl: None, when: When::Na, hot: false });
 
         // ---------- Turbo ----------
         let to = vec3(0.0, DECK - 180.0, -260.0);
@@ -516,7 +611,7 @@ impl Engine {
         b.add(&tube(&up, 28.0, 20, 16), exh(), Some("exhaust"), "Turbo up-pipe", None, Sys::Turbo, Mover::Fixed, id);
         let mut ex_turbo = vec![[0.0, DECK - 140.0, -240.0], [-30.0, DECK - 160.0, -250.0], [-50.0, DECK - 180.0, -262.0]];
         ex_turbo.extend(shift(&[[-50.0, 0.0, -60.0], [-60.0, -60.0, -80.0], [-60.0, -160.0, -60.0]]));
-        paths.push(FlowPath { pts: ex_turbo, intake: false, cyl: None, when: When::Turbo, hot: false });
+        paths.push(FlowPath { fluid: Fluid::Exhaust, pts: ex_turbo, intake: false, cyl: None, when: When::Turbo, hot: false });
 
         // Charge piping. The turbo sits on the exhaust side (-z) and the throttle body on the intake side (+z) at the
         // transmission end, so every route goes around the engine rather than across it.
@@ -528,24 +623,170 @@ impl Engine {
         b.pipe(&direct, 26.0, charge(), Some("intake"), "Charge pipe", Sys::DirectCharge);
         let mut f = shift(&[[70.0, 0.0, 0.0]]);
         f.extend(direct);
-        paths.push(FlowPath { pts: f, intake: true, cyl: None, when: When::TurboDirect, hot: true });
+        paths.push(FlowPath { fluid: Fluid::Air, pts: f, intake: true, cyl: None, when: When::TurboDirect, hot: true });
 
-        // Intercooler: front-mounted below the intake side. Hot pipe runs under the oil pan to its left tank,
+        // Intercooler: front-mounted ahead of the radiator, low. Hot pipe runs under the oil pan to its left tank,
         // the cold pipe leaves the right tank and climbs to the throttle body.
-        let ic = vec3(0.0, -90.0, 480.0);
+        let ic = vec3(0.0, -90.0, 640.0);
         b.add(&boxed(520.0, 180.0, 60.0), metal(0x9aa0a8, 0.7, 0.45), Some("intake"), "Intercooler core", None, Sys::Intercooled, Mover::Fixed, t(ic.x, ic.y, ic.z));
         for (side, name) in [(-1.0, "Intercooler inlet tank"), (1.0, "Intercooler outlet tank")] {
             b.add(&boxed(50.0, 200.0, 80.0), metal(0x6d737b, 0.7, 0.4), Some("intake"), name, None, Sys::Intercooled, Mover::Fixed, t(side * 285.0, ic.y, ic.z));
         }
-        let hot = [comp_out, [200.0, -20.0, -330.0], [170.0, -200.0, -320.0], [0.0, -250.0, -150.0], [-200.0, -240.0, 150.0], [-300.0, -160.0, 380.0], [-290.0, -90.0, 455.0]];
+        let hot = [comp_out, [200.0, -20.0, -330.0], [170.0, -200.0, -320.0], [0.0, -250.0, -150.0], [-200.0, -240.0, 150.0], [-310.0, -170.0, 380.0], [-315.0, -150.0, 520.0], [-290.0, -90.0, 605.0]];
         b.pipe(&hot, 26.0, charge(), Some("intake"), "Charge pipe (hot side)", Sys::Intercooled);
-        let cold = [[290.0, -90.0, 455.0], [310.0, -60.0, 380.0], [350.0, 40.0, 330.0], [350.0, 150.0, 285.0], [330.0, DECK - 30.0, 255.0], tb_in];
+        let cold = [[290.0, -90.0, 605.0], [315.0, -60.0, 520.0], [325.0, -10.0, 420.0], [350.0, 40.0, 330.0], [350.0, 150.0, 285.0], [330.0, DECK - 30.0, 255.0], tb_in];
         b.pipe(&cold, 26.0, charge(), Some("intake"), "Charge pipe (cold side)", Sys::Intercooled);
         let mut f = shift(&[[70.0, 0.0, 0.0]]);
         f.extend(hot);
-        paths.push(FlowPath { pts: f, intake: true, cyl: None, when: When::TurboIc, hot: true });
-        paths.push(FlowPath { pts: vec![[-285.0, ic.y, ic.z], [-150.0, ic.y + 40.0, ic.z], [0.0, ic.y - 40.0, ic.z], [150.0, ic.y + 40.0, ic.z], [285.0, ic.y, ic.z]], intake: true, cyl: None, when: When::TurboIc, hot: false });
-        paths.push(FlowPath { pts: cold.to_vec(), intake: true, cyl: None, when: When::TurboIc, hot: false });
+        paths.push(FlowPath { fluid: Fluid::Air, pts: f, intake: true, cyl: None, when: When::TurboIc, hot: true });
+        paths.push(FlowPath { fluid: Fluid::Air, pts: vec![[-285.0, ic.y, ic.z], [-150.0, ic.y + 40.0, ic.z], [0.0, ic.y - 40.0, ic.z], [150.0, ic.y + 40.0, ic.z], [285.0, ic.y, ic.z]], intake: true, cyl: None, when: When::TurboIc, hot: false });
+        paths.push(FlowPath { fluid: Fluid::Air, pts: cold.to_vec(), intake: true, cyl: None, when: When::TurboIc, hot: false });
+
+
+        // ---------- Cooling ----------
+        // As on the K20: the water pump sits on the timing end of the block, intake side, belt-driven from the
+        // crank, with the thermostat in its inlet. Coolant goes from the pump into the block's water jacket around
+        // the bores, up through the head gasket into the head, and out of the water outlet on the transmission end
+        // of the head. From there the upper hose runs to the radiator (once the thermostat opens), the heater hoses
+        // to the heater core on the firewall, and the bypass back to the pump.
+        let hose = || metal(0x1c1f23, 0.1, 0.85);
+        let coolant = |a: u8| Spec { color: 0x3c8cff, alpha: a, metal: 0.0, rough: 0.4, emissive: 0x0a1e3c };
+        let pump_at = vec3(-232.0, 25.0, 112.0);
+        let i = b.add(&boxed(40.0, 70.0, 50.0), metal(0x9aa0a6, 0.6, 0.45), None, "Water pump", None, Sys::Cooling, Mover::Fixed, t(pump_at.x, pump_at.y, pump_at.z));
+        b.parts[i].heat = Heat::Cold;
+        b.add(&along_x(cylinder_y(32.0, 32.0, 16.0, 32)), metal(0x40464e, 0.6, 0.4), None, "Water pump pulley", None, Sys::Cooling, Mover::PumpPulley(vec3(cyl_x(1) - 120.0, pump_at.y, pump_at.z)), id);
+        let i = b.add(&boxed(30.0, 40.0, 30.0), metal(0x8a9098, 0.6, 0.45), None, "Thermostat housing", None, Sys::Cooling, Mover::Fixed, t(-245.0, 25.0, 152.0));
+        b.parts[i].heat = Heat::Cold;
+        let i = b.add(&boxed(36.0, 44.0, 50.0), metal(0x8a9098, 0.6, 0.45), None, "Water outlet", None, Sys::Cooling, Mover::Fixed, t(230.0, DECK + 80.0, 40.0));
+        b.parts[i].heat = Heat::Hot;
+
+        // Radiator (crossflow: in at the top of the right tank, out the bottom of the left) and two fans behind it.
+        let rad_z = 470.0;
+        let i = b.add(&boxed(470.0, 380.0, 28.0), metal(0x8d949c, 0.6, 0.55), None, "Radiator core", None, Sys::Cooling, Mover::Fixed, t(0.0, 80.0, rad_z));
+        b.parts[i].heat = Heat::Core;
+        for (side, name, heat) in [(1.0, "Radiator inlet tank", Heat::Hot), (-1.0, "Radiator outlet tank", Heat::Cold)] {
+            let i = b.add(&boxed(30.0, 400.0, 40.0), metal(0x2a2e33, 0.2, 0.7), None, name, None, Sys::Cooling, Mover::Fixed, t(side * 250.0, 80.0, rad_z));
+            b.parts[i].heat = heat;
+        }
+        let fan_blades = {
+            let mut parts = vec![transformed(cylinder_y(22.0, 22.0, 24.0, 20), Mat4::from_angle_x(degrees(90.0)))];
+            for k in 0..7 {
+                let rot = Mat4::from_angle_z(radians(k as f32 / 7.0 * std::f32::consts::TAU));
+                parts.push(transformed(boxed(34.0, 96.0, 3.0), rot * t(0.0, 58.0, 0.0) * Mat4::from_angle_y(radians(0.45))));
+            }
+            merge(&parts)
+        };
+        for fx in [-115.0, 115.0] {
+            let c = vec3(fx, 80.0, rad_z - 38.0);
+            b.add(&transformed(open_cylinder_y(112.0, 30.0, 40), Mat4::from_angle_x(degrees(90.0))), metal(0x23262a, 0.2, 0.8), None, "Fan shroud", None, Sys::Cooling, Mover::Fixed, t(c.x, c.y, c.z));
+            b.add(&fan_blades, metal(0x2f3338, 0.2, 0.7), None, "Radiator fan", None, Sys::Cooling, Mover::Fan(c), id);
+            b.add(&transformed(cylinder_y(30.0, 30.0, 40.0, 20), Mat4::from_angle_x(degrees(90.0))), metal(0x50565e, 0.5, 0.5), None, "Fan motor", None, Sys::Cooling, Mover::Fixed, t(c.x, c.y, c.z - 30.0));
+        }
+
+        // Hoses.
+        let upper = [[240.0, DECK + 90.0, 55.0], [300.0, 305.0, 140.0], [300.0, 290.0, 330.0], [255.0, 250.0, rad_z - 30.0], [250.0, 240.0, rad_z - 8.0]];
+        let i = b.pipe(&upper, 18.0, hose(), None, "Upper radiator hose", Sys::Cooling);
+        b.parts[i].heat = Heat::Hot;
+        let lower = [[-250.0, -80.0, rad_z - 8.0], [-255.0, -90.0, 380.0], [-290.0, -40.0, 250.0], [-275.0, 10.0, 185.0], [-245.0, 25.0, 160.0]];
+        let i = b.pipe(&lower, 18.0, hose(), None, "Lower radiator hose", Sys::Cooling);
+        b.parts[i].heat = Heat::Cold;
+        let i = b.add(&boxed(220.0, 140.0, 60.0), metal(0x7a6a55, 0.4, 0.6), None, "Heater core (behind the firewall)", None, Sys::Cooling, Mover::Fixed, t(60.0, 390.0, -420.0));
+        b.parts[i].heat = Heat::Core;
+        let heater_out = [[235.0, DECK + 96.0, 30.0], [250.0, 380.0, -60.0], [180.0, 400.0, -300.0], [150.0, 392.0, -395.0]];
+        let i = b.pipe(&heater_out, 9.0, hose(), None, "Heater hose (supply)", Sys::Cooling);
+        b.parts[i].heat = Heat::Hot;
+        let heater_back = [[-30.0, 392.0, -395.0], [-180.0, 400.0, -300.0], [-290.0, 330.0, -100.0], [-300.0, 150.0, 40.0], [-235.0, 55.0, 112.0]];
+        let i = b.pipe(&heater_back, 9.0, hose(), None, "Heater hose (return)", Sys::Cooling);
+        b.parts[i].heat = Heat::Cold;
+
+        // Water jacket and passages.
+        let racetrack = |y: f32, half_z: f32| -> Vec<[f32; 3]> {
+            let mut pts = Vec::new();
+            for k in 0..=8 { let a = std::f32::consts::PI * (k as f32 / 8.0 - 0.5); pts.push([144.0 + half_z * a.cos(), y, half_z * -a.sin()]); }
+            for k in 0..=8 { let a = std::f32::consts::PI * (k as f32 / 8.0 + 0.5); pts.push([-144.0 + half_z * a.cos(), y, half_z * -a.sin()]); }
+            pts
+        };
+        for (y, name) in [(110.0, "Block water jacket (lower)"), (175.0, "Block water jacket (upper)")] {
+            b.passage(&racetrack(y, 55.0), true, 7.0, coolant(150), name, Sys::CoolPassage, Heat::Hot);
+        }
+        b.passage(&racetrack(DECK + 23.0, 50.0), true, 7.0, coolant(150), "Head water passage", Sys::CoolPassage, Heat::Hot);
+        for x in [-96.0, 0.0, 96.0] {
+            for z in [-55.0, 55.0] {
+                b.passage(&[[x, 110.0, z], [x, 175.0, z], [x, DECK + 23.0, z * 0.91]], false, 5.0, coolant(150), "Head gasket coolant hole", Sys::CoolPassage, Heat::Hot);
+            }
+        }
+        let feed = [[pump_at.x, pump_at.y, pump_at.z], [-212.0, 70.0, 70.0], [-199.0, 110.0, 0.0]];
+        b.passage(&feed, false, 8.0, coolant(150), "Water pump to block", Sys::CoolPassage, Heat::Cold);
+        let out = [[199.0, DECK + 23.0, 0.0], [215.0, DECK + 60.0, 25.0], [230.0, DECK + 80.0, 40.0]];
+        b.passage(&out, false, 8.0, coolant(150), "Head to water outlet", Sys::CoolPassage, Heat::Hot);
+        let bypass = [[230.0, DECK + 80.0, 40.0], [205.0, 60.0, 80.0], [0.0, 55.0, 82.0], [-205.0, 50.0, 85.0], [pump_at.x, pump_at.y, pump_at.z]];
+        b.passage(&bypass, false, 6.0, coolant(150), "Bypass (thermostat shut)", Sys::CoolPassage, Heat::Hot);
+
+        // Coolant flow.
+        let cf = |pts: Vec<[f32; 3]>, fluid: Fluid| FlowPath { fluid, pts, intake: false, cyl: None, when: When::Always, hot: false };
+        paths.push(cf(feed.to_vec(), Fluid::Coolant));
+        for z in [55.0, -55.0] {
+            paths.push(cf(vec![[-199.0, 110.0, 0.0], [-144.0, 110.0, z], [0.0, 110.0, z], [144.0, 110.0, z], [199.0, 140.0, z * 0.3]], Fluid::Coolant));
+            paths.push(cf(vec![[-199.0, 175.0, 0.0], [-144.0, 175.0, z], [0.0, 175.0, z], [144.0, 175.0, z], [199.0, 175.0, 0.0]], Fluid::Coolant));
+            paths.push(cf(vec![[-199.0, DECK + 23.0, 0.0], [-144.0, DECK + 23.0, z * 0.91], [0.0, DECK + 23.0, z * 0.91], [144.0, DECK + 23.0, z * 0.91], [199.0, DECK + 23.0, 0.0]], Fluid::Coolant));
+            for x in [-96.0, 0.0, 96.0] {
+                paths.push(cf(vec![[x, 110.0, z], [x, 175.0, z], [x, DECK + 23.0, z * 0.91]], Fluid::Coolant));
+            }
+        }
+        paths.push(cf(out.to_vec(), Fluid::Coolant));
+        let mut rad = upper.to_vec();
+        rad.extend([[250.0, 250.0, rad_z], [150.0, 200.0, rad_z], [-150.0, 120.0, rad_z], [150.0, 40.0, rad_z], [-150.0, -40.0, rad_z], [-250.0, -90.0, rad_z]]);
+        rad.extend(lower);
+        rad.extend([[pump_at.x, pump_at.y, pump_at.z]]);
+        paths.push(cf(rad, Fluid::Radiator));
+        paths.push(cf(bypass.to_vec(), Fluid::Bypass));
+        let mut heater = heater_out.to_vec();
+        heater.extend([[60.0, 390.0, -420.0]]);
+        heater.extend(heater_back);
+        paths.push(cf(heater, Fluid::Coolant));
+
+        // ---------- Oil ----------
+        // Pump at the timing end draws through the pickup in the pan, pushes through the filter on the intake
+        // side into the main gallery, which feeds the five main bearings and, up the transmission end, the head:
+        // the rocker shaft galleries (which also carry the VTEC pin pressure). Oil drains back to the pan.
+        let oil = |a: u8| Spec { color: 0xd9901e, alpha: a, metal: 0.0, rough: 0.35, emissive: 0x2a1600 };
+        let i = b.add(&boxed(40.0, 30.0, 50.0), metal(0x7d848c, 0.6, 0.45), None, "Oil pump", None, Sys::Oil, Mover::Fixed, t(-185.0, -45.0, -30.0));
+        b.parts[i].heat = Heat::Oil;
+        let pickup = [[0.0, -140.0, 0.0], [-100.0, -132.0, 0.0], [-170.0, -80.0, -20.0], [-185.0, -45.0, -30.0]];
+        b.passage(&pickup, false, 8.0, oil(200), "Oil pickup", Sys::Oil, Heat::Oil);
+        let i = b.add(&transformed(cylinder_y(38.0, 38.0, 70.0, 28), Mat4::from_angle_x(degrees(90.0))), metal(0x1f4fa0, 0.3, 0.5), None, "Oil filter", None, Sys::Cooling, Mover::Fixed, t(60.0, 0.0, 140.0));
+        b.parts[i].heat = Heat::Oil;
+        let to_filter = [[-185.0, -45.0, -30.0], [-150.0, -30.0, 70.0], [60.0, 0.0, 100.0]];
+        b.passage(&to_filter, false, 5.0, oil(200), "Oil pump to filter", Sys::Oil, Heat::Oil);
+        let gallery = [[60.0, 0.0, 100.0], [60.0, -20.0, 62.0], [200.0, -20.0, 62.0]];
+        b.passage(&[[-200.0, -20.0, 62.0], [200.0, -20.0, 62.0]], false, 5.0, oil(200), "Main oil gallery", Sys::Oil, Heat::Oil);
+        b.passage(&gallery[..2], false, 5.0, oil(200), "Filter to main gallery", Sys::Oil, Heat::Oil);
+        let mut oil_paths: Vec<Vec<[f32; 3]>> = vec![
+            { let mut p = pickup.to_vec(); p.extend(to_filter); p.extend(gallery); p },
+            vec![[60.0, -20.0, 62.0], [-200.0, -20.0, 62.0]],
+        ];
+        for k in 0..5 {
+            let x = (k as f32 - 2.0) * BORE_SPACING;
+            let feed = [[x, -20.0, 62.0], [x, -8.0, 30.0], [x, 0.0, 0.0]];
+            b.passage(&feed, false, 4.0, oil(200), "Main bearing oil feed", Sys::Oil, Heat::Oil);
+            oil_paths.push(feed.to_vec());
+        }
+        let up = [[200.0, -20.0, 62.0], [200.0, 150.0, 62.0], [200.0, FOLLOWER_Y + 12.0, 58.0]];
+        b.passage(&up, false, 5.0, oil(200), "Oil feed to the head", Sys::Oil, Heat::Oil);
+        oil_paths.push(up.to_vec());
+        for z in [58.0, -58.0] {
+            let rocker = [[200.0, FOLLOWER_Y + 12.0, z], [-200.0, FOLLOWER_Y + 12.0, z]];
+            b.passage(&rocker, false, 4.0, oil(200), "Rocker shaft oil gallery (and VTEC pressure)", Sys::Oil, Heat::Oil);
+            oil_paths.push(rocker.to_vec());
+        }
+        b.passage(&[[200.0, FOLLOWER_Y + 12.0, 58.0], [200.0, FOLLOWER_Y + 12.0, -58.0]], false, 4.0, oil(200), "Head oil cross-drilling", Sys::Oil, Heat::Oil);
+        oil_paths.push(vec![[200.0, FOLLOWER_Y + 12.0, 58.0], [200.0, FOLLOWER_Y + 12.0, -58.0]]);
+        let drain = [[-200.0, FOLLOWER_Y, -60.0], [-200.0, 150.0, -70.0], [-195.0, -110.0, -70.0]];
+        b.passage(&drain, false, 6.0, oil(110), "Oil drain back", Sys::Oil, Heat::Oil);
+        oil_paths.push(drain.to_vec());
+        for pts in oil_paths {
+            paths.push(cf(pts, Fluid::Oil));
+        }
 
         let flows = paths
             .into_iter()
@@ -553,7 +794,7 @@ impl Engine {
                 let curve = Curve::new(&p.pts, false);
                 let n = ((curve.length() / 16.0).round() as usize).max(6);
                 let u = (0..n).map(|i| (i as f32 + 0.3 * ((i * 7919) % 10) as f32 / 10.0) / n as f32).collect();
-                Flow { curve, intake: p.intake, cyl: p.cyl, when: p.when, hot: p.hot, u }
+                Flow { curve, fluid: p.fluid, intake: p.intake, cyl: p.cyl, when: p.when, hot: p.hot, u }
             })
             .collect();
         let mut dot = CpuMesh::sphere(6);
@@ -581,6 +822,7 @@ impl Engine {
             lobes,
             pins: [[0.0; 2]; 4],
             lifts: [[0.0; 2]; 4],
+            fan_angle: 0.0,
         }
     }
 
@@ -595,6 +837,9 @@ impl Engine {
             let spin = (s.boost_kpa.max(0.0) / 100.0 * 9.0 + s.rpm / 8000.0 * 2.0) * if s.running { 1.0 } else { 0.2 };
             self.turbo_angle = (self.turbo_angle + spin * dt * std::f32::consts::TAU) % std::f32::consts::TAU;
         }
+        // Fans spin at up to ~2,000 rpm, slowed with the rest of the playback.
+        self.fan_angle = (self.fan_angle + s.fan.clamp(0.0, 1.0) * 33.0 * dt * slow_mo * std::f32::consts::TAU) % std::f32::consts::TAU;
+        let temps = Temps::of(s);
         self.shake = if s.knock && burning { (self.shake + dt * 8.0).min(1.0) } else { (self.shake - dt * 4.0).max(0.0) };
         let jitter = if self.shake > 0.0 {
             let n = (time * 97.0).sin() * 43758.547;
@@ -673,6 +918,8 @@ impl Engine {
                     let k = if side == Side::Intake { 0 } else { 1 };
                     t(cyl_x(cyl) - 30.0 + 30.0 * pins[cyl - 1][k], -lifts[cyl - 1][k], 0.0)
                 }
+                Mover::Fan(c) => Mat4::from_translation(c) * Mat4::from_angle_z(radians(self.fan_angle)),
+                Mover::PumpPulley(c) => Mat4::from_translation(c) * Mat4::from_angle_x(degrees(crank * 1.2)),
                 Mover::TurbineWheel => Mat4::from_translation(self.turbo_offset + vec3(-50.0, 0.0, 0.0)) * Mat4::from_angle_x(radians(self.turbo_angle)),
                 Mover::CompWheel => Mat4::from_translation(self.turbo_offset + vec3(70.0, 0.0, 0.0)) * Mat4::from_angle_x(radians(self.turbo_angle)),
             };
@@ -683,22 +930,24 @@ impl Engine {
             vis &= When::of(p.sys).holds(s.turbo, s.intercooler);
             let cast_mode = match mode {
                 Mode::Block => Castings::Solid,
-                Mode::Airflow => Castings::SeeThrough,
+                Mode::Airflow | Mode::Cooling => Castings::SeeThrough,
                 _ => castings,
             };
             if p.sys == Sys::Casting { vis &= cast_mode != Castings::Hidden; }
             p.visible = vis;
 
             // Transparency: castings follow the setting; airflow mode ghosts the plumbing.
-            let ghost = mode == Mode::Airflow && matches!(p.sys, Sys::Intake | Sys::Exhaust | Sys::Turbo | Sys::NaIntake | Sys::Intercooled | Sys::DirectCharge);
+            let ghost = mode == Mode::Airflow && matches!(p.sys, Sys::Intake | Sys::Exhaust | Sys::Turbo | Sys::NaIntake | Sys::Intercooled | Sys::DirectCharge | Sys::Cooling);
             let (alpha, transparent) = if p.sys == Sys::Casting {
                 match (mode, cast_mode) {
-                    (Mode::Airflow, _) => ((p.base_alpha as f32 * 0.45) as u8, true),
+                    (Mode::Airflow | Mode::Cooling, _) => ((p.base_alpha as f32 * 0.45) as u8, true),
                     (_, Castings::Solid) => (235, true),
                     _ => (p.base_alpha, true),
                 }
             } else if ghost {
                 (56, true)
+            } else if mode == Mode::Cooling && p.heat == Heat::Core && p.label == "Radiator core" {
+                (150, true)                       // see the fans behind it
             } else {
                 (p.base_alpha, !p.opaque)
             };
@@ -718,6 +967,19 @@ impl Engine {
                         albedo = lerp_color(p.base, rgb, amount);
                         let e = amount * amount * if k == "exhaust" { 0.8 } else { 0.3 };
                         emissive = lerp_color(p.base_emissive, rgb, e);
+                    }
+                }
+                Mode::Cooling => {
+                    let c = match p.heat {
+                        Heat::None => None,
+                        Heat::Hot => Some(coolant_rgb(temps.hot)),
+                        Heat::Cold => Some(coolant_rgb(temps.cold)),
+                        Heat::Core => Some(coolant_rgb((temps.hot + temps.cold) / 2.0)),
+                        Heat::Oil => Some(oil_rgb(temps.oil)),
+                    };
+                    if let Some(c) = c {
+                        albedo = Srgba::new(c[0], c[1], c[2], p.base.a);
+                        emissive = Srgba::new(c[0] / 5, c[1] / 5, c[2] / 5, 255);
                     }
                 }
                 Mode::Materials => {
@@ -770,15 +1032,35 @@ impl Engine {
         }
 
         // Airflow particles.
-        self.show_particles = mode == Mode::Airflow;
+        self.show_particles = matches!(mode, Mode::Airflow | Mode::Cooling);
         if self.show_particles {
             let base = if s.running && s.rpm > 300.0 { 220.0 + 900.0 * (s.air_gs / 150.0).clamp(0.0, 2.2) } else { 0.0 };
             let boost = (s.boost_kpa / 150.0).clamp(0.0, 1.0);
             let heat = s.stress_of("exhaust", None).clamp(0.0, 1.2);
             let mut tf = Vec::new();
             let mut colors = Vec::new();
+            let pumping = if s.rpm > 100.0 { 60.0 + 420.0 * (s.rpm / 8000.0).min(1.1) } else { 0.0 };
             for f in self.flows.iter_mut() {
                 if !f.when.holds(s.turbo, s.intercooler) { continue; }
+                let air = matches!(f.fluid, Fluid::Air | Fluid::Exhaust);
+                if air != (mode == Mode::Airflow) { continue; }
+                if !air {
+                    // Coolant and oil move with the pumps, which turn with the crank.
+                    let (speed, col) = match f.fluid {
+                        Fluid::Radiator => (pumping * s.thermostat.clamp(0.0, 1.0), coolant_rgb(temps.cold)),
+                        Fluid::Bypass => (pumping * (1.0 - s.thermostat.clamp(0.0, 1.0)), coolant_rgb(temps.hot)),
+                        Fluid::Oil => (pumping * 0.7 * (temps.oil_kpa / 350.0).clamp(0.3, 1.5), oil_rgb(temps.oil)),
+                        _ => (pumping, coolant_rgb(temps.hot)),
+                    };
+                    if speed <= 0.5 && matches!(f.fluid, Fluid::Radiator | Fluid::Bypass) { continue; }
+                    let du = speed * dt / f.curve.length();
+                    for u in f.u.iter_mut() {
+                        *u = (*u + du) % 1.0;
+                        tf.push(world * Mat4::from_translation(f.curve.point_at(*u)));
+                        colors.push(Srgba::new(col[0], col[1], col[2], 255));
+                    }
+                    continue;
+                }
                 let gate = match f.cyl {
                     Some(c) => {
                         let lift = lifts[c - 1][if f.intake { 0 } else { 1 }];

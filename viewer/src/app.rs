@@ -308,6 +308,27 @@ pub fn run(mut opts: Options) {
                             stress_bar(ui, "Intake pressure", state.stress_of("intake", None));
                             stress_bar(ui, "Turbo", state.stress_of("turbo", None));
                         }
+                        Mode::Cooling => {
+                            ui.label("Coolant and oil, coloured by temperature. Coolant runs from the water pump through the block's water jacket and up into the head, out to the radiator once the thermostat opens (round the bypass until then) and through the heater core. Oil runs from the pan through the filter to the main bearings and the head.");
+                            let tp = crate::engine::Temps::of(&state);
+                            let swatch_row = |ui: &mut egui::Ui, label: &str, c: [u8; 3], text: String| {
+                                ui.horizontal(|ui| {
+                                    swatch(ui, c);
+                                    ui.add_sized([120.0, 18.0], egui::Label::new(label));
+                                    ui.monospace(text);
+                                });
+                            };
+                            swatch_row(ui, "Coolant out", crate::engine::coolant_rgb(tp.hot), format!("{:.0} °C", tp.hot));
+                            swatch_row(ui, "From radiator", crate::engine::coolant_rgb(tp.cold), format!("{:.0} °C{}", tp.cold, if state.coolant_out_c.is_none() { " (est.)" } else { "" }));
+                            swatch_row(ui, "Oil", crate::engine::oil_rgb(tp.oil), format!("{:.0} °C", tp.oil));
+                            ui.horizontal(|ui| {
+                                ui.add_sized([134.0, 18.0], egui::Label::new("Oil pressure"));
+                                ui.monospace(format!("{:.0} kPa{}", tp.oil_kpa, if state.oil_kpa.is_none() { " (est.)" } else { "" }));
+                            });
+                            bar(ui, "Thermostat", state.thermostat, egui::Color32::from_rgb(0x6e, 0xc8, 0xff), format!("{:.0}% open", state.thermostat * 100.0));
+                            bar(ui, "Fans", state.fan, egui::Color32::from_rgb(0x9a, 0xa3, 0xad), if state.fan > 0.0 { format!("{:.0}%", state.fan * 100.0) } else { "off".into() });
+                            ui.weak("Coolant: blue cold, cyan warming, yellow at operating temperature, red overheating. Oil: dark when cold, amber when hot.");
+                        }
                         Mode::Stress => {
                             ui.label("Parts tint yellow, orange, then red as they near or pass the limit the sim uses.");
                             for (k, l) in STRESS_PARTS { stress_bar(ui, l, state.stress_of(k, None)); }

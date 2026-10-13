@@ -42,6 +42,18 @@ pub struct SimState {
     pub intercooler: bool,
     /// Intake air temperature at the throttle body, °C.
     pub iat_c: f32,
+    /// Coolant temperature leaving the engine (water outlet), °C.
+    pub coolant_c: f32,
+    /// Coolant temperature leaving the radiator, °C. None = estimated from the thermostat and fan.
+    pub coolant_out_c: Option<f32>,
+    /// Oil temperature, °C.
+    pub oil_c: f32,
+    /// Oil pressure, kPa. None = estimated from rpm.
+    pub oil_kpa: Option<f32>,
+    /// Thermostat opening, 0 (shut, coolant goes round the bypass) to 1 (fully open, through the radiator).
+    pub thermostat: f32,
+    /// Radiator fan speed, 0 (off) to 1 (full).
+    pub fan: f32,
     /// The K20Z3 cam card. None = the viewer's stand-in figures.
     pub cams: Option<CamSpecs>,
     /// VTEC lock pin travel, 0 (low cam) to 1 (locked to the VTEC lobe), when the sim models it: one value for all
@@ -73,6 +85,12 @@ impl Default for SimState {
             turbo: false,
             intercooler: true,
             iat_c: 25.0,
+            coolant_c: 88.0,
+            coolant_out_c: None,
+            oil_c: 95.0,
+            oil_kpa: None,
+            thermostat: 1.0,
+            fan: 0.0,
             cams: None,
             vtec_pin: None,
             stress: HashMap::new(),

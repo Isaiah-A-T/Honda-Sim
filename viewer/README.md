@@ -10,6 +10,7 @@ Views, picked from the tabs along the top:
 - **Internals**: pistons, rods, crank and the valvetrain with cam lobes, VTEC switching to the high lobe and VTC phasing.
 - **Block**: the castings on their own with the main dimensions.
 - **Airflow**: intake and exhaust flow, through the turbo on a turbo build, gated by valve lift.
+- **Cooling & oil**: the water pump, block water jacket, head passages, thermostat, bypass, upper and lower hoses, radiator, two fans, heater core, and the oil pump, filter, main gallery, bearing feeds and head galleries, with flow coloured by coolant and oil temperature.
 - **Stress**: each part tinted green, yellow, orange, red as it nears or passes its limit.
 - **Materials**: each part colored by alloy family; hover for the exact material.
 
@@ -97,6 +98,12 @@ for 1.5 seconds the viewer falls back to its demo.
 | `iatC` | number | Intake air temperature at the throttle body, °C |
 | `cams` | object | Cam card: `intakeLow`, `intakeHigh`, `exhaustLow`, `exhaustHigh`, each `{ liftMm, durationDeg, centerlineDeg }` (valve lift; duration at 1 mm lift; centreline ATDC for intake, BTDC for exhaust, at 0° VTC). The lobes are redrawn to match. Without it the viewer uses stand-in figures |
 | `vtecPin` | 0–1, or an array of 4 | VTEC lock pin travel (all cylinders, or per cylinder), if the sim models it. Without it the viewer moves each cylinder's pins itself when `vtec` changes, only while that cylinder's followers are on the base circle |
+| `coolantC` | number | Coolant temperature leaving the head, °C (default 88) |
+| `coolantOutC` | number | Coolant back from the radiator, °C. Without it the viewer estimates it from `coolantC`, thermostat and fan |
+| `oilC` | number | Oil temperature, °C (default 95) |
+| `oilKpa` | number | Oil pressure, kPa. Without it the viewer estimates it from rpm and oil temperature |
+| `thermostat` | 0–1 | Thermostat opening; 0 sends all coolant round the bypass, 1 all through the radiator (default 1) |
+| `fan` | 0–1 | Radiator fan speed (default 0) |
 | `stress` | object | Part key to load (1 = at the limit), or an array of 4 for per-cylinder parts |
 | `partMaterials` | object | Part key to `{ part, label, family, detail }`. When present the Materials view is read-only |
 | `readouts` | array | Extra `[label, value]` rows for the side panel |
