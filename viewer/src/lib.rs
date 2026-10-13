@@ -30,6 +30,7 @@
 //!
 //! The standalone `honda-sim-viewer` program (src/main.rs) is the same window with `Link::listen()`.
 
+#[cfg(not(target_os = "ios"))]
 pub mod app;
 pub mod engine;
 pub mod fake_sim;
@@ -39,6 +40,7 @@ pub mod materials;
 pub mod meshes;
 pub mod state;
 
+#[cfg(not(target_os = "ios"))]
 pub use app::{run, Options};
 /// The egui version the viewer draws with, for hosts adding their own panels through `Options::host_panels`.
 pub use three_d::egui;
