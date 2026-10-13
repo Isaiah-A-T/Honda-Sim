@@ -96,7 +96,7 @@ for 1.5 seconds the viewer falls back to its demo.
 | `intercooler` | bool | Turbo build has a front-mount intercooler (default true); false runs the charge pipe straight to the throttle body |
 | `iatC` | number | Intake air temperature at the throttle body, °C |
 | `cams` | object | Cam card: `intakeLow`, `intakeHigh`, `exhaustLow`, `exhaustHigh`, each `{ liftMm, durationDeg, centerlineDeg }` (valve lift; duration at 1 mm lift; centreline ATDC for intake, BTDC for exhaust, at 0° VTC). The lobes are redrawn to match. Without it the viewer uses stand-in figures |
-| `vtecPin` | 0–1 | VTEC lock pin travel, if the sim models it. Without it the viewer moves each cylinder's pins itself when `vtec` changes, only while that cylinder's followers are on the base circle |
+| `vtecPin` | 0–1, or an array of 4 | VTEC lock pin travel (all cylinders, or per cylinder), if the sim models it. Without it the viewer moves each cylinder's pins itself when `vtec` changes, only while that cylinder's followers are on the base circle |
 | `stress` | object | Part key to load (1 = at the limit), or an array of 4 for per-cylinder parts |
 | `partMaterials` | object | Part key to `{ part, label, family, detail }`. When present the Materials view is read-only |
 | `readouts` | array | Extra `[label, value]` rows for the side panel |

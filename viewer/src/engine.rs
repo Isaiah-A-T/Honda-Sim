@@ -624,7 +624,7 @@ impl Engine {
             for (k, side) in [Side::Intake, Side::Exhaust].into_iter().enumerate() {
                 let v = if side == Side::Intake { vtc } else { 0.0 };
                 let pin = &mut self.pins[c - 1][k];
-                if let Some(p) = s.vtec_pin {
+                if let Some(p) = s.vtec_pin_of(c) {
                     *pin = p.clamp(0.0, 1.0);
                 } else {
                     let aligned = lobe_lift(c, crank, side, true, v, &specs) < 0.05 && lobe_lift(c, crank, side, false, v, &specs) < 0.05;

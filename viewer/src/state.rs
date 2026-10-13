@@ -44,9 +44,10 @@ pub struct SimState {
     pub iat_c: f32,
     /// The K20Z3 cam card. None = the viewer's stand-in figures.
     pub cams: Option<CamSpecs>,
-    /// VTEC lock pin travel, 0 (low cam) to 1 (locked to the VTEC lobe), when the sim models it. None = the viewer
-    /// moves the pins itself from `vtec`, each cylinder's only while its followers are on the base circle.
-    pub vtec_pin: Option<f32>,
+    /// VTEC lock pin travel, 0 (low cam) to 1 (locked to the VTEC lobe), when the sim models it: one value for all
+    /// cylinders or one per cylinder (1–4). None = the viewer moves the pins itself from `vtec`, each cylinder's only
+    /// while its followers are on the base circle.
+    pub vtec_pin: Option<StressValue>,
     pub stress: HashMap<String, StressValue>,
     /// The sim's own materials per part (read-only in the viewer). None = use the placeholder catalog.
     pub part_materials: Option<HashMap<String, PartMaterial>>,
@@ -83,6 +84,14 @@ impl Default for SimState {
 
 impl SimState {
     /// Stress for a part (worst cylinder when `index` is None and the sim sent one value per cylinder).
+    /// Pin travel for cylinder `cyl` (1–4), if the sim sent it.
+    pub fn vtec_pin_of(&self, cyl: usize) -> Option<f32> {
+        match self.vtec_pin.as_ref()? {
+            StressValue::One(v) => Some(*v),
+            StressValue::PerCylinder(v) => v.get(cyl - 1).copied(),
+        }
+    }
+
     pub fn stress_of(&self, key: &str, index: Option<usize>) -> f32 {
         match self.stress.get(key) {
             Some(StressValue::One(v)) => *v,
@@ -105,7 +114,7 @@ mod tests {
             r#"{"rpm":6500,"throttle":1,"mapKpa":180,"vtec":true,"vtcDeg":30,"turbo":true,
                 "stress":{"rods":0.9,"pistons":[0.5,0.6,0.7,0.8]},
                 "partMaterials":{"pistons":{"label":"Cast","family":"aluminum"}},
-                "readouts":[["Peak pressure","95 bar"]],"unknownField":1}"#,
+                "readouts":[["Peak pressure","95 bar"]],"unknownField":1,"vtecPin":[1,0.5,0,0]}"#,
         )
         .unwrap();
         assert_eq!(s.rpm, 6500.0);
@@ -113,6 +122,7 @@ mod tests {
         assert_eq!(s.stress_of("rods", None), 0.9);
         assert_eq!(s.stress_of("pistons", Some(2)), 0.7);
         assert_eq!(s.stress_of("pistons", None), 0.8);
+        assert_eq!(s.vtec_pin_of(2), Some(0.5));
         assert_eq!(s.part_materials.unwrap()["pistons"].family, "aluminum");
         assert_eq!(s.readouts[0].1, "95 bar");
         assert_eq!(s.ign_deg, 15.0); // default kept
