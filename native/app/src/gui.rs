@@ -274,6 +274,29 @@ impl Gui {
     fn tables(&mut self, ui: &mut egui::Ui, sh: &mut Shared) -> bool {
         let mut changed = false;
         ui.heading("Tune tables");
+        ui.label(RichText::new("Everything a tune needs: the eight tables below plus these switch points. Click a table name, then click a cell to edit it, or paste a whole table from FlashPro.").small());
+        egui::Grid::new("tune-points").num_columns(2).show(ui, |ui| {
+            let t = &mut sh.tune;
+            changed |= num_field(ui, "VTEC point", &mut t.vtec_rpm, 25.0, 2000.0..=9000.0, " rpm");
+            changed |= num_field(ui, "VTEC minimum MAP", &mut t.vtec_min_map, 1.0, 0.0..=250.0, " kPa");
+            changed |= num_field(ui, "Rev limit", &mut t.rev_limit, 25.0, 3000.0..=9500.0, " rpm");
+            changed |= num_field(ui, "Rev limit hysteresis", &mut t.rev_limit_hyst, 10.0, 0.0..=1000.0, " rpm");
+            changed |= num_field(ui, "Injector size", &mut t.injector_cc, 5.0, 100.0..=2500.0, " cc/min");
+            changed |= num_field(ui, "Injector dead time", &mut t.injector_dead_ms, 0.01, 0.0..=3.0, " ms");
+            changed |= opt_field(ui, "Overboost cut", &mut t.overboost_kpa, 200.0, 1.0, " kPa");
+            ui.label("Fuel table holds");
+            let mut u = t.fuel_units.clone().unwrap_or_else(|| guess_fuel_units(&t.fuel_low).to_string());
+            egui::ComboBox::from_id_salt("fuel-units").selected_text(match u.as_str() { "afr" => "AFR target", "ms" => "injector ms", _ => "lambda target" }).show_ui(ui, |ui| {
+                for (k, l) in [("lambda", "lambda target"), ("afr", "AFR target"), ("ms", "injector ms")] {
+                    if ui.selectable_value(&mut u, k.to_string(), l).changed() {
+                        t.fuel_units = Some(u.clone());
+                        changed = true;
+                    }
+                }
+            });
+            ui.end_row();
+        });
+        ui.separator();
         ui.horizontal_wrapped(|ui| {
             for (k, label) in TABLES {
                 let exists = table_mut(&mut sh.tune, k).is_some();
@@ -335,7 +358,21 @@ impl Gui {
             }
             ui.label(RichText::new("Underlined: the cell the engine is on now (or the one you clicked to edit).").small().color(Color32::from_gray(150)));
         } else {
-            ui.label("This tune doesn't have that table. Paste one below.");
+            ui.label("This tune doesn't have that table yet. Paste one below, or start from a filled-in one:");
+            if ui.button("Create this table").clicked() {
+                let base = sh.tune.fuel_low.clone();
+                let fill = |f: &dyn Fn(f64, f64) -> f64| Table { rows: base.rows.clone(), cols: base.cols.clone(), data: base.rows.iter().map(|&r| base.cols.iter().map(|&c| (f(r, c) * 100.0).round() / 100.0).collect()).collect() };
+                let t = match key {
+                    "fuelHigh" => sh.tune.fuel_low.clone(),
+                    "ignHigh" => sh.tune.ign_low.clone(),
+                    "vtcLow" => fill(&|r, c| honda_sim_core::gasflow::stock_vtc(r, c, false)),
+                    "vtcHigh" => fill(&|r, c| honda_sim_core::gasflow::stock_vtc(r, c, true)),
+                    "boostTarget" => fill(&|_, _| 101.3 + sh.tune.turbo.spring_kpa),
+                    _ => fill(&|_, _| 0.0),
+                };
+                set_table(&mut sh.tune, key, t);
+                changed = true;
+            }
         }
 
         ui.separator();
