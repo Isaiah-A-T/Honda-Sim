@@ -21,7 +21,7 @@ fn android_main(app: AndroidApp) {
     }
     let hint = dir.map(|d| format!("Files are in {}/HondaSim (Android/data/com.hondasim.app on your phone's storage).", d.display())).unwrap_or_default();
     let clip_app = app.clone();
-    honda_sim_mobile::set_platform(Platform { clipboard: Some(Box::new(move || clipboard(&clip_app))), files_hint: hint });
+    honda_sim_mobile::set_platform(Platform { clipboard: Some(Box::new(move || clipboard(&clip_app))), files_hint: hint, poll_gamepads: None });
 
     let event_loop = EventLoopBuilder::new().with_android_app(app).build();
     honda_sim_mobile::run(event_loop, WindowBuilder::new().with_title("Honda Sim"), |w| Box::new(WindowedSurface::new(w)));

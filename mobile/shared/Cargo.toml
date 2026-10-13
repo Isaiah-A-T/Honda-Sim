@@ -24,4 +24,4 @@ winit = "0.28"
 three-d = { version = "0.19", features = ["egui-gui", "window"] }
 
 [target.'cfg(target_os = "ios")'.dependencies]
-three-d = { version = "0.19", features = ["egui-gui"] }
+three-d = { version = "0.19", default-features = false, features = ["egui-gui"] }

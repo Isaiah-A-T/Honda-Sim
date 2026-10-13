@@ -97,8 +97,17 @@ impl Shared {
 #[derive(Default)]
 pub struct Platform {
     pub clipboard: Option<Box<dyn Fn() -> Option<String> + Send + Sync>>,
-    /// Shown under the menu's Files line: where saved tunes and logs can be found from outside the app.
+    /// Shown under the Tables and Log pages: where saved tunes and logs can be found from outside the app.
     pub files_hint: String,
+    /// Called every frame to read gamepads the window doesn't report as key presses (iOS); it reports
+    /// buttons with `gamepad_button`.
+    pub poll_gamepads: Option<Box<dyn Fn() + Send + Sync>>,
+}
+
+/// A gamepad button (Linux input code: 304 A, 305 B, 307 X, 308 Y, 310/311 bumpers, 312/313 triggers,
+/// 315 Start) is down or up.
+pub fn gamepad_button(code: u32, pressed: bool) {
+    controls::key_event(code, pressed);
 }
 
 static PLATFORM: OnceLock<Platform> = OnceLock::new();

@@ -87,6 +87,9 @@ impl App {
         let (w, h) = (width as f32 / scale, height as f32 / scale);
         let landscape = w > h;
 
+        if let Some(poll) = &crate::platform().poll_gamepads {
+            poll();
+        }
         // The drive controls and keyboard from touches since the last frame.
         let pedals = self.input.pedals();
         let fired: Vec<&'static str> = self.input.fired.drain(..).collect();
