@@ -8,7 +8,8 @@ use honda_sim_core::engine::hp;
 use honda_sim_core::internals::{part_material_id, part_status, PARTS};
 use honda_sim_core::k20z3::{placeholder_tune, turbo_6262, turbo_gt35, turbo_setup};
 use honda_sim_core::materials::{material, materials_for};
-use honda_sim_core::parts::{catalog, piston_problem, rod_problem};
+use honda_sim_core::engines::{engines, head_fit, pump_fit};
+use honda_sim_core::parts::{catalog, crank_problem, cranks_for, piston_problem, pistons_for, rod_problem};
 use honda_sim_core::sim::log_to_csv;
 use honda_sim_core::thermal::{boiling_c, viscosity_cst, Cooling};
 use honda_sim_core::tables::{active_cell, guess_fuel_units, parse_table, Table};
@@ -66,6 +67,118 @@ fn set_table(t: &mut Tune, key: &str, v: Table) {
         "wgDuty" => t.wg_duty = Some(v),
         _ => {}
     }
+}
+
+/// Engine: which block, head and oil pump, and whether they go together (src/engines.js).
+fn engine_section(ui: &mut egui::Ui, sh: &mut Shared, b: &honda_sim_core::parts::BottomEnd) -> bool {
+    let data = engines();
+    let mut c = false;
+    let grey = Color32::from_gray(160);
+    let warn = Color32::from_rgb(0xf2, 0xa9, 0x3b);
+    ui.heading("Engine");
+    ui.label(RichText::new("Mix any K-series block, head and oil pump. Combinations no build guide documents are greyed out with the reason.").small());
+
+    ui.label("Block (with its stock crank, rods and pistons)");
+    egui::ComboBox::from_id_salt("block").width(340.0).selected_text(&b.block.name).show_ui(ui, |ui| {
+        for k in &data.blocks {
+            if ui.selectable_label(k.id == b.block.id, &k.name).clicked() {
+                sh.tune.engine.block = if k.id == "K20Z3" { None } else { Some(k.id.clone()) };
+                sh.tune.engine.head = None;
+                sh.tune.engine.oil_pump = None;
+                if sh.tune.parts.crank.as_deref() == Some("honda-k24-99-hybrid") { sh.tune.parts.crank = None; }
+                c = true;
+            }
+        }
+    });
+    let r = &b.block.rating;
+    ui.label(RichText::new(format!(
+        "{} × {} mm, {} mm rods, {:.1}:1 stock. Rated {:.0} hp at {:.0} and {:.0} lb-ft at {:.0} rpm; redline {:.0}.",
+        b.block.bore_mm, b.block.stroke_mm, b.block.rod_mm, b.block.compression, r.hp, r.hp_rpm, r.torque_lbft, r.torque_rpm, r.redline_rpm
+    )).small().color(grey));
+
+    ui.add_space(4.0);
+    ui.label("Head");
+    egui::ComboBox::from_id_salt("head").width(340.0).selected_text(&b.head.name).show_ui(ui, |ui| {
+        for h in &data.heads {
+            let fit = head_fit(h, b.block);
+            let label = match fit.works.as_str() {
+                "no" => format!("{} (no documented build on a {})", h.name, b.block.family),
+                "mods" => format!("{} (needs swap parts)", h.name),
+                _ => h.name.clone(),
+            };
+            if ui.add_enabled(fit.works != "no", egui::Button::selectable(h.id == b.head.id, label)).clicked() {
+                sh.tune.engine.head = if h.id == b.block.head { None } else { Some(h.id.clone()) };
+                c = true;
+            }
+        }
+    });
+    let vtec = match b.head.vtec.as_str() {
+        "economy" => "Economy i-VTEC: intake cam only; below the switch point one intake valve barely opens",
+        "intake" => "VTEC on the intake cam only",
+        _ => "VTEC on both cams",
+    };
+    ui.label(RichText::new(format!("{vtec}. Valves {} / {} mm. Stock VTEC point {:.0} rpm.", b.head.in_valve_mm, b.head.ex_valve_mm, b.head.vtec_rpm)).small().color(grey));
+    ui.horizontal(|ui| {
+        if (sh.tune.vtec_rpm - b.head.vtec_rpm).abs() > 1.0 && ui.small_button(format!("Set VTEC to {:.0} rpm", b.head.vtec_rpm)).clicked() {
+            sh.tune.vtec_rpm = b.head.vtec_rpm;
+            c = true;
+        }
+        let limit = r.rev_limit_rpm.unwrap_or(r.redline_rpm);
+        if (sh.tune.rev_limit - limit).abs() > 1.0 && ui.small_button(format!("Set rev limit to {limit:.0} rpm")).clicked() {
+            sh.tune.rev_limit = limit;
+            c = true;
+        }
+    });
+    if b.head_fit.works == "mods" {
+        ui.label(RichText::new(format!("Swap parts: {}.", b.head_fit.needs.join("; "))).color(warn));
+    }
+    if !b.head_fit.note.is_empty() && b.head.id != b.block.head {
+        ui.label(RichText::new(&b.head_fit.note).small().color(grey));
+    }
+
+    ui.add_space(4.0);
+    ui.label("Oil pump");
+    egui::ComboBox::from_id_salt("oilpump").width(340.0).selected_text(&b.pump.name).show_ui(ui, |ui| {
+        for p in &data.oil_pumps {
+            let fit = pump_fit(p, b.block);
+            let label = match fit.works.as_str() {
+                "no" => format!("{} (not listed for the {})", p.name, b.block.id),
+                "mods" => format!("{} (needs install parts)", p.name),
+                _ => p.name.clone(),
+            };
+            if ui.add_enabled(fit.works != "no", egui::Button::selectable(p.id == b.pump.id, label)).clicked() {
+                sh.tune.engine.oil_pump = if p.id == b.block.oil_pump { None } else { Some(p.id.clone()) };
+                c = true;
+            }
+        }
+    });
+    let p = b.pump;
+    let flow = if p.flow_scale != 1.0 { format!("{:+.0}% flow", (p.flow_scale - 1.0) * 100.0) } else { "Stock flow".to_string() };
+    ui.label(RichText::new(format!(
+        "{}. {flow}, holds pressure to about {:.0} rpm.",
+        if p.balance_shafts { "Drives the balance shafts" } else { "No balance shafts (frees about 7 hp at 7,800 rpm, vendor claims)" },
+        p.max_rpm
+    )).small().color(grey));
+    if b.pump_fit.works == "mods" {
+        ui.label(RichText::new(format!("Install parts: {}.", b.pump_fit.needs.join("; "))).color(warn));
+    }
+    let mut est: Vec<&String> = b.head.estimated.values().collect();
+    est.extend(p.estimated.values());
+    for v in est {
+        ui.label(RichText::new(format!("Estimated: {v}")).small().color(Color32::from_gray(150)));
+    }
+    let mut srcs: Vec<(String, String)> = vec![];
+    srcs.extend(b.block.sources.iter().take(2).map(|u| (b.block.id.clone(), u.clone())));
+    srcs.extend(b.head.sources.iter().take(1).map(|u| (format!("{} head", b.head.id), u.clone())));
+    srcs.extend(p.sources.iter().take(1).map(|u| ("pump".to_string(), u.clone())));
+    srcs.extend(b.head_fit.sources.iter().take(1).map(|u| ("swap".to_string(), u.clone())));
+    ui.horizontal_wrapped(|ui| {
+        ui.label(RichText::new("Sources:").small());
+        for (i, (what, u)) in srcs.iter().enumerate() {
+            ui.hyperlink_to(RichText::new(format!("{what} {}", i + 1)).small(), u);
+        }
+    });
+    c
 }
 
 /// One part's alloy picker with its published properties, for the Parts tab.
@@ -581,13 +694,17 @@ impl Gui {
         let cat = catalog();
         let b = sh.sim.eng.bottom.clone();
         let mut c = false;
+        c |= engine_section(ui, sh, &b);
+        ui.separator();
         ui.heading("Bottom end");
         ui.label(RichText::new("Real aftermarket parts. Ones that don't fit with the chosen crank are greyed out with the reason.").small());
         let crank = &b.crank;
         ui.label("Crank / kit");
         egui::ComboBox::from_id_salt("crank").width(340.0).selected_text(&crank.name).show_ui(ui, |ui| {
-            for k in &cat.cranks {
-                if ui.selectable_label(k.id == crank.id, &k.name).clicked() {
+            for k in &cranks_for(b.block) {
+                let why = crank_problem(b.block, k);
+                let label = match &why { Some(w) => format!("{} ({w})", k.name), None => k.name.clone() };
+                if ui.add_enabled(why.is_none(), egui::Button::selectable(k.id == crank.id, label)).clicked() {
                     sh.tune.parts.crank = if k.id == "stock" { None } else { Some(k.id.clone()) };
                     sh.tune.materials.remove("crank");
                     sh.tune.materials.remove("piston");
@@ -604,7 +721,7 @@ impl Gui {
         } else {
             egui::ComboBox::from_id_salt("rod").width(340.0).selected_text(&b.rod.name).show_ui(ui, |ui| {
                 for r in &cat.rods {
-                    let why = rod_problem(crank, r, Some(&b.piston));
+                    let why = rod_problem(crank, r, Some(&b.piston), b.block);
                     let label = match &why { Some(w) => format!("{} ({w})", r.name), None => r.name.clone() };
                     if ui.add_enabled(why.is_none(), egui::Button::selectable(r.id == b.rod.id, label)).clicked() {
                         sh.tune.parts.rod = if r.id == "stock" { None } else { Some(r.id.clone()) };
@@ -623,13 +740,13 @@ impl Gui {
             ui.label(format!("{} (comes with the kit)", kp.name));
         } else {
             egui::ComboBox::from_id_salt("piston").width(340.0).selected_text(&b.piston.name).show_ui(ui, |ui| {
-                for p in &cat.pistons {
-                    let why = piston_problem(crank, p);
+                for p in &pistons_for(b.block) {
+                    let why = piston_problem(crank, p, b.block);
                     let label = match &why { Some(w) => format!("{} ({w})", p.name), None => p.name.clone() };
                     if ui.add_enabled(why.is_none(), egui::Button::selectable(p.id == b.piston.id, label)).clicked() {
                         sh.tune.parts.piston = if p.id == "stock" { None } else { Some(p.id.clone()) };
                         sh.tune.materials.remove("piston");
-                        if p.requires_sleeves && sh.tune.materials.get("sleeve").map(|s| s == "sleeve").unwrap_or(true) {
+                        if p.bore_mm > b.block.bore_mm + 1.0 && sh.tune.materials.get("sleeve").map(|s| s == "sleeve").unwrap_or(true) {
                             sh.tune.materials.insert("sleeve".into(), "sleeveDuctile".into());
                         }
                         c = true;
@@ -646,7 +763,7 @@ impl Gui {
                 ("Displacement", format!("{:.0} cc", b.displacement_l * 1000.0)),
                 ("Compression", format!("{:.1}:1", b.compression)),
                 ("Deck clearance", format!("{:.2} mm", b.deck_clearance_mm)),
-                ("Block", format!("{} ({} mm deck)", crank.block.unwrap_or("K20Z3"), b.deck_mm)),
+                ("Deck height", format!("{} mm ({} block)", b.deck_mm, b.block.id)),
                 ("Piston weight", format!("{:.0} g", b.piston_kg * 1000.0)),
             ] {
                 ui.label(RichText::new(k).color(Color32::from_gray(160)));

@@ -64,12 +64,12 @@ export function partMaterial(tune, part) {
 // re-sleeved block (any aftermarket sleeve material) is back to full wall thickness.
 export function engineGeometry(tune) {
   const b = bottomEnd(tune);
-  if (b.stock) return GEOMETRY;
+  if (b.geomStock) return GEOMETRY;
   const resleeved = (tune?.materials?.sleeve ?? 'sleeve') !== 'sleeve';
   return {
     ...GEOMETRY, boreM: b.boreMm / 1000, strokeM: b.strokeMm / 1000, rodM: b.rodMm / 1000, compression: b.compression,
     pinM: b.pinMm / 1000, bigEndM: b.bigEndBearingMm / 1000, pistonKg: b.pistonKg, rodSmallEndKg: b.rodRecipKg,
-    sleeveWallM: resleeved ? GEOMETRY.sleeveWallM : Math.max(0.0015, GEOMETRY.sleeveWallM - (b.boreMm - 86) / 2000),
+    sleeveWallM: resleeved ? GEOMETRY.sleeveWallM : Math.max(0.0015, GEOMETRY.sleeveWallM - (b.boreMm - b.block.boreMm) / 2000),
   };
 }
 const derate = (m, tempC) => (m.strengthVsTempC ? lookup1(m.strengthVsTempC.map(d => d[0]), m.strengthVsTempC.map(d => d[1]), tempC) : 1);

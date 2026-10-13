@@ -1,8 +1,10 @@
-//! Bottom end: fitted crank (or stroker kit), rods and pistons, whether they fit together, and the
+//! Bottom end: the block (src/engines.js) with its own crank, rods and pistons, or the aftermarket
+//! crank (or stroker kit), rods and pistons fitted in place of them, whether they fit together, and the
 //! bore, stroke, rod length, compression and displacement they add up to (src/parts.js).
 //! Every aftermarket part is a real part from docs/parts-catalog.json.
 
-use crate::tune::Tune;
+use crate::engines::{engine_setup, Block, Fit, Head, OilPump};
+use crate::tune::{EngineSel, Tune};
 use serde::Serialize;
 use serde_json::Value;
 use std::collections::BTreeMap;
@@ -14,6 +16,8 @@ const STOCK_PISTON_KG: f64 = 0.290;
 const STOCK_ROD_RECIP_KG: f64 = 0.160;
 const ROD_RECIP_SHARE: f64 = 0.32;
 const MAX_PROTRUSION_MM: f64 = 0.3;
+const MAX_OVERBORE_MM: f64 = 1.0;
+const LEGACY_K24: &str = "honda-k24-99-hybrid";
 
 fn cc(bore_mm: f64, stroke_mm: f64) -> f64 {
     std::f64::consts::PI / 4.0 * bore_mm.powi(2) * stroke_mm / 1000.0
@@ -34,7 +38,6 @@ pub struct Piston {
     pub for_stroke_mm: f64,
     pub for_rod_length_mm: f64,
     pub for_deck_mm: f64,
-    pub requires_sleeves: bool,
     pub material: Option<&'static str>,
     pub sources: Vec<String>,
 }
@@ -76,7 +79,7 @@ pub struct Crank {
     pub deck_mm: f64,
     pub housing_mm: Option<f64>,
     pub material: Option<&'static str>,
-    pub block: Option<&'static str>,
+    pub family: &'static str,
     pub rod_locked: Option<String>,
     pub kit_piston: Option<KitPiston>,
     pub kit_rod: Option<String>,
@@ -121,7 +124,7 @@ pub fn catalog() -> &'static Catalog {
         let mut pistons = vec![Piston {
             id: "stock".into(), brand: "Honda".into(), part_number: "OEM".into(), name: "Stock K20Z3 pistons (86 mm, 11.0:1)".into(),
             bore_mm: 86.0, compression_ratio: 11.0, compression_height_mm: 30.0, pin_dia_mm: 22.0, weight_g: None,
-            for_stroke_mm: 86.0, for_rod_length_mm: 139.0, for_deck_mm: K20_DECK, requires_sleeves: false, material: None, sources: stock_sources.clone(),
+            for_stroke_mm: 86.0, for_rod_length_mm: 139.0, for_deck_mm: K20_DECK, material: None, sources: stock_sources.clone(),
         }];
         for p in data["pistons"].as_array().unwrap() {
             let for_stroke = f(p, "forStroke_mm").unwrap_or(86.0);
@@ -131,7 +134,7 @@ pub fn catalog() -> &'static Catalog {
                 bore_mm: f(p, "bore_mm").unwrap(), compression_ratio: f(p, "compressionRatio").unwrap(),
                 compression_height_mm: f(p, "compressionHeight_mm").unwrap(), pin_dia_mm: f(p, "pinDia_mm").unwrap_or(22.0),
                 weight_g: f(p, "pistonWeight_g"), for_stroke_mm: for_stroke, for_rod_length_mm: f(p, "forRodLength_mm").unwrap_or(139.0),
-                for_deck_mm: if for_stroke == 99.0 { K24_DECK } else { K20_DECK }, requires_sleeves: p["requiresSleeves"].as_bool().unwrap_or(false),
+                for_deck_mm: if for_stroke == 99.0 { K24_DECK } else { K20_DECK },
                 material: piston_material(&s(p, "alloy")), sources: sources(p),
             });
         }
@@ -151,7 +154,7 @@ pub fn catalog() -> &'static Catalog {
 
         let mut cranks = vec![Crank {
             id: "stock".into(), name: "Stock K20Z3 crank (86 mm stroke)".into(), brand: "Honda".into(), stroke_mm: 86.0, rod_length_mm: Some(139.0),
-            deck_mm: K20_DECK, housing_mm: Some(51.0), material: None, block: None, rod_locked: None, kit_piston: None, kit_rod: None,
+            deck_mm: K20_DECK, housing_mm: Some(51.0), material: None, family: "K20", rod_locked: None, kit_piston: None, kit_rod: None,
             estimated: BTreeMap::new(), sources: stock_sources.clone(),
         }];
         {
@@ -166,7 +169,7 @@ pub fn catalog() -> &'static Catalog {
             cranks.push(Crank {
                 id: s(&c, "id"), name: "Brian Crower 92 mm stroker kit (BC5048 + BC6040 rods + BC7048 pistons)".into(), brand: s(&c, "brand"),
                 stroke_mm: f(&c, "stroke_mm").unwrap(), rod_length_mm: f(&c, "rodLength_mm"), deck_mm: K20_DECK, housing_mm: f(&r, "bigEnd_mm"),
-                material: Some("crank4340"), block: None, rod_locked: Some(s(&r, "id")),
+                material: Some("crank4340"), family: "K20", rod_locked: Some(s(&r, "id")),
                 kit_piston: Some(KitPiston { name: "BC7048 custom pistons".into(), bore_mm: 86.0, compression_ratio: None, clearance_mm: 0.0, pin_mm: f(&r, "pinDia_mm"), alloy: "2618" }),
                 kit_rod: None, estimated: est.iter().map(|(a, b)| (a.to_string(), b.to_string())).collect(), sources: sources(&c),
             });
@@ -185,7 +188,7 @@ pub fn catalog() -> &'static Catalog {
             if let Some(x) = extra { est.insert("compressionRatio".into(), x.into()); }
             Crank {
                 id: format!("{}-{}", id, fmt_num(bore)), name: format!("Toda {} mm kit, {} mm bore", fmt_num(f(&c, "stroke_mm").unwrap()), fmt_num(bore)), brand: "Toda".into(),
-                stroke_mm: f(&c, "stroke_mm").unwrap(), rod_length_mm: None, deck_mm: K20_DECK, housing_mm: None, material: None, block: None, rod_locked: None,
+                stroke_mm: f(&c, "stroke_mm").unwrap(), rod_length_mm: None, deck_mm: K20_DECK, housing_mm: None, material: None, family: "K20", rod_locked: None,
                 kit_piston: Some(KitPiston { name: "Toda kit pistons".into(), bore_mm: bore, compression_ratio: pick("compressionRatio"), clearance_mm: 0.0, pin_mm: None, alloy: "forged" }),
                 kit_rod: Some("Toda kit rods (I-section chromoly)".into()), estimated: est, sources: sources(&c),
             }
@@ -197,24 +200,66 @@ pub fn catalog() -> &'static Catalog {
         cranks.push(toda("toda-k20-90.7-lc", 86.5, 0, None));
         cranks.push(toda("toda-k20-84-short", 87.0, 0, Some(gk)));
         cranks.push(toda("toda-k20-84-short", 87.5, 1, Some(gk)));
-        {
-            let c = crank_json("honda-k24-99-hybrid");
-            cranks.push(Crank {
-                id: s(&c, "id"), name: "K24 block + 99 mm crank + 152 mm rods (\"K24/K20\" with the K20Z3 head)".into(), brand: s(&c, "brand"),
-                stroke_mm: f(&c, "stroke_mm").unwrap(), rod_length_mm: f(&c, "rodLength_mm"), deck_mm: K24_DECK, housing_mm: Some(51.0),
-                material: None, block: Some("K24A"), rod_locked: None, kit_piston: None, kit_rod: None,
-                estimated: [("rods".to_string(), "stock K24 rods (152 mm) used; no aftermarket 152 mm rods in the catalog yet".to_string())].into_iter().collect(),
-                sources: sources(&c),
-            });
-        }
         Catalog { cranks, pistons, rods }
     })
 }
 
+/// The block's own pistons.
+pub fn stock_piston(block: &Block) -> Piston {
+    Piston {
+        id: "stock".into(), brand: "Honda".into(), part_number: "OEM".into(),
+        name: format!("Stock {} pistons ({} mm, {:.1}:1)", block.id, fmt_num(block.bore_mm), block.compression),
+        bore_mm: block.bore_mm, compression_ratio: block.compression, compression_height_mm: block.compression_height_mm, pin_dia_mm: block.pin_mm,
+        weight_g: None, for_stroke_mm: block.stroke_mm, for_rod_length_mm: block.rod_mm, for_deck_mm: block.deck_mm, material: None, sources: block.sources.clone(),
+    }
+}
+/// The block's own crank.
+pub fn stock_crank(block: &Block) -> Crank {
+    Crank {
+        id: "stock".into(), name: format!("Stock {} crank ({} mm stroke)", block.id, fmt_num(block.stroke_mm)), brand: "Honda".into(),
+        stroke_mm: block.stroke_mm, rod_length_mm: Some(block.rod_mm), deck_mm: block.deck_mm, housing_mm: Some(block.big_end_mm), material: None,
+        family: if block.family == "K24" { "K24" } else { "K20" }, rod_locked: None, kit_piston: None, kit_rod: None,
+        estimated: BTreeMap::new(), sources: block.sources.clone(),
+    }
+}
+/// Crank list for a block: its own crank first, then the aftermarket ones.
+pub fn cranks_for(block: &Block) -> Vec<Crank> {
+    std::iter::once(stock_crank(block)).chain(catalog().cranks[1..].iter().cloned()).collect()
+}
+/// Piston list for a block: its own pistons first.
+pub fn pistons_for(block: &Block) -> Vec<Piston> {
+    std::iter::once(stock_piston(block)).chain(catalog().pistons[1..].iter().cloned()).collect()
+}
+
+const A3_NOTE: &str = "aftermarket K20 bottom ends don't list the K20A3, whose rods and bearings differ";
+
+/// Why this crank can't go in this block, or None if it fits.
+pub fn crank_problem(block: &Block, crank: &Crank) -> Option<String> {
+    if crank.id == "stock" {
+        return None;
+    }
+    if !block.aftermarket_bottom_end {
+        return Some(A3_NOTE.into());
+    }
+    if crank.family != block.family {
+        return Some(format!("made for the {} block ({} mm deck); the {} deck is {} mm", crank.family, fmt_num(crank.deck_mm), block.id, fmt_num(block.deck_mm)));
+    }
+    None
+}
+
 /// Why this piston can't go in with this crank, or None if it fits.
-pub fn piston_problem(crank: &Crank, piston: &Piston) -> Option<String> {
+pub fn piston_problem(crank: &Crank, piston: &Piston, block: &Block) -> Option<String> {
     if crank.kit_piston.is_some() {
         return if piston.id == "stock" { None } else { Some("this kit comes with its own pistons".into()) };
+    }
+    if piston.id == "stock" {
+        return None;
+    }
+    if !block.aftermarket_bottom_end {
+        return Some(A3_NOTE.into());
+    }
+    if piston.bore_mm < block.bore_mm {
+        return Some(format!("{} mm is smaller than the {}'s {} mm bore", fmt_num(piston.bore_mm), block.id, fmt_num(block.bore_mm)));
     }
     let rod_mm = crank.rod_length_mm.unwrap_or(139.0);
     let clearance = crank.deck_mm - (crank.stroke_mm / 2.0 + rod_mm + piston.compression_height_mm);
@@ -228,7 +273,7 @@ pub fn piston_problem(crank: &Crank, piston: &Piston) -> Option<String> {
 }
 
 /// Why this rod can't go in with this crank and piston, or None if it fits.
-pub fn rod_problem(crank: &Crank, rod: &Rod, piston: Option<&Piston>) -> Option<String> {
+pub fn rod_problem(crank: &Crank, rod: &Rod, piston: Option<&Piston>, block: &Block) -> Option<String> {
     if crank.kit_rod.is_some() {
         return if rod.id == "stock" { None } else { Some("this kit comes with its own rods".into()) };
     }
@@ -237,6 +282,9 @@ pub fn rod_problem(crank: &Crank, rod: &Rod, piston: Option<&Piston>) -> Option<
     }
     if rod.id == "stock" {
         return None;
+    }
+    if !block.aftermarket_bottom_end {
+        return Some(A3_NOTE.into());
     }
     if rod.length_mm != crank.rod_length_mm {
         return Some(format!("{} mm long; this crank needs {} mm", fmt_num(rod.length_mm.unwrap_or(0.0)), fmt_num(crank.rod_length_mm.unwrap_or(0.0))));
@@ -263,7 +311,15 @@ pub struct FittedMaterials {
 #[derive(Clone, Debug, Serialize)]
 #[serde(rename_all = "camelCase")]
 pub struct BottomEnd {
+    /// The K20Z3 as it came: block, head, oil pump and parts.
     pub stock: bool,
+    /// The K20Z3 block and head with their own parts (the geometry the gas model is calibrated on).
+    pub geom_stock: bool,
+    pub block: &'static Block,
+    pub head: &'static Head,
+    pub pump: &'static OilPump,
+    pub head_fit: Fit,
+    pub pump_fit: Fit,
     pub crank: Crank,
     pub piston: Piston,
     pub rod: Rod,
@@ -287,29 +343,41 @@ pub struct BottomEnd {
     pub materials: FittedMaterials,
 }
 
-/// Everything the engine model needs from the fitted parts.
+/// Everything the engine model needs from the fitted block, head, pump and parts.
 pub fn bottom_end(tune: &Tune) -> BottomEnd {
     let cat = catalog();
     let sel = &tune.parts;
-    let mut issues = Vec::new();
-    let crank = sel.crank.as_ref().and_then(|id| cat.cranks.iter().find(|c| &c.id == id)).unwrap_or(&cat.cranks[0]).clone();
-    if let Some(id) = &sel.crank {
-        if &crank.id != id {
+    let setup = engine_setup(tune);
+    let block = setup.block;
+    let (mut head, mut head_fit) = (setup.head, setup.head_fit.clone());
+    let mut issues = setup.issues.clone();
+    let mut estimated = block.estimated.clone();
+
+    let crank_id = sel.crank.as_deref().map(|c| if c == LEGACY_K24 { "stock" } else { c });
+    let mut crank = match crank_id {
+        Some(id) if id != "stock" => cat.cranks[1..].iter().find(|c| c.id == id).cloned().unwrap_or_else(|| {
             issues.push(format!("Unknown crank \"{id}\"; using stock."));
-        }
+            stock_crank(block)
+        }),
+        _ => stock_crank(block),
+    };
+    if let Some(why) = crank_problem(block, &crank) {
+        issues.push(format!("{} can't be used: {}.", crank.name, why));
+        crank = stock_crank(block);
     }
-    let mut estimated = crank.estimated.clone();
-    let stock_piston = &cat.pistons[0];
-    let mut piston = sel.piston.as_ref().and_then(|id| cat.pistons.iter().find(|p| &p.id == id)).unwrap_or(stock_piston).clone();
+    estimated.extend(crank.estimated.clone());
+
+    let stock_p = stock_piston(block);
+    let mut piston = sel.piston.as_ref().filter(|id| id.as_str() != "stock").and_then(|id| cat.pistons.iter().find(|p| &p.id == id)).cloned().unwrap_or(stock_p.clone());
     if crank.kit_piston.is_some() {
-        piston = stock_piston.clone();
-    } else if let Some(why) = piston_problem(&crank, &piston) {
+        piston = stock_p.clone();
+    } else if let Some(why) = piston_problem(&crank, &piston, block) {
         issues.push(format!("{} can't be used: {}.", piston.name, why));
-        piston = cat.pistons.iter().find(|p| piston_problem(&crank, p).is_none()).unwrap().clone();
+        piston = stock_p.clone();
     }
     let rod_id = crank.rod_locked.clone().or(sel.rod.clone());
     let mut rod = rod_id.as_ref().and_then(|id| cat.rods.iter().find(|r| &r.id == id)).unwrap_or(&cat.rods[0]).clone();
-    if let Some(why) = rod_problem(&crank, &rod, if crank.kit_piston.is_some() { None } else { Some(&piston) }) {
+    if let Some(why) = rod_problem(&crank, &rod, if crank.kit_piston.is_some() { None } else { Some(&piston) }, block) {
         issues.push(format!("{} can't be used: {}.", rod.name, why));
         rod = match &crank.rod_locked {
             Some(id) => cat.rods.iter().find(|r| &r.id == id).unwrap().clone(),
@@ -317,17 +385,27 @@ pub fn bottom_end(tune: &Tune) -> BottomEnd {
         };
     }
 
+    // Stock K24 pistons under a K20 head: A4 pistons risk hitting the valves, A8 pistons hit them.
+    let k20_on_k24 = head.family == "K20" && block.family == "K24";
+    if k20_on_k24 && piston.id == "stock" && block.pistons_vs_k20_head.as_deref() == Some("contact") {
+        issues.push(format!("Stock {} pistons hit the {}'s valves; fit aftermarket pistons. Using the {}'s own head.", block.id, head.name, block.id));
+        head = engine_setup(&Tune { engine: EngineSel { block: Some(block.id.clone()), ..Default::default() }, ..Tune::empty() }).head;
+        head_fit = Fit { works: "yes".into(), needs: vec![], note: "This block's own head.".into(), sources: vec![] };
+    } else if k20_on_k24 && piston.id == "stock" && block.pistons_vs_k20_head.as_deref() == Some("risk") {
+        issues.push(format!("Stock {} pistons can touch the {}'s valves; the build guides use K24A1/A2 or aftermarket pistons.", block.id, head.name));
+    }
+
     let stroke_mm = crank.stroke_mm;
     let rod_mm = rod.length_mm.or(crank.rod_length_mm).unwrap_or(139.0);
-    let (bore_mm, compression, piston_kg, ch_mm, piston_mat, pin_mm, requires_sleeves);
+    let block_vc = cc(block.bore_mm, block.stroke_mm) / (block.compression - 1.0);
+    let (bore_mm, compression, piston_kg, ch_mm, piston_mat, pin_mm);
     if let Some(k) = &crank.kit_piston {
         bore_mm = k.bore_mm;
         ch_mm = crank.deck_mm - stroke_mm / 2.0 - rod_mm - k.clearance_mm;
-        compression = k.compression_ratio.unwrap_or_else(|| 1.0 + cc(bore_mm, stroke_mm) / (cc(86.0, 86.0) / (11.0 - 1.0)));
+        compression = k.compression_ratio.unwrap_or_else(|| 1.0 + cc(bore_mm, stroke_mm) / block_vc);
         piston_kg = STOCK_PISTON_KG * (bore_mm / 86.0).powi(2);
         piston_mat = piston_material(k.alloy);
         pin_mm = k.pin_mm.unwrap_or(22.0);
-        requires_sleeves = false;
     } else {
         bore_mm = piston.bore_mm;
         ch_mm = piston.compression_height_mm;
@@ -342,16 +420,17 @@ pub fn bottom_end(tune: &Tune) -> BottomEnd {
             estimated.insert("pistonWeight".into(), "not listed; stock weight scaled by bore area".into());
         }
         piston_mat = piston.material;
-        requires_sleeves = piston.requires_sleeves;
     }
+    let requires_sleeves = bore_mm > block.bore_mm + MAX_OVERBORE_MM + 1e-9;
     let deck_clearance_mm = crank.deck_mm - (stroke_mm / 2.0 + rod_mm + ch_mm);
     let rod_recip_kg = rod.weight_g.map(|g| g / 1000.0 * ROD_RECIP_SHARE).unwrap_or(STOCK_ROD_RECIP_KG);
     let housing_mm = if rod.id == "stock" { crank.housing_mm.unwrap_or(51.0) } else { rod.big_end_mm };
-    let stock = crank.id == "stock" && piston.id == "stock" && rod.id == "stock";
+    let parts_stock = crank.id == "stock" && piston.id == "stock" && rod.id == "stock";
+    let geom_stock = parts_stock && block.id == "K20Z3" && head.id == "K20Z3";
     if requires_sleeves {
         issues.push(format!(
             "{} mm needs the block re-sleeved. Picking these pistons fits ductile iron sleeves; set stock sleeves under Materials to see them bored {:.2} mm thinner per side.",
-            fmt_num(bore_mm), (bore_mm - 86.0) / 2.0
+            fmt_num(bore_mm), (bore_mm - block.bore_mm) / 2.0
         ));
     }
     let piston_name = crank.kit_piston.as_ref().map(|k| k.name.clone()).unwrap_or(piston.name.clone());
@@ -362,8 +441,9 @@ pub fn bottom_end(tune: &Tune) -> BottomEnd {
         crank: crank.material,
     };
     BottomEnd {
-        stock, deck_mm: crank.deck_mm, crank, piston, rod, issues, estimated, bore_mm, stroke_mm, rod_mm, compression_height_mm: ch_mm, deck_clearance_mm,
-        compression, displacement_l: if stock { 1.998 } else { 4.0 * cc(bore_mm, stroke_mm) / 1000.0 },
+        stock: geom_stock && setup.pump.id == "rbc", geom_stock, block, head, pump: setup.pump, head_fit, pump_fit: setup.pump_fit,
+        deck_mm: crank.deck_mm, crank, piston, rod, issues, estimated, bore_mm, stroke_mm, rod_mm, compression_height_mm: ch_mm, deck_clearance_mm,
+        compression, displacement_l: if geom_stock { 1.998 } else { 4.0 * cc(bore_mm, stroke_mm) / 1000.0 },
         piston_kg, rod_recip_kg, pin_mm, big_end_bearing_mm: housing_mm - 3.0, requires_sleeves, piston_name, rod_name, materials,
     }
 }

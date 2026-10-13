@@ -194,8 +194,11 @@ export function stepThermal(th, { rpm, fuelGs, frictionW, heatLoss, speedMs, map
 
 // Oil pressure (kPa): flow through the bearings and galleries rises with pump speed and with viscosity,
 // until the relief valve opens. Same as before for hot oil.
-export function oilPressureKpa(rpm, oilC, g = COOLING) {
-  const hot = g.oilHotIdleKpa + rpm * g.oilKpaPerRpm;
+// pump: the fitted oil pump (src/engines.js). Its flowScale multiplies delivery, and so the pressure the
+// bearings' fixed leak paths hold; above maxRpm it cavitates and delivers no more.
+export function oilPressureKpa(rpm, oilC, g = COOLING, pump = null) {
+  const r = pump ? Math.min(rpm, pump.maxRpm) : rpm;
+  const hot = (g.oilHotIdleKpa + r * g.oilKpaPerRpm) * (pump?.flowScale ?? 1);
   return clamp(hot * viscRatio(oilC, g) ** 0.5, 0, g.oilReliefKpa);
 }
 

@@ -1,6 +1,7 @@
 // Writes the data the native (Rust) sim compiles in, and parity fixtures its tests compare against.
 //   native/sim/data/materials.json   material library (same as src/materials.js)
 //   native/sim/data/parts-catalog.json
+//   native/sim/data/engines.json      K-series blocks, heads and oil pumps
 //   native/sim/data/parity.json      JS results for fixed scenarios
 // Run after changing the JS model: node tools/export-native-data.mjs
 import { writeFileSync, copyFileSync } from 'node:fs';
@@ -16,6 +17,7 @@ import { createThermal, stepThermal, rotatingOil } from '../src/thermal.js';
 const out = p => new URL(`../native/sim/data/${p}`, import.meta.url);
 writeFileSync(out('materials.json'), JSON.stringify(MATERIALS, null, 1));
 copyFileSync(new URL('../docs/parts-catalog.json', import.meta.url), out('parts-catalog.json'));
+copyFileSync(new URL('../docs/engines.json', import.meta.url), out('engines.json'));
 
 const gas = [];
 for (const c of [
@@ -96,5 +98,25 @@ for (let i = 0; i < 6000; i++) {
 const lube = [[800, 150, 25, 0.2], [3000, 390, 90, 0.5], [7000, 500, 100, 0.6], [7000, 100, 100, 0.6], [8000, 600, 140, 1.2], [0, 0, 80, 0.5]]
   .map(([rpm, oilKpa, oilC, loadRatio]) => ({ rpm, oilKpa, oilC, loadRatio, out: rotatingOil(rpm, oilKpa, oilC, undefined, loadRatio) }));
 
-writeFileSync(out('parity.json'), JSON.stringify({ veCorrLow: VE_CORR_LOW, veCorrHigh: VE_CORR_HIGH, gas, engine, parts, drive, thermal, coldStart, turboSoak, lube }, null, 1));
+// Other K-series blocks, heads and oil pumps: what fits, and the engine at full throttle.
+const engines = [
+  [{ block: 'K24A2' }, {}], [{ block: 'K24A2', head: 'K20Z3' }, {}], [{ block: 'K24A8', head: 'K20A2' }, {}],
+  [{ block: 'K24A8', head: 'K20A2' }, { piston: 'cp-k24k20-87-14.2' }], [{ block: 'K20Z3', head: 'K24A2' }, {}],
+  [{ block: 'K20A3' }, { rod: 'eagle-k20-139' }], [{ block: 'K24Z7' }, { crank: 'bc-k20-92-stroker' }],
+  [{ block: 'K24A4', head: 'K20Z3', oilPump: 'prb' }, { piston: 'wiseco-k20-87.5-12.0' }],
+  [{ oilPump: 'prb' }, {}], [{ oilPump: '4p-ported' }, {}], [{ block: 'K20A', head: 'K20A-R', oilPump: 'raa' }, {}],
+  [{ block: 'K20A3' }, {}], [{ block: 'K20A3' }, { crank: 'toda-k20-90.7-hc-87' }],
+].map(([eng, p]) => {
+  const tune = { ...placeholderTune(), engine: eng, parts: p, vtecRpm: 5500 };
+  const b = bottomEnd(tune);
+  const runs = [3000, 7000].map(rpm => {
+    const e = createEngine(tune);
+    for (let t = 0; t < 1; t += 0.001) { e.rpm = rpm; stepEngine(e, 1, 0.001); }
+    return { rpm, torqueNm: e.torqueNm, frictionNm: e.frictionNm, oilKpa: e.oilKpa, camF: e.camF };
+  });
+  return { engine: eng, parts: p, head: b.head.id, pump: b.pump.id, boreMm: b.boreMm, strokeMm: b.strokeMm, rodMm: b.rodMm, compression: b.compression,
+    displacementL: b.displacementL, deckClearanceMm: b.deckClearanceMm, requiresSleeves: b.requiresSleeves, issues: b.issues.length, headWorks: b.headFit.works, pumpWorks: b.pumpFit.works, runs };
+});
+
+writeFileSync(out('parity.json'), JSON.stringify({ veCorrLow: VE_CORR_LOW, veCorrHigh: VE_CORR_HIGH, gas, engine, parts, drive, thermal, coldStart, turboSoak, lube, engines }, null, 1));
 console.log(`gas ${gas.length}, engine ${engine.length}, parts ${parts.length}, drive ${drive.length}`);

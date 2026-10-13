@@ -41,7 +41,7 @@ view.update(renderState(sim), dtSeconds);
 | `failed` | Name of the failed part, or `null` |
 | `forces` | Rod force down on the firing stroke and up at TDC (N), sleeve hoop stress (MPa) |
 | `geometry` | Bore, stroke, rod length, deck height and deck clearance, valve sizes (m); compression ratio; displacement (L). Changes with the fitted crank, rods and pistons |
-| `bottomEnd` | Names of the fitted crank (or stroker kit), rods and pistons, the block (K20Z3 or K24A), whether it's all stock, and any fitment notes |
+| `bottomEnd` | Names of the fitted crank (or stroker kit), rods and pistons, the block, head and oil pump ids (docs/ENGINES.md), whether it's all stock, and any fitment notes |
 | `cooling` | Coolant and oil: temperatures (head, radiator outlet, pump inlet, oil), thermostat opening, fans, flows (L/min), heat (kW), boiling point and overheat time, oil pressure, viscosity and cooler; `coolantCircuit` and `oilCircuit` list each hose, passage and line as `{from, to, name, flowLpm, tempC}` between the components in `COMPONENTS` (src/thermal.js; `cooling_components()` in the native core), which gives each one a name and an approximate position and size for drawing. See docs/COOLING.md. |
 
 Helpers:

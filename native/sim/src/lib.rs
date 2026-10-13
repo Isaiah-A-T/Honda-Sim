@@ -2,6 +2,7 @@
 //! Parity tests (tests/parity.rs) compare it with the JavaScript model's results.
 
 pub mod engine;
+pub mod engines;
 pub mod gasflow;
 pub mod internals;
 pub mod k20z3;

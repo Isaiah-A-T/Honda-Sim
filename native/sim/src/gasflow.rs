@@ -14,6 +14,9 @@ pub struct Lobes {
     pub in_dur: f64,
     pub ex_lift: f64,
     pub ex_dur: f64,
+    /// Economy i-VTEC low cam: share of the full intake curtain (one valve only cracks open). None = all valves.
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub in_valves: Option<f64>,
 }
 
 #[derive(Clone, Debug, PartialEq, Serialize)]
@@ -59,8 +62,8 @@ pub fn flow_defaults() -> Flow {
         ex_valve_m: 0.030,
         valves: 2.0,
         stem_m: 0.0055,
-        cams_low: Lobes { in_lift: 0.0095, in_dur: 228.0, ex_lift: 0.0090, ex_dur: 222.0 },
-        cams_high: Lobes { in_lift: 0.0117, in_dur: 262.0, ex_lift: 0.0110, ex_dur: 256.0 },
+        cams_low: Lobes { in_lift: 0.0095, in_dur: 228.0, ex_lift: 0.0090, ex_dur: 222.0, in_valves: None },
+        cams_high: Lobes { in_lift: 0.0117, in_dur: 262.0, ex_lift: 0.0110, ex_dur: 256.0, in_valves: None },
         intake_centre0: 130.0,
         exhaust_centre: 105.0,
         valve_cd: 0.72,
@@ -321,7 +324,8 @@ impl Gas {
         let out_area = c.out_area_m2.unwrap_or(PI / 4.0 * g.exhaust_dia_m.powi(2)) / 4.0;
         let in_centre = -360.0 + g.intake_centre0 - c.vtc;
         let ex_centre = 360.0 - g.exhaust_centre;
-        let throat_in = g.valves * (PI / 4.0 * (0.88 * g.in_valve_m).powi(2) - PI / 4.0 * g.stem_m.powi(2));
+        let in_valves = cam.in_valves.unwrap_or(g.valves);
+        let throat_in = in_valves * (PI / 4.0 * (0.88 * g.in_valve_m).powi(2) - PI / 4.0 * g.stem_m.powi(2));
         let throat_ex = g.valves * (PI / 4.0 * (0.88 * g.ex_valve_m).powi(2) - PI / 4.0 * g.stem_m.powi(2));
         let a_run = PI / 4.0 * g.runner_dia_m.powi(2);
         let a_pri = PI / 4.0 * g.primary_dia_m.powi(2);
@@ -364,7 +368,7 @@ impl Gas {
 
             let li = lift_at(thm, in_centre, cam.in_dur, cam.in_lift);
             let le = lift_at(thm, ex_centre, cam.ex_dur, cam.ex_lift);
-            let a_iv = if li > 1e-4 { g.valve_cd * (g.valves * PI * g.in_valve_m * li).min(throat_in) } else { 0.0 };
+            let a_iv = if li > 1e-4 { g.valve_cd * (in_valves * PI * g.in_valve_m * li).min(throat_in) } else { 0.0 };
             let a_ev = if le > 1e-4 { g.valve_cd * (g.valves * PI * g.ex_valve_m * le).min(throat_ex) } else { 0.0 };
 
             let f_iv = limit(flow(a_iv, self.p_in, t0, p, self.t, 1.4) * dt, self.p_in, t0, v_in, p, self.t, v);

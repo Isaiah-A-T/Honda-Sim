@@ -161,7 +161,10 @@ export function runCycle(s, c, stepDeg = 1) {
   const p0 = c.mapKpa * 1000, Tm = 273 + c.iatC, T0 = Tm + G.chargeHeatK * wallF * (3000 / rpm) ** 0.3, pOut = (c.outKpa ?? 101.3) * 1000;
   const outArea = (c.outAreaM2 ?? Math.PI / 4 * G.exhaustDiaM ** 2) / 4;
   const inCentre = -360 + G.intakeCentre0 - (c.vtc ?? 0), exCentre = 360 - G.exhaustCentre;
-  const throatIn = G.valves * (Math.PI / 4 * (0.88 * G.inValveM) ** 2 - Math.PI / 4 * G.stemM ** 2);
+  // Economy i-VTEC heads open one intake valve only a crack on the low cam: cam.inValves counts the
+  // intake valves' share of the full curtain and throat (2 when both open fully).
+  const inValves = cam.inValves ?? G.valves;
+  const throatIn = inValves * (Math.PI / 4 * (0.88 * G.inValveM) ** 2 - Math.PI / 4 * G.stemM ** 2);
   const throatEx = G.valves * (Math.PI / 4 * (0.88 * G.exValveM) ** 2 - Math.PI / 4 * G.stemM ** 2);
   const aRun = Math.PI / 4 * G.runnerDiaM ** 2, aPri = Math.PI / 4 * G.primaryDiaM ** 2;
   // The collector is shared by four cylinders, so it sees four smaller pulses per cycle. Giving this
@@ -191,7 +194,7 @@ export function runCycle(s, c, stepDeg = 1) {
 
     // Valve areas
     const li = liftAt(thm, inCentre, cam.inDur, cam.inLift), le = liftAt(thm, exCentre, cam.exDur, cam.exLift);
-    const aIv = li > 1e-4 ? G.valveCd * Math.min(G.valves * Math.PI * G.inValveM * li, throatIn) : 0;
+    const aIv = li > 1e-4 ? G.valveCd * Math.min(inValves * Math.PI * G.inValveM * li, throatIn) : 0;
     const aEv = le > 1e-4 ? G.valveCd * Math.min(G.valves * Math.PI * G.exValveM * le, throatEx) : 0;
 
     // Flows this step (kg)

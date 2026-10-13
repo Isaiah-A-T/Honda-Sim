@@ -345,7 +345,7 @@
     "crank": 0.2594490869795715,
     "gasket": 0.3298522329774728,
     "headBolt": 0.24251207385979484,
-    "sleeve": 0.3458812836653032,
+    "sleeve": 0.30894908866399184,
     "block": 0.1610943794396846,
     "valvetrain": 0.0575623054394076
    }
@@ -368,7 +368,7 @@
     "crank": 0.3583450604825482,
     "gasket": 0.48465208530849097,
     "headBolt": 0.3563231367200213,
-    "sleeve": 0.5438853174329785,
+    "sleeve": 0.4821958167106098,
     "block": 0.20472707819352637,
     "valvetrain": 0.2302492217576304
    }
@@ -391,7 +391,7 @@
     "crank": 0.3552755738216188,
     "gasket": 0.5363788815354364,
     "headBolt": 0.39435341626030346,
-    "sleeve": 0.6163955441407127,
+    "sleeve": 0.5449965430816426,
     "block": 0.15583767400144616,
     "valvetrain": 0.6084369929691725
    }
@@ -526,12 +526,12 @@
     "crank": "honda-k24-99-hybrid",
     "rod": "eagle-k20-139"
    },
-   "boreMm": 86,
+   "boreMm": 87,
    "strokeMm": 99,
    "rodMm": 152,
-   "compression": 12.511627906976743,
-   "displacementL": 2.300286707329061,
-   "pistonKg": 0.29,
+   "compression": 10.5,
+   "displacementL": 2.354092764707093,
+   "pistonKg": 0.29678339643050294,
    "issues": 1
   },
   {
@@ -2270,6 +2270,468 @@
     ],
     "splashLpm": 0
    }
+  }
+ ],
+ "engines": [
+  {
+   "engine": {
+    "block": "K24A2"
+   },
+   "parts": {},
+   "head": "K24A2",
+   "pump": "raa",
+   "boreMm": 87,
+   "strokeMm": 99,
+   "rodMm": 152,
+   "compression": 10.5,
+   "displacementL": 2.354092764707093,
+   "deckClearanceMm": 0,
+   "requiresSleeves": false,
+   "issues": 0,
+   "headWorks": "yes",
+   "pumpWorks": "yes",
+   "runs": [
+    {
+     "rpm": 3000,
+     "torqueNm": 184.80554363743335,
+     "frictionNm": 11.299999999999999,
+     "oilKpa": 350,
+     "camF": 0
+    },
+    {
+     "rpm": 7000,
+     "torqueNm": 204.27860624061614,
+     "frictionNm": 28.099999999999998,
+     "oilKpa": 600,
+     "camF": 1
+    }
+   ]
+  },
+  {
+   "engine": {
+    "block": "K24A2",
+    "head": "K20Z3"
+   },
+   "parts": {},
+   "head": "K20Z3",
+   "pump": "raa",
+   "boreMm": 87,
+   "strokeMm": 99,
+   "rodMm": 152,
+   "compression": 10.5,
+   "displacementL": 2.354092764707093,
+   "deckClearanceMm": 0,
+   "requiresSleeves": false,
+   "issues": 0,
+   "headWorks": "mods",
+   "pumpWorks": "yes",
+   "runs": [
+    {
+     "rpm": 3000,
+     "torqueNm": 184.8495862694928,
+     "frictionNm": 11.299999999999999,
+     "oilKpa": 350,
+     "camF": 0
+    },
+    {
+     "rpm": 7000,
+     "torqueNm": 194.31398593613574,
+     "frictionNm": 28.099999999999998,
+     "oilKpa": 600,
+     "camF": 1
+    }
+   ]
+  },
+  {
+   "engine": {
+    "block": "K24A8",
+    "head": "K20A2"
+   },
+   "parts": {},
+   "head": "K24A4",
+   "pump": "raa",
+   "boreMm": 87,
+   "strokeMm": 99,
+   "rodMm": 152,
+   "compression": 9.7,
+   "displacementL": 2.354092764707093,
+   "deckClearanceMm": 0,
+   "requiresSleeves": false,
+   "issues": 1,
+   "headWorks": "yes",
+   "pumpWorks": "yes",
+   "runs": [
+    {
+     "rpm": 3000,
+     "torqueNm": 172.23876205261615,
+     "frictionNm": 11.299999999999999,
+     "oilKpa": 350,
+     "camF": 0
+    },
+    {
+     "rpm": 7000,
+     "torqueNm": 160.24710138149248,
+     "frictionNm": 28.099999999999998,
+     "oilKpa": 600,
+     "camF": 1
+    }
+   ]
+  },
+  {
+   "engine": {
+    "block": "K24A8",
+    "head": "K20A2"
+   },
+   "parts": {
+    "piston": "cp-k24k20-87-14.2"
+   },
+   "head": "K20A2",
+   "pump": "raa",
+   "boreMm": 87,
+   "strokeMm": 99,
+   "rodMm": 152,
+   "compression": 14.2,
+   "displacementL": 2.354092764707093,
+   "deckClearanceMm": 0,
+   "requiresSleeves": false,
+   "issues": 0,
+   "headWorks": "mods",
+   "pumpWorks": "yes",
+   "runs": [
+    {
+     "rpm": 3000,
+     "torqueNm": 189.56068198603785,
+     "frictionNm": 11.299999999999999,
+     "oilKpa": 350,
+     "camF": 0
+    },
+    {
+     "rpm": 7000,
+     "torqueNm": 213.61140895628154,
+     "frictionNm": 28.099999999999998,
+     "oilKpa": 600,
+     "camF": 1
+    }
+   ]
+  },
+  {
+   "engine": {
+    "block": "K20Z3",
+    "head": "K24A2"
+   },
+   "parts": {},
+   "head": "K20Z3",
+   "pump": "rbc",
+   "boreMm": 86,
+   "strokeMm": 86,
+   "rodMm": 139,
+   "compression": 11,
+   "displacementL": 1.998,
+   "deckClearanceMm": 0,
+   "requiresSleeves": false,
+   "issues": 1,
+   "headWorks": "yes",
+   "pumpWorks": "yes",
+   "runs": [
+    {
+     "rpm": 3000,
+     "torqueNm": 158.2872047802362,
+     "frictionNm": 11.299999999999999,
+     "oilKpa": 350,
+     "camF": 0
+    },
+    {
+     "rpm": 7000,
+     "torqueNm": 185.01231161292685,
+     "frictionNm": 28.099999999999998,
+     "oilKpa": 600,
+     "camF": 1
+    }
+   ]
+  },
+  {
+   "engine": {
+    "block": "K20A3"
+   },
+   "parts": {
+    "rod": "eagle-k20-139"
+   },
+   "head": "K20A3",
+   "pump": "prb",
+   "boreMm": 86,
+   "strokeMm": 86,
+   "rodMm": 139,
+   "compression": 9.8,
+   "displacementL": 1.9982288568717095,
+   "deckClearanceMm": 0,
+   "requiresSleeves": false,
+   "issues": 1,
+   "headWorks": "yes",
+   "pumpWorks": "yes",
+   "runs": [
+    {
+     "rpm": 3000,
+     "torqueNm": 153.110227949482,
+     "frictionNm": 8.663113368891674,
+     "oilKpa": 350,
+     "camF": 0
+    },
+    {
+     "rpm": 7000,
+     "torqueNm": 162.5700729814086,
+     "frictionNm": 21.947264527413907,
+     "oilKpa": 600,
+     "camF": 1
+    }
+   ]
+  },
+  {
+   "engine": {
+    "block": "K24Z7"
+   },
+   "parts": {
+    "crank": "bc-k20-92-stroker"
+   },
+   "head": "K24Z",
+   "pump": "r40",
+   "boreMm": 87,
+   "strokeMm": 99,
+   "rodMm": 152,
+   "compression": 11,
+   "displacementL": 2.354092764707093,
+   "deckClearanceMm": 0,
+   "requiresSleeves": false,
+   "issues": 1,
+   "headWorks": "yes",
+   "pumpWorks": "yes",
+   "runs": [
+    {
+     "rpm": 3000,
+     "torqueNm": 187.20227260372786,
+     "frictionNm": 11.299999999999999,
+     "oilKpa": 350,
+     "camF": 0
+    },
+    {
+     "rpm": 7000,
+     "torqueNm": 197.51479569460608,
+     "frictionNm": 28.099999999999998,
+     "oilKpa": 600,
+     "camF": 1
+    }
+   ]
+  },
+  {
+   "engine": {
+    "block": "K24A4",
+    "head": "K20Z3",
+    "oilPump": "prb"
+   },
+   "parts": {
+    "piston": "wiseco-k20-87.5-12.0"
+   },
+   "head": "K20Z3",
+   "pump": "prb",
+   "boreMm": 87.5,
+   "strokeMm": 99,
+   "rodMm": 152,
+   "compression": 13.662790697674419,
+   "displacementL": 2.3812290566506387,
+   "deckClearanceMm": 0,
+   "requiresSleeves": false,
+   "issues": 0,
+   "headWorks": "mods",
+   "pumpWorks": "mods",
+   "runs": [
+    {
+     "rpm": 3000,
+     "torqueNm": 194.39170447482752,
+     "frictionNm": 8.663113368891674,
+     "oilKpa": 350,
+     "camF": 0
+    },
+    {
+     "rpm": 7000,
+     "torqueNm": 218.0366740198394,
+     "frictionNm": 21.947264527413907,
+     "oilKpa": 600,
+     "camF": 1
+    }
+   ]
+  },
+  {
+   "engine": {
+    "oilPump": "prb"
+   },
+   "parts": {},
+   "head": "K20Z3",
+   "pump": "prb",
+   "boreMm": 86,
+   "strokeMm": 86,
+   "rodMm": 139,
+   "compression": 11,
+   "displacementL": 1.998,
+   "deckClearanceMm": 0,
+   "requiresSleeves": false,
+   "issues": 0,
+   "headWorks": "yes",
+   "pumpWorks": "mods",
+   "runs": [
+    {
+     "rpm": 3000,
+     "torqueNm": 160.92409141134453,
+     "frictionNm": 8.663113368891674,
+     "oilKpa": 350,
+     "camF": 0
+    },
+    {
+     "rpm": 7000,
+     "torqueNm": 191.16504708551292,
+     "frictionNm": 21.947264527413907,
+     "oilKpa": 600,
+     "camF": 1
+    }
+   ]
+  },
+  {
+   "engine": {
+    "oilPump": "4p-ported"
+   },
+   "parts": {},
+   "head": "K20Z3",
+   "pump": "4p-ported",
+   "boreMm": 86,
+   "strokeMm": 86,
+   "rodMm": 139,
+   "compression": 11,
+   "displacementL": 1.998,
+   "deckClearanceMm": 0,
+   "requiresSleeves": false,
+   "issues": 0,
+   "headWorks": "yes",
+   "pumpWorks": "mods",
+   "runs": [
+    {
+     "rpm": 3000,
+     "torqueNm": 160.92409141134453,
+     "frictionNm": 8.663113368891674,
+     "oilKpa": 437.5,
+     "camF": 0
+    },
+    {
+     "rpm": 7000,
+     "torqueNm": 191.16504708551292,
+     "frictionNm": 21.947264527413907,
+     "oilKpa": 600,
+     "camF": 1
+    }
+   ]
+  },
+  {
+   "engine": {
+    "block": "K20A",
+    "head": "K20A-R",
+    "oilPump": "raa"
+   },
+   "parts": {},
+   "head": "K20A-R",
+   "pump": "prb",
+   "boreMm": 86,
+   "strokeMm": 86,
+   "rodMm": 139,
+   "compression": 11.5,
+   "displacementL": 1.9982288568717095,
+   "deckClearanceMm": 0,
+   "requiresSleeves": false,
+   "issues": 1,
+   "headWorks": "yes",
+   "pumpWorks": "yes",
+   "runs": [
+    {
+     "rpm": 3000,
+     "torqueNm": 162.78113227077122,
+     "frictionNm": 8.663113368891674,
+     "oilKpa": 350,
+     "camF": 0
+    },
+    {
+     "rpm": 7000,
+     "torqueNm": 194.08400809544835,
+     "frictionNm": 21.947264527413907,
+     "oilKpa": 600,
+     "camF": 1
+    }
+   ]
+  },
+  {
+   "engine": {
+    "block": "K20A3"
+   },
+   "parts": {},
+   "head": "K20A3",
+   "pump": "prb",
+   "boreMm": 86,
+   "strokeMm": 86,
+   "rodMm": 139,
+   "compression": 9.8,
+   "displacementL": 1.9982288568717095,
+   "deckClearanceMm": 0,
+   "requiresSleeves": false,
+   "issues": 0,
+   "headWorks": "yes",
+   "pumpWorks": "yes",
+   "runs": [
+    {
+     "rpm": 3000,
+     "torqueNm": 153.110227949482,
+     "frictionNm": 8.663113368891674,
+     "oilKpa": 350,
+     "camF": 0
+    },
+    {
+     "rpm": 7000,
+     "torqueNm": 162.5700729814086,
+     "frictionNm": 21.947264527413907,
+     "oilKpa": 600,
+     "camF": 1
+    }
+   ]
+  },
+  {
+   "engine": {
+    "block": "K20A3"
+   },
+   "parts": {
+    "crank": "toda-k20-90.7-hc-87"
+   },
+   "head": "K20A3",
+   "pump": "prb",
+   "boreMm": 86,
+   "strokeMm": 86,
+   "rodMm": 139,
+   "compression": 9.8,
+   "displacementL": 1.9982288568717095,
+   "deckClearanceMm": 0,
+   "requiresSleeves": false,
+   "issues": 1,
+   "headWorks": "yes",
+   "pumpWorks": "yes",
+   "runs": [
+    {
+     "rpm": 3000,
+     "torqueNm": 153.110227949482,
+     "frictionNm": 8.663113368891674,
+     "oilKpa": 350,
+     "camF": 0
+    },
+    {
+     "rpm": 7000,
+     "torqueNm": 162.5700729814086,
+     "frictionNm": 21.947264527413907,
+     "oilKpa": 600,
+     "camF": 1
+    }
+   ]
   }
  ]
 }

@@ -91,7 +91,7 @@ pub fn render_state(sim: &Sim) -> Value {
         "cooling": cooling,
         "bottomEnd": {
             "stock": b.stock, "crank": b.crank.name, "pistons": b.piston_name, "rods": b.rod_name,
-            "block": b.crank.block.unwrap_or("K20Z3"), "issues": b.issues,
+            "block": b.block.id, "head": b.head.id, "oilPump": b.pump.id, "issues": b.issues,
         },
     })
 }

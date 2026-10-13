@@ -1,0 +1,1470 @@
+{
+ "_meta": {
+  "generatedBy": "tools/build-engines.py from docs/k-series-specs.json",
+  "rules": [
+   "A head fits a block of its own family (K20 on K20, K24 on K24). Only the K20A2-on-K20A3 swap is documented; the rest are inferred from the shared design.",
+   "A K20 DOHC VTEC head fits a K24 block with the parts listed in `compatibility`.",
+   "Combinations no fetched page documents (a K24 head on a K20 block, an economy K20 head on a K24 block) are not allowed.",
+   "Stock K24A4 pistons risk hitting a K20 head's valves; K24A8 pistons hit them. Aftermarket pistons are needed.",
+   "Aftermarket K20 cranks, rods and stroker kits do not list the K20A3, whose rods and bearings differ, and are not allowed in it."
+  ],
+  "blockedRuleSources": [
+   "https://www.hybrid-racing.com/blogs/hybrid-racing/k20-k24-hybrid-engine-build-guide"
+  ]
+ },
+ "blocks": [
+  {
+   "id": "K20Z3",
+   "name": "K20Z3 (2006-11 Civic Si)",
+   "family": "K20",
+   "series": "Z",
+   "vehicles": [
+    "2006-2011 Civic Si",
+    "2007-2010 Acura CSX Type-S"
+   ],
+   "boreMm": 86,
+   "strokeMm": 86,
+   "rodMm": 139,
+   "deckMm": 212,
+   "compression": 11.0,
+   "compressionHeightMm": 30,
+   "pinMm": 22,
+   "bigEndMm": 51,
+   "balanceShafts": true,
+   "oilPump": "rbc",
+   "head": "K20Z3",
+   "rating": {
+    "hp": 197,
+    "hpRpm": 7800,
+    "torqueLbft": 139,
+    "torqueRpm": 6200,
+    "redlineRpm": 8000,
+    "revLimitRpm": 8300
+   },
+   "aftermarketBottomEnd": true,
+   "pistonsVsK20Head": null,
+   "estimated": {
+    "deck": "deck heights (212 / 231.5 mm) are Wikipedia figures, consistent with stroke/2 + rod + 30 mm compression height"
+   },
+   "sources": [
+    "https://en.wikipedia.org/wiki/Honda_K_engine",
+    "https://hondanews.com/en-US/releases/release-e9dd7ff209cc71cc83947a004c34c1b2-2006-honda-civic-coupe-and-civic-si-specifications",
+    "https://hondanews.com/en-US/honda-automobiles/releases/release-56b0418fdb34027710fdde004c34c1ad-2006-honda-civic-powertrains",
+    "https://www.hybrid-racing.com/products/honda-rbb-oil-jet-squirter-k20z3-k24a2-15280-prb-a00",
+    "https://www.realstreetperformance.com/eagle-h-beam-rods-honda-rsx-type-s-k20a2-5-470.html",
+    "https://www.realstreetperformance.com/wiseco-pistons-acura-rsx-k20-86-5mm-11-71.html",
+    "https://www.hybrid-racing.com/products/manley-h-beam-connecting-rods-k20a-k20z",
+    "https://www.hybrid-racing.com/products/speedfactory-h-beam-connecting-rods-k20a-k20z",
+    "https://www.king-catalog.com/cr4542xpdc",
+    "https://www.realstreetperformance.com/brian-crower-honda-92mm-stroker-k20a2-b16a-journal.html",
+    "https://jdmshop.eu/en/crankshaft-bearings-acl-race-honda-4b1972h",
+    "https://a4h-tech.com/de/king-bearings-race-kurbelwelle-lagern-b16-b18-k20-k24-motor"
+   ]
+  },
+  {
+   "id": "K20A2",
+   "name": "K20A2 (2002-04 RSX Type S)",
+   "family": "K20",
+   "series": "A",
+   "vehicles": [
+    "2002-2004 Acura RSX Type-S (USDM)",
+    "2001-2006 Civic Type R EP3 (EDM)",
+    "2002-2004 Integra Type R (AUDM/NZDM)"
+   ],
+   "boreMm": 86,
+   "strokeMm": 86,
+   "rodMm": 139,
+   "deckMm": 212,
+   "compression": 11.0,
+   "compressionHeightMm": 30,
+   "pinMm": 22,
+   "bigEndMm": 51,
+   "balanceShafts": false,
+   "oilPump": "prb",
+   "head": "K20A2",
+   "rating": {
+    "hp": 200,
+    "hpRpm": 7400,
+    "torqueLbft": 142,
+    "torqueRpm": 6000,
+    "redlineRpm": 7900,
+    "revLimitRpm": 8250
+   },
+   "aftermarketBottomEnd": true,
+   "pistonsVsK20Head": null,
+   "estimated": {
+    "deck": "deck heights (212 / 231.5 mm) are Wikipedia figures, consistent with stroke/2 + rod + 30 mm compression height"
+   },
+   "sources": [
+    "https://en.wikipedia.org/wiki/Honda_K_engine",
+    "https://hondanews.com/en-US/releases/release-adb0454bed14c263063cd9004c34c7d6-2002-acura-rsx-and-rsx-type-s-specifications",
+    "https://hondanews.com/en-US/releases/release-34d72a086b54bdfac70ff4004c34c4e5-2004-acura-rsx-specifications",
+    "https://www.acurapartswarehouse.com/genuine/acura~pump~assy~oil~15100-prb-a01.html",
+    "https://www.hybrid-racing.com/products/oem-honda-acura-rsx-s-oil-pump",
+    "https://www.hybrid-racing.com/products/honda-rbb-oil-jet-squirter-k20z3-k24a2-15280-prb-a00",
+    "https://www.realstreetperformance.com/eagle-h-beam-rods-honda-rsx-type-s-k20a2-5-470.html",
+    "https://www.realstreetperformance.com/wiseco-pistons-acura-rsx-k20-86-5mm-11-71.html",
+    "https://www.hybrid-racing.com/products/manley-h-beam-connecting-rods-k20a-k20z",
+    "https://www.hybrid-racing.com/products/speedfactory-h-beam-connecting-rods-k20a-k20z",
+    "https://www.king-catalog.com/cr4542xpdc",
+    "https://www.realstreetperformance.com/brian-crower-honda-92mm-stroker-k20a2-b16a-journal.html",
+    "https://jdmshop.eu/en/crankshaft-bearings-acl-race-honda-4b1972h",
+    "https://a4h-tech.com/de/king-bearings-race-kurbelwelle-lagern-b16-b18-k20-k24-motor"
+   ]
+  },
+  {
+   "id": "K20Z1",
+   "name": "K20Z1 (2005-06 RSX Type S)",
+   "family": "K20",
+   "series": "Z",
+   "vehicles": [
+    "2005-2006 Acura RSX Type-S",
+    "2005-2006 Integra Type S (AUDM/NZDM)"
+   ],
+   "boreMm": 86,
+   "strokeMm": 86,
+   "rodMm": 139,
+   "deckMm": 212,
+   "compression": 11.0,
+   "compressionHeightMm": 30,
+   "pinMm": 22,
+   "bigEndMm": 51,
+   "balanceShafts": false,
+   "oilPump": "prb",
+   "head": "K20Z1",
+   "rating": {
+    "hp": 201,
+    "hpRpm": 7800,
+    "torqueLbft": 140,
+    "torqueRpm": 7000,
+    "redlineRpm": 8100,
+    "revLimitRpm": 8300
+   },
+   "aftermarketBottomEnd": true,
+   "pistonsVsK20Head": null,
+   "estimated": {
+    "deck": "deck heights (212 / 231.5 mm) are Wikipedia figures, consistent with stroke/2 + rod + 30 mm compression height"
+   },
+   "sources": [
+    "https://en.wikipedia.org/wiki/Honda_K_engine",
+    "https://hondanews.com/en-US/releases/release-0daa64f6d63e67bca17317004c34c18f-2006-acura-rsx-rsx-type-s-specifications",
+    "https://www.acurapartswarehouse.com/genuine/acura~pump~assy~oil~15100-prb-a01.html",
+    "https://www.hybrid-racing.com/products/honda-rbb-oil-jet-squirter-k20z3-k24a2-15280-prb-a00",
+    "https://www.realstreetperformance.com/eagle-h-beam-rods-honda-rsx-type-s-k20a2-5-470.html",
+    "https://www.realstreetperformance.com/wiseco-pistons-acura-rsx-k20-86-5mm-11-71.html",
+    "https://www.hybrid-racing.com/products/manley-h-beam-connecting-rods-k20a-k20z",
+    "https://www.hybrid-racing.com/products/speedfactory-h-beam-connecting-rods-k20a-k20z",
+    "https://www.king-catalog.com/cr4542xpdc",
+    "https://www.realstreetperformance.com/brian-crower-honda-92mm-stroker-k20a2-b16a-journal.html",
+    "https://jdmshop.eu/en/crankshaft-bearings-acl-race-honda-4b1972h",
+    "https://a4h-tech.com/de/king-bearings-race-kurbelwelle-lagern-b16-b18-k20-k24-motor",
+    "https://hondanews.com/en-US/releases/release-da3dc5c8517bf1f899bb57004c34c1aa-summary-of-changes-for-acura-2006-lineup",
+    "https://www.auto123.com/en/news/2005-acura-rsx-type-s-road-test/53761/"
+   ]
+  },
+  {
+   "id": "K20A",
+   "name": "K20A Type R (JDM DC5 / EP3)",
+   "family": "K20",
+   "series": "A",
+   "vehicles": [
+    "2001 Integra Type R DC5",
+    "2001 Civic Type R EP3 (JDM)",
+    "2002 Accord Euro-R CL7",
+    "2007 Civic Type R FD2",
+    "2009 Civic Type R Euro"
+   ],
+   "boreMm": 86,
+   "strokeMm": 86,
+   "rodMm": 139,
+   "deckMm": 212,
+   "compression": 11.5,
+   "compressionHeightMm": 30,
+   "pinMm": 22,
+   "bigEndMm": 51,
+   "balanceShafts": false,
+   "oilPump": "prb",
+   "head": "K20A-R",
+   "rating": {
+    "hp": 217,
+    "hpRpm": 8000,
+    "torqueLbft": 152,
+    "torqueRpm": 7000,
+    "redlineRpm": 8400,
+    "revLimitRpm": 8400
+   },
+   "aftermarketBottomEnd": true,
+   "pistonsVsK20Head": null,
+   "estimated": {
+    "compressionHeight": "not found; 30 mm as on the other K20 blocks",
+    "balanceShafts": "sources disagree; the FD2 pump is sold as a balance-shaft delete, so none assumed",
+    "oilPump": "DC5/EP3 pump part number not found; the RSX Type S pump assumed",
+    "deck": "deck heights (212 / 231.5 mm) are Wikipedia figures, consistent with stroke/2 + rod + 30 mm compression height"
+   },
+   "sources": [
+    "https://en.wikipedia.org/wiki/Honda_K_engine",
+    "https://www.honda.co.jp/factbook/auto/INTEGRA/200107/07.html",
+    "https://www.honda.co.jp/factbook/auto/CIVIC_TYPE_R/200703/04.html",
+    "https://www.honda.co.jp/factbook/auto/civic-r/200110/08.html",
+    "https://www.motorreviewer.com/engine.php?engine_id=163",
+    "https://www.honda.co.jp/factbook/auto/INTEGRA/200107/03.html",
+    "https://www.realstreetperformance.com/eagle-h-beam-rods-honda-rsx-type-s-k20a2-5-470.html",
+    "https://www.realstreetperformance.com/wiseco-pistons-acura-rsx-k20-86-5mm-11-71.html",
+    "https://www.hybrid-racing.com/products/manley-h-beam-connecting-rods-k20a-k20z",
+    "https://www.hybrid-racing.com/products/speedfactory-h-beam-connecting-rods-k20a-k20z",
+    "https://www.king-catalog.com/cr4542xpdc",
+    "https://www.realstreetperformance.com/brian-crower-honda-92mm-stroker-k20a2-b16a-journal.html",
+    "https://www.honda.co.jp/sportscar/vtec_history/K20A/",
+    "https://jdmshop.eu/en/crankshaft-bearings-acl-race-honda-4b1972h",
+    "https://a4h-tech.com/de/king-bearings-race-kurbelwelle-lagern-b16-b18-k20-k24-motor",
+    "https://www.honda.co.jp/factbook/auto/INTEGRA/200107/06.html"
+   ]
+  },
+  {
+   "id": "K20A-FD2",
+   "name": "K20A Type R (JDM FD2)",
+   "family": "K20",
+   "series": "A",
+   "vehicles": [
+    "2001 Integra Type R DC5",
+    "2001 Civic Type R EP3 (JDM)",
+    "2002 Accord Euro-R CL7",
+    "2007 Civic Type R FD2",
+    "2009 Civic Type R Euro"
+   ],
+   "boreMm": 86,
+   "strokeMm": 86,
+   "rodMm": 139,
+   "deckMm": 212,
+   "compression": 11.7,
+   "compressionHeightMm": 30,
+   "pinMm": 22,
+   "bigEndMm": 51,
+   "balanceShafts": false,
+   "oilPump": "rrc",
+   "head": "K20A-R",
+   "rating": {
+    "hp": 222,
+    "hpRpm": 8000,
+    "torqueLbft": 159,
+    "torqueRpm": 6100,
+    "redlineRpm": 8400,
+    "revLimitRpm": 8400
+   },
+   "aftermarketBottomEnd": true,
+   "pistonsVsK20Head": null,
+   "estimated": {
+    "compressionHeight": "not found; 30 mm as on the other K20 blocks",
+    "deck": "deck heights (212 / 231.5 mm) are Wikipedia figures, consistent with stroke/2 + rod + 30 mm compression height"
+   },
+   "sources": [
+    "https://en.wikipedia.org/wiki/Honda_K_engine",
+    "https://www.honda.co.jp/factbook/auto/INTEGRA/200107/07.html",
+    "https://www.honda.co.jp/factbook/auto/CIVIC_TYPE_R/200703/04.html",
+    "https://www.honda.co.jp/factbook/auto/civic-r/200110/08.html",
+    "https://www.motorreviewer.com/engine.php?engine_id=163",
+    "https://www.honda.co.jp/factbook/auto/INTEGRA/200107/03.html",
+    "https://www.realstreetperformance.com/eagle-h-beam-rods-honda-rsx-type-s-k20a2-5-470.html",
+    "https://www.realstreetperformance.com/wiseco-pistons-acura-rsx-k20-86-5mm-11-71.html",
+    "https://www.hybrid-racing.com/products/manley-h-beam-connecting-rods-k20a-k20z",
+    "https://www.hybrid-racing.com/products/speedfactory-h-beam-connecting-rods-k20a-k20z",
+    "https://www.king-catalog.com/cr4542xpdc",
+    "https://www.realstreetperformance.com/brian-crower-honda-92mm-stroker-k20a2-b16a-journal.html",
+    "https://www.honda.co.jp/sportscar/vtec_history/K20A/",
+    "https://jdmshop.eu/en/crankshaft-bearings-acl-race-honda-4b1972h",
+    "https://a4h-tech.com/de/king-bearings-race-kurbelwelle-lagern-b16-b18-k20-k24-motor",
+    "https://www.honda.co.jp/factbook/auto/INTEGRA/200107/06.html"
+   ]
+  },
+  {
+   "id": "K20Z4",
+   "name": "K20Z4 (2007-10 Civic Type R FN2)",
+   "family": "K20",
+   "series": "Z",
+   "vehicles": [
+    "2007-2010 Civic Type R FN2 (EDM)"
+   ],
+   "boreMm": 86,
+   "strokeMm": 86,
+   "rodMm": 139,
+   "deckMm": 212,
+   "compression": 11.0,
+   "compressionHeightMm": 30,
+   "pinMm": 22,
+   "bigEndMm": 51,
+   "balanceShafts": true,
+   "oilPump": "rbc",
+   "head": "K20Z4",
+   "rating": {
+    "hp": 198,
+    "hpRpm": 7800,
+    "torqueLbft": 142,
+    "torqueRpm": 5600,
+    "redlineRpm": 8000,
+    "revLimitRpm": 8200
+   },
+   "aftermarketBottomEnd": true,
+   "pistonsVsK20Head": null,
+   "estimated": {
+    "bore": "bore, stroke and rod not found for the FN2; same as the K20Z3",
+    "oilPump": "part number not found; K20Z3 balancer pump assumed",
+    "deck": "deck heights (212 / 231.5 mm) are Wikipedia figures, consistent with stroke/2 + rod + 30 mm compression height"
+   },
+   "sources": [
+    "https://en.wikipedia.org/wiki/Honda_K_engine",
+    "https://type-r-owners.co.uk/fn2.html",
+    "https://a4h-tech.com/en/oem-honda-balancer-shaft-delete-kit"
+   ]
+  },
+  {
+   "id": "K20A3",
+   "name": "K20A3 (RSX base / 2002-05 Civic Si)",
+   "family": "K20",
+   "series": "A3",
+   "vehicles": [
+    "2002-2006 Acura RSX (base)",
+    "2002-2005 Civic Si EP3 (USDM)",
+    "2002-2005 Civic Type S (EDM)"
+   ],
+   "boreMm": 86,
+   "strokeMm": 86,
+   "rodMm": 139,
+   "deckMm": 212,
+   "compression": 9.8,
+   "compressionHeightMm": 30,
+   "pinMm": 22,
+   "bigEndMm": 51,
+   "balanceShafts": false,
+   "oilPump": "prb",
+   "head": "K20A3",
+   "rating": {
+    "hp": 160,
+    "hpRpm": 6500,
+    "torqueLbft": 141,
+    "torqueRpm": 4000,
+    "redlineRpm": 6800,
+    "revLimitRpm": 7000
+   },
+   "aftermarketBottomEnd": false,
+   "pistonsVsK20Head": null,
+   "estimated": {
+    "rod": "K20A3 rod length not found; 139 mm assumed",
+    "compressionHeight": "not found; 30 mm assumed",
+    "deck": "deck heights (212 / 231.5 mm) are Wikipedia figures, consistent with stroke/2 + rod + 30 mm compression height"
+   },
+   "sources": [
+    "https://en.wikipedia.org/wiki/Honda_K_engine",
+    "https://hondanews.com/en-US/releases/release-adb0454bed14c263063cd9004c34c7d6-2002-acura-rsx-and-rsx-type-s-specifications",
+    "https://hondanews.com/en-US/releases/release-0daa64f6d63e67bca17317004c34c18f-2006-acura-rsx-rsx-type-s-specifications",
+    "https://www.acurapartswarehouse.com/genuine/acura~pump~assy~oil~15100-prb-a01.html",
+    "https://www.hondapartsnow.com/genuine/honda~pump~assy~oil~15100-pne-013.html",
+    "https://www.hondapartsnow.com/oem-2003-honda-civic-oil_pump.html",
+    "https://www.hondabook.ru/en/Civic/7/power/lubrication/maslyanyy-nasos",
+    "https://www.hondapartsnow.com/oem-2003-honda-civic-connecting_rod.html",
+    "https://www.hondapartsnow.com/genuine/honda~rod~connecting~13210-pna-000.html",
+    "https://www.realstreetperformance.com/eagle-h-beam-rods-honda-rsx-type-s-k20a2-5-470.html",
+    "https://www.hybrid-racing.com/products/speedfactory-h-beam-connecting-rods-k20a-k20z",
+    "https://www.realstreetperformance.com/brian-crower-honda-92mm-stroker-k20a2-b16a-journal.html",
+    "https://www.king-catalog.com/cr4542xpdc",
+    "https://nipponpower.com/products/acl-high-performance-oversized-rod-bearing-set-for-acura-and-honda-k20a3-f23a-engines",
+    "https://onefastshop.com/products/king-honda-f23-performance-rod-bearing-set-size-std",
+    "https://www.honda.co.jp/factbook/auto/INTEGRA/200107/07.html",
+    "https://hondanews.com/en-US/releases/release-34d72a086b54bdfac70ff4004c34c4e5-2004-acura-rsx-specifications"
+   ]
+  },
+  {
+   "id": "K20Z2",
+   "name": "K20Z2 (CSX base / Euro Accord)",
+   "family": "K20",
+   "series": "Z",
+   "vehicles": [
+    "2006-2011 Acura CSX (base)",
+    "2006-2008 Accord (EDM)",
+    "2006-2010 Civic (SEA)"
+   ],
+   "boreMm": 86,
+   "strokeMm": 86,
+   "rodMm": 139,
+   "deckMm": 212,
+   "compression": 9.8,
+   "compressionHeightMm": 30,
+   "pinMm": 22,
+   "bigEndMm": 51,
+   "balanceShafts": true,
+   "oilPump": "rbc",
+   "head": "K20Z2",
+   "rating": {
+    "hp": 153,
+    "hpRpm": 6000,
+    "torqueLbft": 139,
+    "torqueRpm": 4500,
+    "redlineRpm": 6800,
+    "revLimitRpm": null
+   },
+   "aftermarketBottomEnd": true,
+   "pistonsVsK20Head": null,
+   "estimated": {
+    "bore": "Wikipedia only; 86 x 86 like the other K20s",
+    "oilPump": "not found; K20Z3 balancer pump assumed",
+    "balanceShafts": "not found; assumed like the K20Z3",
+    "deck": "deck heights (212 / 231.5 mm) are Wikipedia figures, consistent with stroke/2 + rod + 30 mm compression height"
+   },
+   "sources": [
+    "https://en.wikipedia.org/wiki/Honda_K_engine",
+    "https://www.king-catalog.com/cr4542xpdc"
+   ]
+  },
+  {
+   "id": "K24A2",
+   "name": "K24A2 (2004-08 TSX)",
+   "family": "K24",
+   "series": "A",
+   "vehicles": [
+    "2004-2008 Acura TSX (CL9)"
+   ],
+   "boreMm": 87,
+   "strokeMm": 99,
+   "rodMm": 152,
+   "deckMm": 231.5,
+   "compression": 10.5,
+   "compressionHeightMm": 30,
+   "pinMm": 22,
+   "bigEndMm": 51,
+   "balanceShafts": true,
+   "oilPump": "raa",
+   "head": "K24A2",
+   "rating": {
+    "hp": 205,
+    "hpRpm": 7000,
+    "torqueLbft": 164,
+    "torqueRpm": 4500,
+    "redlineRpm": 7100,
+    "revLimitRpm": 7200
+   },
+   "aftermarketBottomEnd": true,
+   "pistonsVsK20Head": null,
+   "estimated": {
+    "deck": "deck heights (212 / 231.5 mm) are Wikipedia figures, consistent with stroke/2 + rod + 30 mm compression height"
+   },
+   "sources": [
+    "https://en.wikipedia.org/wiki/Honda_K_engine",
+    "https://www.realstreetperformance.com/wiseco-pistons-k24a1-a2-a3-a4-a8-with-k20a2-z1-z3-head-87mm-std-12-81-99mm-stroke.html",
+    "https://www.realstreetperformance.com/cp-forged-pistons-set-acura-honda-k24a-2-4l-with-k20a-or-k20z-vtec-head-87mm-std-11-6-cc14-21.html",
+    "https://www.enginelabs.com/?p=247727",
+    "https://hondanews.com/en-US/releases/release-70a2bcad7a6cc95be46391004c34c6ec-2003-honda-accord-sedan-specifications",
+    "https://www.theautochannel.com/news/2003/09/25/169355.html",
+    "https://www.hybrid-racing.com/products/honda-rbb-oil-jet-squirter-k20z3-k24a2-15280-prb-a00",
+    "https://hondanews.com/en-US/releases/release-da3dc5c8517bf1f899bb57004c34c1aa-summary-of-changes-for-acura-2006-lineup",
+    "https://www.realstreetperformance.com/manley-turbo-tuff-rods-honda-tsx-k24a-k24z-element-crv.html",
+    "https://www.hybrid-racing.com/blogs/hybrid-racing/k20-k24-hybrid-engine-build-guide",
+    "https://www.king-catalog.com/cr4542xpdc",
+    "https://jdmshop.eu/en/crankshaft-bearings-acl-race-honda-4b1972h",
+    "https://a4h-tech.com/de/king-bearings-race-kurbelwelle-lagern-b16-b18-k20-k24-motor"
+   ]
+  },
+  {
+   "id": "K24A1",
+   "name": "K24A1 (2002-06 CR-V)",
+   "family": "K24",
+   "series": "A",
+   "vehicles": [
+    "2002-2006 CR-V"
+   ],
+   "boreMm": 87,
+   "strokeMm": 99,
+   "rodMm": 152,
+   "deckMm": 231.5,
+   "compression": 9.6,
+   "compressionHeightMm": 30,
+   "pinMm": 22,
+   "bigEndMm": 51,
+   "balanceShafts": true,
+   "oilPump": "raa",
+   "head": "K24A1",
+   "rating": {
+    "hp": 160,
+    "hpRpm": 6000,
+    "torqueLbft": 162,
+    "torqueRpm": 3600,
+    "redlineRpm": 6500,
+    "revLimitRpm": 7000
+   },
+   "aftermarketBottomEnd": true,
+   "pistonsVsK20Head": null,
+   "estimated": {
+    "oilPump": "CR-V pump page would not load; the K24A balancer pump assumed",
+    "balanceShafts": "not stated; assumed like the K24A2",
+    "deck": "deck heights (212 / 231.5 mm) are Wikipedia figures, consistent with stroke/2 + rod + 30 mm compression height"
+   },
+   "sources": [
+    "https://en.wikipedia.org/wiki/Honda_K_engine",
+    "https://hondanews.com/en-US/releases/release-64ea815d6e8d0126225ce8004c34c80f-2002-honda-cr-v-specifications",
+    "https://www.realstreetperformance.com/manley-turbo-tuff-rods-honda-tsx-k24a-k24z-element-crv.html",
+    "https://www.realstreetperformance.com/wiseco-pistons-k24a1-a2-a3-a4-a8-with-k20a2-z1-z3-head-87mm-std-12-81-99mm-stroke.html",
+    "https://www.realstreetperformance.com/cp-forged-pistons-set-acura-honda-k24a-2-4l-with-k20a-or-k20z-vtec-head-87mm-std-11-6-cc14-21.html",
+    "https://www.hybrid-racing.com/blogs/hybrid-racing/k20-k24-hybrid-engine-build-guide"
+   ]
+  },
+  {
+   "id": "K24A4",
+   "name": "K24A4 (2003-05 Accord / Element)",
+   "family": "K24",
+   "series": "A",
+   "vehicles": [
+    "2003-2005 Accord (USDM)",
+    "2003-2006 Element",
+    "2003-2008 Odyssey (non-US per Wikipedia)"
+   ],
+   "boreMm": 87,
+   "strokeMm": 99,
+   "rodMm": 152,
+   "deckMm": 231.5,
+   "compression": 9.7,
+   "compressionHeightMm": 30,
+   "pinMm": 22,
+   "bigEndMm": 51,
+   "balanceShafts": true,
+   "oilPump": "raa",
+   "head": "K24A4",
+   "rating": {
+    "hp": 160,
+    "hpRpm": 5500,
+    "torqueLbft": 161,
+    "torqueRpm": 4500,
+    "redlineRpm": 6500,
+    "revLimitRpm": null
+   },
+   "aftermarketBottomEnd": true,
+   "pistonsVsK20Head": "risk",
+   "estimated": {
+    "deck": "deck heights (212 / 231.5 mm) are Wikipedia figures, consistent with stroke/2 + rod + 30 mm compression height"
+   },
+   "sources": [
+    "https://en.wikipedia.org/wiki/Honda_K_engine",
+    "https://hondanews.com/en-US/releases/release-70a2bcad7a6cc95be46391004c34c6ec-2003-honda-accord-sedan-specifications",
+    "https://www.hybrid-racing.com/blogs/hybrid-racing/k20-k24-hybrid-engine-build-guide",
+    "https://a4h-tech.com/en/oem-honda-balancer-shaft-delete-kit",
+    "https://www.realstreetperformance.com/manley-turbo-tuff-rods-honda-tsx-k24a-k24z-element-crv.html",
+    "https://www.realstreetperformance.com/wiseco-pistons-k24a1-a2-a3-a4-a8-with-k20a2-z1-z3-head-87mm-std-12-81-99mm-stroke.html",
+    "https://www.realstreetperformance.com/cp-forged-pistons-set-acura-honda-k24a-2-4l-with-k20a-or-k20z-vtec-head-87mm-std-11-6-cc14-21.html"
+   ]
+  },
+  {
+   "id": "K24A8",
+   "name": "K24A8 (2006-07 Accord / Element)",
+   "family": "K24",
+   "series": "A",
+   "vehicles": [
+    "2006-2007 Accord (USDM)",
+    "2007-2011 Element"
+   ],
+   "boreMm": 87,
+   "strokeMm": 99,
+   "rodMm": 152,
+   "deckMm": 231.5,
+   "compression": 9.7,
+   "compressionHeightMm": 30,
+   "pinMm": 22,
+   "bigEndMm": 51,
+   "balanceShafts": true,
+   "oilPump": "raa",
+   "head": "K24A4",
+   "rating": {
+    "hp": 166,
+    "hpRpm": 5800,
+    "torqueLbft": 160,
+    "torqueRpm": 4000,
+    "redlineRpm": 6500,
+    "revLimitRpm": null
+   },
+   "aftermarketBottomEnd": true,
+   "pistonsVsK20Head": "contact",
+   "estimated": {
+    "deck": "deck heights (212 / 231.5 mm) are Wikipedia figures, consistent with stroke/2 + rod + 30 mm compression height"
+   },
+   "sources": [
+    "https://en.wikipedia.org/wiki/Honda_K_engine",
+    "https://www.realstreetperformance.com/wiseco-pistons-k24a1-a2-a3-a4-a8-with-k20a2-z1-z3-head-87mm-std-12-81-99mm-stroke.html",
+    "https://www.realstreetperformance.com/manley-turbo-tuff-rods-honda-tsx-k24a-k24z-element-crv.html",
+    "https://www.realstreetperformance.com/cp-forged-pistons-set-acura-honda-k24a-2-4l-with-k20a-or-k20z-vtec-head-87mm-std-11-6-cc14-21.html",
+    "https://www.hybrid-racing.com/blogs/hybrid-racing/k20-k24-hybrid-engine-build-guide"
+   ]
+  },
+  {
+   "id": "K24Z3",
+   "name": "K24Z3 (2008-12 Accord)",
+   "family": "K24",
+   "series": "Z",
+   "vehicles": [
+    "2008-2012 Accord EX/EX-L (USDM 190 hp)",
+    "2009-2014 TSX / Euro Accord (201 hp, 11.0:1)"
+   ],
+   "boreMm": 87,
+   "strokeMm": 99,
+   "rodMm": 152,
+   "deckMm": 231.5,
+   "compression": 10.5,
+   "compressionHeightMm": 30,
+   "pinMm": 22,
+   "bigEndMm": 51,
+   "balanceShafts": true,
+   "oilPump": "r40",
+   "head": "K24Z",
+   "rating": {
+    "hp": 190,
+    "hpRpm": 7000,
+    "torqueLbft": 162,
+    "torqueRpm": 4400,
+    "redlineRpm": 7100,
+    "revLimitRpm": null
+   },
+   "aftermarketBottomEnd": true,
+   "pistonsVsK20Head": null,
+   "estimated": {
+    "rod": "not found for the Z3; 152 mm as on the other K24s",
+    "balanceShafts": "stated for the K24Z7; assumed for the Z3",
+    "deck": "deck heights (212 / 231.5 mm) are Wikipedia figures, consistent with stroke/2 + rod + 30 mm compression height"
+   },
+   "sources": [
+    "https://en.wikipedia.org/wiki/Honda_K_engine",
+    "https://automobiles.honda.com/images/2008/accord-sedan/downloads/2008-accord-sedan-factsheet.pdf",
+    "https://jdmshop.eu/en/crankshaft-bearings-acl-race-honda-4b1972h",
+    "https://www.tegiwa.com/products/kpower-k20-oil-pump-upgrade-for-honda-k24z3",
+    "https://prlmotorsports.com/blogs/news/k24z7-and-k24z3-prb-type-s-oil-pump-swap-kit"
+   ]
+  },
+  {
+   "id": "K24Z7",
+   "name": "K24Z7 (2012-15 Civic Si)",
+   "family": "K24",
+   "series": "Z",
+   "vehicles": [
+    "2012-2015 Civic Si",
+    "2013-2015 Acura ILX 2.4"
+   ],
+   "boreMm": 87,
+   "strokeMm": 99,
+   "rodMm": 152,
+   "deckMm": 231.5,
+   "compression": 11.0,
+   "compressionHeightMm": 30,
+   "pinMm": 22,
+   "bigEndMm": 51,
+   "balanceShafts": true,
+   "oilPump": "r40",
+   "head": "K24Z",
+   "rating": {
+    "hp": 205,
+    "hpRpm": 7000,
+    "torqueLbft": 174,
+    "torqueRpm": 4400,
+    "redlineRpm": 7000,
+    "revLimitRpm": 7500
+   },
+   "aftermarketBottomEnd": true,
+   "pistonsVsK20Head": null,
+   "estimated": {
+    "deck": "deck heights (212 / 231.5 mm) are Wikipedia figures, consistent with stroke/2 + rod + 30 mm compression height"
+   },
+   "sources": [
+    "https://en.wikipedia.org/wiki/Honda_K_engine",
+    "https://hondanews.com/en-US/releases/2012-honda-civic-powertrains?l=es-ES",
+    "https://www.realstreetperformance.com/manley-turbo-tuff-rods-honda-tsx-k24a-k24z-element-crv.html",
+    "https://www.realstreetperformance.com/wiseco-pistons-k24a1-a2-a3-a4-a8-with-k20a2-z1-z3-head-87mm-std-12-81-99mm-stroke.html",
+    "https://www.realstreetperformance.com/cp-forged-pistons-set-acura-honda-k24a-2-4l-with-k20a-or-k20z-vtec-head-87mm-std-11-6-cc14-21.html",
+    "https://motoiq.com/Extreme-Engine-Tech-Building-the-Ultimate-K24-Part-1-The-Cylinder-Head"
+   ]
+  }
+ ],
+ "heads": [
+  {
+   "id": "K20Z3",
+   "name": "K20Z3 head (RBC)",
+   "family": "K20",
+   "vtec": "dohc",
+   "vtecRpm": 5800,
+   "inValveMm": 35,
+   "exValveMm": 30,
+   "partNumber": "12100-RBC-000",
+   "cams": {
+    "low": {
+     "inLift": 0.0095,
+     "inDur": 228,
+     "exLift": 0.009,
+     "exDur": 222
+    },
+    "high": {
+     "inLift": 0.0117,
+     "inDur": 262,
+     "exLift": 0.011,
+     "exDur": 256
+    }
+   },
+   "estimated": {
+    "cams": "cam lobes not published; K20Z3 estimates used"
+   },
+   "sources": [
+    "https://www.hondapartsnow.com/oem-2007-honda-civic-cylinder_head.html",
+    "https://en.wikipedia.org/wiki/Honda_K_engine",
+    "https://www.hybrid-racing.com/collections/acura-tsx-04-08/products/oem-honda-rbc-intake-manifold",
+    "https://www.realstreetperformance.com/supertech-std-intake-stainless-steel-inconel-exhaust-valves-set-rsx-k20a2-k20a3-k20z1.html",
+    "https://hondanews.com/en-US/honda-automobiles/releases/release-56b0418fdb34027710fdde004c34c1ad-2006-honda-civic-powertrains"
+   ]
+  },
+  {
+   "id": "K20A2",
+   "name": "K20A2 head (PRB)",
+   "family": "K20",
+   "vtec": "dohc",
+   "vtecRpm": 5800,
+   "inValveMm": 35,
+   "exValveMm": 30,
+   "partNumber": "12100-PRB-A00",
+   "cams": {
+    "low": {
+     "inLift": 0.0095,
+     "inDur": 228,
+     "exLift": 0.009,
+     "exDur": 222
+    },
+    "high": {
+     "inLift": 0.0117,
+     "inDur": 262,
+     "exLift": 0.011,
+     "exDur": 256
+    }
+   },
+   "estimated": {
+    "cams": "cam lobes not published; K20Z3 estimates used (only low-confidence K20A2 cam figures were found)"
+   },
+   "sources": [
+    "https://www.acurapartswarehouse.com/oem-2003-acura-rsx-cylinder_head.html",
+    "https://en.wikipedia.org/wiki/Honda_K_engine",
+    "https://www.hybrid-racing.com/blogs/hybrid-racing/tech-talk-hybrid-racing-k-series-75mm-throttle-body",
+    "https://www.realstreetperformance.com/supertech-std-intake-stainless-steel-inconel-exhaust-valves-set-rsx-k20a2-k20a3-k20z1.html",
+    "https://www.jdmgarageuk.com/bc3040.html",
+    "https://hybrid-racing.com/products/supertech-honda-k20-k24-black-nitrided-exhaust-valves",
+    "https://www.motorreviewer.com/engine.php?engine_id=163",
+    "https://8020automotive.com/honda-k20a3-engine-guide/",
+    "https://hondata.com/help/flashpro/tuning_for_vtc.htm",
+    "https://www.tegiwa.com/products/genuine-honda-25deg-vtc-actuator-intake-cam-gear-k-series"
+   ]
+  },
+  {
+   "id": "K20Z1",
+   "name": "K20Z1 head",
+   "family": "K20",
+   "vtec": "dohc",
+   "vtecRpm": 5800,
+   "inValveMm": 35,
+   "exValveMm": 30,
+   "partNumber": null,
+   "cams": {
+    "low": {
+     "inLift": 0.0095,
+     "inDur": 228,
+     "exLift": 0.009,
+     "exDur": 222
+    },
+    "high": {
+     "inLift": 0.0117,
+     "inDur": 262,
+     "exLift": 0.011,
+     "exDur": 256
+    }
+   },
+   "estimated": {
+    "cams": "cam lobes not published; K20Z3 estimates used"
+   },
+   "sources": [
+    "https://en.wikipedia.org/wiki/Honda_K_engine",
+    "https://www.realstreetperformance.com/supertech-std-intake-stainless-steel-inconel-exhaust-valves-set-rsx-k20a2-k20a3-k20z1.html"
+   ]
+  },
+  {
+   "id": "K20A-R",
+   "name": "K20A Type R head (PRC / RRC)",
+   "family": "K20",
+   "vtec": "dohc",
+   "vtecRpm": 6000,
+   "inValveMm": 35,
+   "exValveMm": 30,
+   "partNumber": null,
+   "cams": {
+    "low": {
+     "inLift": 0.0095,
+     "inDur": 228,
+     "exLift": 0.009,
+     "exDur": 222
+    },
+    "high": {
+     "inLift": 0.0119,
+     "inDur": 262,
+     "exLift": 0.012,
+     "exDur": 256
+    }
+   },
+   "estimated": {
+    "cams": "K20Z3 estimates, with the high lobes raised by the ratio of the K20A to K20A2 figures on motorreviewer.com (low confidence: +2% intake, +9% exhaust)"
+   },
+   "sources": [
+    "https://en.wikipedia.org/wiki/Honda_K_engine",
+    "https://www.jdmgarageuk.com/bc3040.html",
+    "https://www.motorreviewer.com/engine.php?engine_id=163",
+    "https://www.honda.co.jp/sportscar/vtec_history/K20A/",
+    "https://www.honda.co.jp/factbook/auto/INTEGRA/200107/07.html",
+    "https://www.honda.co.jp/factbook/auto/CIVIC_TYPE_R/200703/04.html"
+   ]
+  },
+  {
+   "id": "K20Z4",
+   "name": "K20Z4 head (FN2)",
+   "family": "K20",
+   "vtec": "dohc",
+   "vtecRpm": 5400,
+   "inValveMm": 35,
+   "exValveMm": 30,
+   "partNumber": null,
+   "cams": {
+    "low": {
+     "inLift": 0.0095,
+     "inDur": 228,
+     "exLift": 0.009,
+     "exDur": 222
+    },
+    "high": {
+     "inLift": 0.0117,
+     "inDur": 262,
+     "exLift": 0.011,
+     "exDur": 256
+    }
+   },
+   "estimated": {
+    "cams": "cam lobes not published; K20Z3 estimates used",
+    "valves": "not found; K20Z3 sizes"
+   },
+   "sources": [
+    "https://en.wikipedia.org/wiki/Honda_K_engine"
+   ]
+  },
+  {
+   "id": "K20A3",
+   "name": "K20A3 head (economy i-VTEC)",
+   "family": "K20",
+   "vtec": "economy",
+   "vtecRpm": 2200,
+   "inValveMm": 35,
+   "exValveMm": 30,
+   "partNumber": "12100-PNC-010 (supersedes 12100-PNC-000 and EP3 12100-PNL-E00)",
+   "cams": {
+    "low": {
+     "inLift": 0.008,
+     "inDur": 216,
+     "exLift": 0.009,
+     "exDur": 222,
+     "inValves": 1.15
+    },
+    "high": {
+     "inLift": 0.0095,
+     "inDur": 228,
+     "exLift": 0.009,
+     "exDur": 222
+    }
+   },
+   "estimated": {
+    "cams": "not published; the low intake lobe is smaller and one intake valve only cracks open (the swirl mode Honda describes), one exhaust lobe"
+   },
+   "sources": [
+    "https://www.acurapartswarehouse.com/oem-2003-acura-rsx-cylinder_head.html",
+    "https://www.hondapartsnow.com/oem-2003-honda-civic-cylinder_head.html",
+    "https://en.wikipedia.org/wiki/Honda_K_engine",
+    "https://www.realstreetperformance.com/supertech-std-intake-stainless-steel-inconel-exhaust-valves-set-rsx-k20a2-k20a3-k20z1.html",
+    "https://8020automotive.com/honda-k20a3-engine-guide/",
+    "https://www.honda.co.jp/factbook/auto/INTEGRA/200107/07.html"
+   ]
+  },
+  {
+   "id": "K20Z2",
+   "name": "K20Z2 head (economy i-VTEC)",
+   "family": "K20",
+   "vtec": "economy",
+   "vtecRpm": 2200,
+   "inValveMm": 35,
+   "exValveMm": 30,
+   "partNumber": null,
+   "cams": {
+    "low": {
+     "inLift": 0.008,
+     "inDur": 216,
+     "exLift": 0.009,
+     "exDur": 222,
+     "inValves": 1.15
+    },
+    "high": {
+     "inLift": 0.0095,
+     "inDur": 228,
+     "exLift": 0.009,
+     "exDur": 222
+    }
+   },
+   "estimated": {
+    "cams": "not published; same economy layout as the K20A3",
+    "vtecRpm": "not found; K20A3 value",
+    "valves": "not found; K20A3 sizes"
+   },
+   "sources": [
+    "https://en.wikipedia.org/wiki/Honda_K_engine"
+   ]
+  },
+  {
+   "id": "K24A2",
+   "name": "K24A2 head (RBB, 2006-08)",
+   "family": "K24",
+   "vtec": "dohc",
+   "vtecRpm": 6000,
+   "inValveMm": 36,
+   "exValveMm": 30,
+   "partNumber": "12100-RBB-000 (listed for both 2004 and 2006 TSX)",
+   "cams": {
+    "low": {
+     "inLift": 0.0095,
+     "inDur": 228,
+     "exLift": 0.009,
+     "exDur": 222
+    },
+    "high": {
+     "inLift": 0.0126,
+     "inDur": 274,
+     "exLift": 0.011,
+     "exDur": 256
+    }
+   },
+   "estimated": {
+    "cams": "not published; K20Z3 estimates plus the 2006 change Honda describes for the intake high lobe (+0.9 mm lift, +12 degrees)"
+   },
+   "sources": [
+    "https://www.acurapartswarehouse.com/oem-2004-acura-tsx-cylinder_head.html",
+    "https://www.acurapartswarehouse.com/oem-2006-acura-tsx-cylinder_head.html",
+    "https://www.enginelabs.com/?p=247727",
+    "https://en.wikipedia.org/wiki/Honda_K_engine",
+    "https://www.hybrid-racing.com/blogs/hybrid-racing/tech-talk-hybrid-racing-k-series-75mm-throttle-body",
+    "https://www.realstreetperformance.com/supertech-std-intake-stainless-steel-inconel-exhaust-valves-set-rsx-k20a2-k20a3-k20z1.html",
+    "https://hondanews.com/en-US/releases/release-da3dc5c8517bf1f899bb57004c34c1aa-summary-of-changes-for-acura-2006-lineup",
+    "https://www.theautochannel.com/news/2003/09/25/169355.html"
+   ]
+  },
+  {
+   "id": "K24A1",
+   "name": "K24A1 head (CR-V)",
+   "family": "K24",
+   "vtec": "economy",
+   "vtecRpm": 2750,
+   "inValveMm": 35,
+   "exValveMm": 30,
+   "partNumber": null,
+   "cams": {
+    "low": {
+     "inLift": 0.008,
+     "inDur": 216,
+     "exLift": 0.009,
+     "exDur": 222,
+     "inValves": 1.15
+    },
+    "high": {
+     "inLift": 0.0095,
+     "inDur": 228,
+     "exLift": 0.009,
+     "exDur": 222
+    }
+   },
+   "estimated": {
+    "cams": "not published; Honda does not say which i-VTEC the CR-V has, economy layout assumed"
+   },
+   "sources": [
+    "https://en.wikipedia.org/wiki/Honda_K_engine",
+    "https://hondanews.com/en-US/releases/release-64ea815d6e8d0126225ce8004c34c80f-2002-honda-cr-v-specifications",
+    "https://www.realstreetperformance.com/supertech-std-intake-stainless-steel-inconel-exhaust-valves-set-rsx-k20a2-k20a3-k20z1.html",
+    "https://hybrid-racing.com/products/supertech-honda-k20-k24-black-nitrided-exhaust-valves"
+   ]
+  },
+  {
+   "id": "K24A4",
+   "name": "K24A4 / K24A8 head (RAA)",
+   "family": "K24",
+   "vtec": "economy",
+   "vtecRpm": 3500,
+   "inValveMm": 35,
+   "exValveMm": 30,
+   "partNumber": "12100-RAA-A01 (supersedes -A00)",
+   "cams": {
+    "low": {
+     "inLift": 0.008,
+     "inDur": 216,
+     "exLift": 0.009,
+     "exDur": 222,
+     "inValves": 1.15
+    },
+    "high": {
+     "inLift": 0.0095,
+     "inDur": 228,
+     "exLift": 0.009,
+     "exDur": 222
+    }
+   },
+   "estimated": {
+    "cams": "not published; economy layout assumed",
+    "valves": "not found; 35 / 30 mm assumed"
+   },
+   "sources": [
+    "https://www.hondapartsnow.com/oem-2005-honda-accord-cylinder_head.html",
+    "https://en.wikipedia.org/wiki/Honda_K_engine"
+   ]
+  },
+  {
+   "id": "K24Z",
+   "name": "K24Z3 / K24Z7 head (R40)",
+   "family": "K24",
+   "vtec": "intake",
+   "vtecRpm": 5000,
+   "inValveMm": 35,
+   "exValveMm": 30,
+   "partNumber": "12100-R40-A02 (supersedes -A00, -A01)",
+   "cams": {
+    "low": {
+     "inLift": 0.0095,
+     "inDur": 228,
+     "exLift": 0.009,
+     "exDur": 222
+    },
+    "high": {
+     "inLift": 0.0117,
+     "inDur": 262,
+     "exLift": 0.009,
+     "exDur": 222
+    }
+   },
+   "estimated": {
+    "cams": "not published; Honda says VTEC on the intake valves only, so one exhaust lobe",
+    "valves": "not found; 35 / 30 mm assumed"
+   },
+   "sources": [
+    "https://www.hondapartsnow.com/oem-2013-honda-civic-cylinder_head.html",
+    "https://hondanews.com/en-US/releases/2012-honda-civic-powertrains?l=es-ES",
+    "https://motoiq.com/Extreme-Engine-Tech-Building-the-Ultimate-K24-Part-1-The-Cylinder-Head"
+   ]
+  }
+ ],
+ "oilPumps": [
+  {
+   "id": "rbc",
+   "name": "K20Z3 balancer pump (15100-RBC-016)",
+   "partNumber": "15100-RBC-016",
+   "balanceShafts": true,
+   "flowScale": 1.0,
+   "maxRpm": 8500,
+   "fits": [
+    {
+     "blocks": [
+      "K20Z3",
+      "K20Z4",
+      "K20Z2"
+     ],
+     "needs": []
+    }
+   ],
+   "estimated": {
+    "flow": "no published flow or relief figures; same delivery as the stock pump assumed",
+    "maxRpm": "no published limit for this pump; 8,500 rpm assumed like the RSX Type S pump"
+   },
+   "sources": [
+    "https://www.hondapartsnow.com/genuine/honda~pump~assy~oil~15100-rbc-016.html",
+    "https://www.hondapartsnow.com/oem-2007-honda-civic-oil_pump.html",
+    "https://hondanews.com/en-US/honda-automobiles/releases/release-56b0418fdb34027710fdde004c34c1ad-2006-honda-civic-powertrains",
+    "https://www.hybrid-racing.com/blogs/hybrid-racing/k20-k24-hybrid-engine-build-guide"
+   ]
+  },
+  {
+   "id": "prb",
+   "name": "RSX Type S pump (15100-PRB-A01)",
+   "partNumber": "15100-PRB-A01",
+   "balanceShafts": false,
+   "flowScale": 1.0,
+   "maxRpm": 8500,
+   "fits": [
+    {
+     "blocks": [
+      "K20A2",
+      "K20Z1",
+      "K20A3",
+      "K20A",
+      "K20A-FD2"
+     ],
+     "needs": []
+    },
+    {
+     "blocks": [
+      "K20Z3",
+      "K20Z4",
+      "K20Z2"
+     ],
+     "needs": [
+      "K20A2 windage tray 11221-PNC-000",
+      "oil pump chain 13441-PCX-004",
+      "chain guide 13460-PNC-004",
+      "tensioner 13450-RAA-A02"
+     ]
+    },
+    {
+     "blocks": [
+      "K24A2",
+      "K24A1",
+      "K24A4",
+      "K24A8"
+     ],
+     "needs": [
+      "pump housing notched to clear the K24 block",
+      "K20A2 windage tray 11221-PNC-000",
+      "oil pump chain 13441-PCX-004",
+      "chain guide 13460-PNC-004",
+      "tensioner 13450-RAA-A02"
+     ]
+    },
+    {
+     "blocks": [
+      "K24Z3",
+      "K24Z7"
+     ],
+     "needs": [
+      "PRL or KPower swap kit: oil filter moved back to the K24A position, bracket, girdle trimmed",
+      "K20A2 windage tray 11221-PNC-000",
+      "oil pump chain 13441-PCX-004",
+      "chain guide 13460-PNC-004",
+      "tensioner 13450-RAA-A02"
+     ]
+    }
+   ],
+   "estimated": {
+    "flow": "no published flow or relief figures; same delivery as the stock pump assumed"
+   },
+   "sources": [
+    "https://www.acurapartswarehouse.com/genuine/acura~pump~assy~oil~15100-prb-a01.html",
+    "https://www.hybrid-racing.com/products/oem-honda-acura-rsx-s-oil-pump",
+    "https://www.hondabook.ru/en/Civic/7/power/lubrication/maslyanyy-nasos",
+    "https://prlmotorsports.com/blogs/news/k24z7-and-k24z3-prb-type-s-oil-pump-swap-kit",
+    "https://4pistonracing.com/products/4p-kpump",
+    "https://www.hybrid-racing.com/blogs/hybrid-racing/k20-k24-hybrid-engine-build-guide",
+    "https://www.enginelabs.com/?p=247727",
+    "https://4pistonracing.com/products/type-s-oil-pump-k20-k24-install-kit",
+    "https://www.tegiwa.com/products/kpower-k20-oil-pump-upgrade-for-honda-k24z3",
+    "https://www.hybrid-racing.com/products/hybrid-racing-k20a2-oil-pump-installation-kit"
+   ]
+  },
+  {
+   "id": "pne",
+   "name": "2002-05 Civic Si pump (15100-PNE-013)",
+   "partNumber": "15100-PNE-013",
+   "balanceShafts": true,
+   "flowScale": 1.0,
+   "maxRpm": 8500,
+   "fits": [
+    {
+     "blocks": [
+      "K20A3"
+     ],
+     "needs": []
+    }
+   ],
+   "estimated": {
+    "flow": "no published flow or relief figures; same delivery as the stock pump assumed",
+    "maxRpm": "no published limit for this pump; 8,500 rpm assumed like the RSX Type S pump",
+    "balanceShafts": "not stated; it comes with a holder set like the balancer pumps, so balance shafts assumed"
+   },
+   "sources": [
+    "https://www.hondapartsnow.com/genuine/honda~pump~assy~oil~15100-pne-013.html",
+    "https://www.hondapartsnow.com/oem-2003-honda-civic-oil_pump.html"
+   ]
+  },
+  {
+   "id": "raa",
+   "name": "K24A balancer pump (15100-RAA-A02)",
+   "partNumber": "15100-RAA-A02",
+   "balanceShafts": true,
+   "flowScale": 1.0,
+   "maxRpm": 8500,
+   "fits": [
+    {
+     "blocks": [
+      "K24A2",
+      "K24A1",
+      "K24A4",
+      "K24A8"
+     ],
+     "needs": []
+    }
+   ],
+   "estimated": {
+    "flow": "no published flow or relief figures; same delivery as the stock pump assumed",
+    "maxRpm": "no published limit for this pump; 8,500 rpm assumed like the RSX Type S pump"
+   },
+   "sources": [
+    "https://www.hondapartsnow.com/genuine/honda~pump~assy~oil~15100-raa-a02.html",
+    "https://www.acurapartswarehouse.com/oem-2005-acura-tsx-oil_pump.html",
+    "https://www.acurapartswarehouse.com/oem-2006-acura-tsx-oil_pump.html",
+    "https://www.hondapartsnow.com/oem-2005-honda-accord-oil_pump.html",
+    "https://www.theautochannel.com/news/2003/09/25/169355.html",
+    "https://www.hybrid-racing.com/blogs/hybrid-racing/k20-k24-hybrid-engine-build-guide"
+   ]
+  },
+  {
+   "id": "r40",
+   "name": "K24Z balancer pump (15100-R40-A02)",
+   "partNumber": "15100-R40-A02",
+   "balanceShafts": true,
+   "flowScale": 1.0,
+   "maxRpm": 8500,
+   "fits": [
+    {
+     "blocks": [
+      "K24Z3",
+      "K24Z7"
+     ],
+     "needs": []
+    }
+   ],
+   "estimated": {
+    "flow": "no published flow or relief figures; same delivery as the stock pump assumed",
+    "maxRpm": "no published limit for this pump; 8,500 rpm assumed like the RSX Type S pump"
+   },
+   "sources": [
+    "https://www.hondapartsnow.com/genuine/honda~pump~assy~oil~15100-r40-a02.html",
+    "https://hondanews.com/en-US/releases/2012-honda-civic-powertrains?l=es-ES",
+    "https://prlmotorsports.com/blogs/news/k24z7-and-k24z3-prb-type-s-oil-pump-swap-kit"
+   ]
+  },
+  {
+   "id": "rrc",
+   "name": "FD2 Type R pump, balance-shaft delete kit (15100-RRC-003)",
+   "partNumber": "15100-RRC-003",
+   "balanceShafts": false,
+   "flowScale": 1.0,
+   "maxRpm": 8500,
+   "fits": [
+    {
+     "blocks": [
+      "K20A-FD2",
+      "K20A",
+      "K20A2",
+      "K20Z1"
+     ],
+     "needs": []
+    },
+    {
+     "blocks": [
+      "K20Z4",
+      "K20Z3",
+      "K20Z2"
+     ],
+     "needs": [
+      "kit parts: chain 13441-PCX-004, guide 13460-PNC-004, windage tray 11221-PNC-000, tensioner 13450-RRC-004"
+     ]
+    },
+    {
+     "blocks": [
+      "K24A2",
+      "K24A1",
+      "K24A4",
+      "K24A8"
+     ],
+     "needs": [
+      "kit parts as above",
+      "K20 oil pan",
+      "1 L more oil"
+     ]
+    }
+   ],
+   "estimated": {
+    "flow": "no published flow or relief figures; same delivery as the stock pump assumed",
+    "maxRpm": "no published limit for this pump; 8,500 rpm assumed like the RSX Type S pump"
+   },
+   "sources": [
+    "https://a4h-tech.com/en/oem-honda-balancer-shaft-delete-kit"
+   ]
+  },
+  {
+   "id": "4p-ported",
+   "name": "4 Piston ported Type S pump",
+   "partNumber": "4P-KPUMP",
+   "balanceShafts": false,
+   "flowScale": 1.25,
+   "maxRpm": 12000,
+   "fits": [
+    {
+     "blocks": [
+      "K20A2",
+      "K20Z1",
+      "K20A3",
+      "K20A",
+      "K20A-FD2"
+     ],
+     "needs": []
+    },
+    {
+     "blocks": [
+      "K20Z3",
+      "K20Z4",
+      "K20Z2"
+     ],
+     "needs": [
+      "K20A2 windage tray 11221-PNC-000",
+      "oil pump chain 13441-PCX-004",
+      "chain guide 13460-PNC-004",
+      "tensioner 13450-RAA-A02"
+     ]
+    },
+    {
+     "blocks": [
+      "K24A2",
+      "K24A1",
+      "K24A4",
+      "K24A8"
+     ],
+     "needs": [
+      "notched for the K24 as sold",
+      "K20A2 windage tray 11221-PNC-000",
+      "oil pump chain 13441-PCX-004",
+      "chain guide 13460-PNC-004",
+      "tensioner 13450-RAA-A02"
+     ]
+    },
+    {
+     "blocks": [
+      "K24Z3",
+      "K24Z7"
+     ],
+     "needs": [
+      "PRL or KPower swap kit: oil filter moved back to the K24A position, bracket, girdle trimmed",
+      "K20A2 windage tray 11221-PNC-000",
+      "oil pump chain 13441-PCX-004",
+      "chain guide 13460-PNC-004",
+      "tensioner 13450-RAA-A02"
+     ]
+    }
+   ],
+   "estimated": {
+    "flow": "4 Piston claims 25% more flow than stock; no pressure figures published",
+    "maxRpm": "4 Piston says tested to 12,000 rpm"
+   },
+   "sources": [
+    "https://4pistonracing.com/products/4p-kpump",
+    "https://4pistonracing.com/products/type-s-oil-pump-k20-k24-install-kit"
+   ]
+  },
+  {
+   "id": "dc-s2k",
+   "name": "Drag Cartel S2000 (F-series) pump conversion",
+   "partNumber": "Drag Cartel",
+   "balanceShafts": false,
+   "flowScale": 1.0,
+   "maxRpm": 9000,
+   "fits": [
+    {
+     "blocks": [
+      "K20Z3",
+      "K20A2",
+      "K20Z1",
+      "K20A",
+      "K20A-FD2",
+      "K20Z4",
+      "K20A3",
+      "K20Z2",
+      "K24A2",
+      "K24A1",
+      "K24A4",
+      "K24A8"
+     ],
+     "needs": [
+      "windage tray 11221-PNC-000",
+      "tensioner 13450-RAA-A02",
+      "chain guide 13460-PNC-004",
+      "chain 13441-PNA-004",
+      "Moroso baffled or steel oil pan"
+     ]
+    }
+   ],
+   "estimated": {
+    "flow": "no published flow or relief figures; same delivery as the stock pump assumed",
+    "maxRpm": "Drag Cartel says it runs above 9,000 rpm without cavitation; 9,000 used"
+   },
+   "sources": [
+    "https://www.speedscience.co.nz/products/drag-cartel-modified-s2k-oil-pump-k-series"
+   ]
+  }
+ ],
+ "compatibility": [
+  {
+   "heads": [
+    "K20Z3",
+    "K20A2",
+    "K20Z1",
+    "K20A-R",
+    "K20Z4"
+   ],
+   "blocks": [
+    "K24A2",
+    "K24A1",
+    "K24A4",
+    "K24A8"
+   ],
+   "works": "mods",
+   "needs": [
+    "K24 timing chain (K20 chain too short)",
+    "K24 timing chain cover (K20 cover too short)",
+    "K24 head gasket (87 mm bore)",
+    "K24 crank sensor"
+   ],
+   "note": "Both heads have 50.5 cc chambers, so compression stays at the block's ratio.",
+   "sources": [
+    "https://www.hybrid-racing.com/blogs/hybrid-racing/k20-k24-hybrid-engine-build-guide",
+    "https://www.realstreetperformance.com/wiseco-pistons-k24a1-a2-a3-a4-a8-with-k20a2-z1-z3-head-87mm-std-12-81-99mm-stroke.html",
+    "https://www.realstreetperformance.com/cp-forged-pistons-set-acura-honda-k24a-2-4l-with-k20a-or-k20z-vtec-head-87mm-std-11-6-cc14-21.html"
+   ]
+  },
+  {
+   "heads": [
+    "K20Z3",
+    "K20A2",
+    "K20Z1",
+    "K20A-R",
+    "K20Z4"
+   ],
+   "blocks": [
+    "K24Z3",
+    "K24Z7"
+   ],
+   "works": "mods",
+   "needs": [
+    "front (timing) cover modified",
+    "MotoIQ's K20Z3-on-K24Z7 build also used aftermarket pistons"
+   ],
+   "note": "Hybrid Racing's guide does not support Z-series blocks; one documented build.",
+   "sources": [
+    "https://motoiq.com/Extreme-Engine-Tech-Building-the-Ultimate-K24-Part-1-The-Cylinder-Head",
+    "https://www.hybrid-racing.com/blogs/hybrid-racing/k20-k24-hybrid-engine-build-guide"
+   ]
+  },
+  {
+   "heads": [
+    "K20A2"
+   ],
+   "blocks": [
+    "K20A3"
+   ],
+   "works": "yes",
+   "needs": [],
+   "note": "Direct fit; compression stays 9.8:1 with the A3 pistons.",
+   "sources": [
+    "https://8020automotive.com/honda-k20a3-engine-guide/"
+   ]
+  }
+ ]
+}

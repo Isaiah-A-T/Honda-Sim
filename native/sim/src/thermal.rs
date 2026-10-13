@@ -130,9 +130,11 @@ pub fn boiling_c(g: &Cooling) -> f64 {
     107.0 + 0.2 * g.cap_kpa
 }
 
-/// Oil pressure (kPa): rises with pump speed and viscosity until the relief valve opens.
-pub fn oil_pressure_kpa(rpm: f64, oil_c: f64, g: &Cooling) -> f64 {
-    let hot = g.oil_hot_idle_kpa + rpm * g.oil_kpa_per_rpm;
+/// Oil pressure (kPa): rises with pump speed and viscosity until the relief valve opens. The fitted
+/// pump's flow_scale multiplies delivery; above its max_rpm it cavitates and delivers no more.
+pub fn oil_pressure_kpa(rpm: f64, oil_c: f64, g: &Cooling, pump: Option<&crate::engines::OilPump>) -> f64 {
+    let r = pump.map_or(rpm, |p| rpm.min(p.max_rpm));
+    let hot = (g.oil_hot_idle_kpa + r * g.oil_kpa_per_rpm) * pump.map_or(1.0, |p| p.flow_scale);
     clamp(hot * visc_ratio(oil_c, g).powf(0.5), 0.0, g.oil_relief_kpa)
 }
 
