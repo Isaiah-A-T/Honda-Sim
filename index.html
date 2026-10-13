@@ -94,6 +94,25 @@
       </div>
     </section>
 
+    <section class="panel internals">
+      <h2>Engine internals</h2>
+      <div class="row small">
+        <span>Peak cylinder pressure <b id="pmax">0</b> bar</span>
+        <span>Piston crown <b id="pistonC">0</b> °C</span>
+        <span>Rod load <b id="rodComp">0</b> kN down / <b id="rodTen">0</b> kN up</span>
+        <button id="btnRebuild">Rebuild engine</button>
+      </div>
+      <div id="failBanner" class="fail" hidden></div>
+      <div class="tablewrap"><table id="partsTable"></table></div>
+      <details>
+        <summary>Materials and what's estimated</summary>
+        <div class="tablewrap"><table id="matTable"></table></div>
+        <p class="small muted">Published: 86 × 86 mm bore and stroke, 11.0:1, 139 mm rods, 22 mm pins, 48 mm rod big end, powdered-metal stock rods.
+          Estimated: part masses and sections, material grades, the cylinder pressure and piston temperature model, and every limit.
+          Load is demand ÷ capacity. Below 80% a part lives indefinitely; above it, fatigue builds up and "life used" climbs; at 150% it breaks at once.</p>
+      </details>
+    </section>
+
     <section class="panel controls">
       <h2>Wheel and pedals</h2>
       <div id="padName" class="muted small">No wheel or pedals detected yet. Press any pedal or button.</div>

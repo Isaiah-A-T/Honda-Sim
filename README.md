@@ -44,6 +44,13 @@ and a torque warning (RODS lamp) at 350 Nm for stock connecting rods. Your table
 Boost comes from the wastegate spring plus the wastegate duty table. How much boost a given duty makes depends on your
 solenoid and wastegate, so set **WG duty gain** until the sim's boost matches a real datalog.
 
+## Engine internals
+
+The **Engine internals** panel shows peak cylinder pressure, piston temperature and rod forces, and the load on
+each part (pistons, rods, rod bolts, bearings, crank, head gasket, valvetrain) against its material limits.
+Fatigue builds up while a part is over its endurance limit; when one reaches 100% the engine fails and needs a
+rebuild. Details and what's estimated: [docs/INTERNALS.md](docs/INTERNALS.md).
+
 ## How it works
 
 | File | What it does |
@@ -52,6 +59,7 @@ solenoid and wastegate, so set **WG duty gain** until the sim's boost matches a 
 | `src/k20z3.js` | Car data (gear ratios, weight, tires) and the engine's "truth": airflow per cam, best timing, knock limit, friction |
 | `src/engine.js` | Runs the tune like the ECU (fuel, low/high cam ignition, VTEC, rev limit, decel cut, idle) and works out torque |
 | `src/vehicle.js` | Clutch, gearbox and road load |
+| `src/internals.js` | Cylinder pressure, part loads, materials and fatigue |
 | `src/sim.js` | Ties it together: shifting, auto-clutch, stalling, datalog |
 | `src/input.js` | Gamepad API wheel/pedal mapping and keyboard |
 | `src/ui.js` | Dash, table view with the active cell highlighted, dyno chart |

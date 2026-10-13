@@ -2,7 +2,8 @@
 
 import { parseTable, activeCell, guessFuelUnits } from './tables.js';
 import { CAR, placeholderTune, turboSetup } from './k20z3.js';
-import { createSim, step, shift, shiftUp, shiftDown, startEngine, snapshot, logToCsv, setTune } from './sim.js';
+import { createSim, step, shift, shiftUp, shiftDown, startEngine, rebuildEngine, snapshot, logToCsv, setTune } from './sim.js';
+import { PARTS, MATERIALS, partStatus } from './internals.js';
 import { createInput, attachKeyboard, readInput, startLearn, AXES, BUTTONS } from './input.js';
 
 const TUNE_KEY = 'honda-sim.tune.v1';
@@ -253,6 +254,36 @@ function drawDyno() {
   if (peak.hp) { g.fillStyle = css.getPropertyValue('--text'); g.fillText(`peak ${peak.hp.toFixed(0)} hp @ ${peak.rpm}`, W - pad - 130, pad); }
 }
 
+// ------------------------------------------------------------------ internals
+function renderMaterials() {
+  $('matTable').innerHTML = '<thead><tr><th>Part</th><th>Material</th><th>Yield MPa</th><th>Tensile MPa</th><th>Modulus GPa</th><th>Density kg/m³</th><th>Capacity used</th></tr></thead><tbody>' +
+    PARTS.map(p => { const m = MATERIALS[p.material]; return `<tr><td>${p.name}</td><td>${m.name}</td><td class="num">${m.yieldMPa}</td><td class="num">${m.utsMPa}</td><td class="num">${m.modulusGPa}</td><td class="num">${m.densityKgM3}</td><td>${m.strengthMPa} (${m.note})</td></tr>`; }).join('') + '</tbody>';
+  $('partsTable').innerHTML = '<thead><tr><th>Part</th><th>Load now</th><th></th><th>Life used</th><th>Status</th></tr></thead><tbody>' +
+    PARTS.map(p => `<tr><td>${p.name}</td><td><span class="loadbar"><div id="lb-${p.key}"></div></span></td><td class="num" id="lv-${p.key}"></td><td class="num" id="dm-${p.key}"></td><td id="st-${p.key}"></td></tr>`).join('') + '</tbody>';
+}
+$('btnRebuild').onclick = () => { rebuildEngine(sim); startEngine(sim); };
+
+function updateInternals() {
+  const s = sim.internals;
+  $('pmax').textContent = s.pmaxBar.toFixed(0);
+  $('pistonC').textContent = s.pistonC.toFixed(0);
+  $('rodComp').textContent = (s.rodCompN / 1000).toFixed(1);
+  $('rodTen').textContent = (s.rodTensionN / 1000).toFixed(1);
+  for (const p of PARTS) {
+    const load = s.load[p.key], dmg = s.damage[p.key], st = partStatus(load, dmg);
+    const bar = $(`lb-${p.key}`);
+    bar.style.width = `${Math.min(100, load / 1.5 * 100)}%`;
+    bar.className = st;
+    $(`lv-${p.key}`).textContent = `${(load * 100).toFixed(0)}%`;
+    $(`dm-${p.key}`).textContent = dmg > 0 && dmg < 0.001 ? '<0.1%' : `${(dmg * 100).toFixed(1)}%`;
+    const cell = $(`st-${p.key}`);
+    cell.textContent = { ok: 'OK', warn: 'Fatigue', danger: 'Overloaded', failed: 'FAILED' }[st];
+    cell.className = `st-${st}`;
+  }
+  $('failBanner').hidden = !s.failed;
+  if (s.failed) $('failBanner').textContent = `Engine failure: ${s.failed}. Press Rebuild engine to fit fresh parts.`;
+}
+
 // ------------------------------------------------------------------ main loop
 function handleEvents(events) {
   for (const ev of events) {
@@ -304,7 +335,7 @@ function updateDash(input) {
   $('barThrottle').style.width = `${input.throttle * 100}%`;
   $('barBrake').style.width = `${input.brake * 100}%`;
   $('barClutch').style.width = `${(1 - sim.lastClutch) * 100}%`;
-  $('engineState').textContent = sim.running ? 'Engine running' : 'Stalled: press R or Start';
+  $('engineState').textContent = sim.internals.failed ? `Engine failed: ${sim.internals.failed}` : sim.running ? 'Engine running' : 'Stalled: press R or Start';
   $('engineState').className = sim.running ? 'pill' : 'pill off';
   $('padName').textContent = inp.padName ? `Detected: ${inp.padName}` : 'No wheel or pedals detected yet. Press any pedal or button.';
 }
@@ -323,7 +354,7 @@ function loop(now) {
   wasFull = full;
   updateDash(input);
   highlightCell();
-  if (frame++ % 6 === 0) drawDyno();
+  if (frame++ % 6 === 0) { drawDyno(); updateInternals(); }
   $('btnCsv').disabled = sim.logging || !sim.log.length;
   requestAnimationFrame(loop);
 }
@@ -333,4 +364,5 @@ renderTabs();
 renderSettings();
 renderTable();
 renderLearnRows();
+renderMaterials();
 requestAnimationFrame(loop);

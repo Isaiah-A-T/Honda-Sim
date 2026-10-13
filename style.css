@@ -21,7 +21,13 @@ h2 { font-size: 15px; margin: 12px 0 6px; }
 main { display: grid; grid-template-columns: minmax(0, 1fr) minmax(0, 1fr); gap: 12px; padding: 12px 16px; }
 @media (max-width: 1000px) { main { grid-template-columns: minmax(0, 1fr); } }
 .panel { background: var(--panel); border: 1px solid var(--line); border-radius: 8px; padding: 12px; min-width: 0; }
-.controls { grid-column: 1 / -1; }
+.controls, .internals { grid-column: 1 / -1; }
+.loadbar { width: 160px; max-width: 30vw; height: 10px; background: var(--line); border-radius: 5px; overflow: hidden; display: inline-block; vertical-align: middle; }
+.loadbar > div { height: 100%; background: var(--ok); }
+.loadbar > div.warn { background: var(--warn); } .loadbar > div.danger, .loadbar > div.failed { background: var(--bad); }
+td.st-ok { color: var(--ok); } td.st-warn { color: var(--warn); } td.st-danger, td.st-failed { color: var(--bad); font-weight: 700; }
+#partsTable td, #matTable td { text-align: left; } #partsTable td.num, #matTable td.num { text-align: right; }
+.fail { background: var(--bad); color: #fff; padding: 8px 12px; border-radius: 6px; margin: 8px 0; font-weight: 600; }
 .muted { color: var(--muted); } .small { font-size: 12px; }
 .big { font-size: 26px; font-weight: 600; font-variant-numeric: tabular-nums; }
 .pill { padding: 2px 10px; border-radius: 12px; background: var(--ok); color: #fff; font-size: 12px; }
@@ -60,3 +66,4 @@ td.hi { background: var(--cell-hi); font-weight: 700; }
 .settings input, .settings select { width: 100%; }
 #learnRows { display: grid; grid-template-columns: repeat(auto-fill, minmax(210px, 1fr)); gap: 6px; }
 #learnRows div { display: flex; justify-content: space-between; align-items: center; gap: 6px; border: 1px solid var(--line); border-radius: 6px; padding: 4px 8px; }
+#partsTable th, #matTable th { text-align: left; }

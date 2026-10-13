@@ -80,6 +80,7 @@ export function stepEngine(e, pedal, dt) {
 
   // Air the engine actually breathes this cycle (grams per 2 revolutions, whole engine).
   const ve = trueVE(rpm, e.highCam);
+  e.ve = ve;
   const airPerCycle = ve * ENGINE.displacementL * AIR_DENSITY_G_PER_L * (e.map / 101.3) * (298 / (273 + e.iat));
   e.airGs = airPerCycle * rpm / 120;
 

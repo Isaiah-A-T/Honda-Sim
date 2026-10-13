@@ -4,6 +4,7 @@ import { clamp } from './tables.js';
 import { CAR, ENGINE, placeholderTune } from './k20z3.js';
 import { createEngine, stepEngine, hp } from './engine.js';
 import { createVehicle, stepDrivetrain, overallRatio } from './vehicle.js';
+import { createInternals, stepInternals } from './internals.js';
 
 const SUBSTEP = 0.001;
 const SHIFT_TIME = 0.2;                 // seconds the auto-clutch stays open for a shift
@@ -14,6 +15,7 @@ export function createSim(tune = placeholderTune()) {
     t: 0,
     eng: createEngine(tune),
     car: createVehicle(),
+    internals: createInternals(),
     running: true,
     shiftT: 0,
     ac: 0,
@@ -40,11 +42,17 @@ export const shiftUp = sim => shift(sim, sim.car.gear + 1);
 export const shiftDown = sim => shift(sim, sim.car.gear - 1);
 
 export function startEngine(sim) {
-  if (sim.running) return;
+  if (sim.running || sim.internals.failed) return;
   if (sim.car.gear !== 0 && !(sim.lastClutch < 0.2)) return;   // needs neutral or clutch in
   sim.running = true;
   sim.eng.rpm = ENGINE.idleRpm + 300;
   sim.eng.knockRetard = 0;
+}
+
+// Fresh internals after a failure (or to reset wear).
+export function rebuildEngine(sim) {
+  sim.internals = createInternals();
+  sim.eng.knockCount = 0;
 }
 
 // Auto-clutch: opens during a shift, slips to launch from a stop, declutches before a stall,
@@ -82,6 +90,8 @@ export function step(sim, input, dt) {
     let tq = 0;
     if (sim.running) {
       tq = stepEngine(sim.eng, throttle, h);
+      stepInternals(sim.internals, sim.eng, h);
+      if (sim.internals.failed) { sim.running = false; tq = -60; }   // a broken engine locks up hard
       if (sim.eng.rpm < ENGINE.stallRpm) { sim.running = false; }
     } else {
       sim.eng.torqueNm = 0;
@@ -127,6 +137,11 @@ export function snapshot(sim, throttle = 0) {
     boost_cut: e.boostCut ? 1 : 0,
     iat_c: +e.iat.toFixed(1),
     over_torque: e.overTorque ? 1 : 0,
+    pmax_bar: +sim.internals.pmaxBar.toFixed(0),
+    piston_c: +sim.internals.pistonC.toFixed(0),
+    rod_load: +sim.internals.load.rod.toFixed(2),
+    piston_load: +sim.internals.load.piston.toFixed(2),
+    bearing_load: +sim.internals.load.bearing.toFixed(2),
   };
 }
 
