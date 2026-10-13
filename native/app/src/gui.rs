@@ -774,6 +774,31 @@ impl Gui {
             });
             ui.label(RichText::new("Idle a minute before switching off after hard driving: the oil stops when the engine does, and the turbine housing soaks into the bearing.").small().color(Color32::from_gray(150)));
         }
+        if let (Some(l), true) = (&sh.sim.internals.lube, sh.sim.running) {
+            ui.add_space(4.0);
+            ui.label(RichText::new("Rotating assembly").strong());
+            egui::Grid::new("rotating-oil").num_columns(2).show(ui, |ui| {
+                ui.label(grey("Crank feed"));
+                ui.label(format!("{:.1} L/min to the mains; rod journals need {:.0} kPa", l.feed_lpm * 0.5, l.rod_need_kpa));
+                ui.end_row();
+                ui.label(grey("Rod bearing supply"));
+                ui.label(if l.supply >= 1.0 { RichText::new("full") } else { RichText::new(format!("{:.0}%, STARVING", l.supply * 100.0)).color(Color32::from_rgb(0xe0, 0x50, 0x40)) });
+                ui.end_row();
+                ui.label(grey("Main bearings 1–5"));
+                ui.label(format!("{:.2} L/min each, film {:.0} °C, strength {:.2}", l.mains[0].feed_lpm, l.mains[0].film_c, l.mains[0].film));
+                ui.end_row();
+                ui.label(grey("Rod bearings 1–4"));
+                ui.label(format!("{:.2} L/min each through the crank, film {:.0} °C, strength {:.2}", l.rods[0].feed_lpm, l.rods[0].film_c, l.rods[0].film));
+                ui.end_row();
+                ui.label(grey("Piston squirters"));
+                ui.label(if l.jets[0].open { format!("spraying, {:.2} L/min each", l.jets[0].flow_lpm) } else { "shut (under 200 kPa)".into() });
+                ui.end_row();
+                ui.label(grey("Splash back to the pan"));
+                ui.label(format!("{:.1} L/min", l.splash_lpm));
+                ui.end_row();
+            });
+            ui.label(RichText::new("Film strength 1.0 = 100 °C oil at full supply. Lower means a thinner film: the rod bearings load up and wear faster.").small().color(Color32::from_gray(150)));
+        }
         ui.label(RichText::new("Cold oil is thick: more friction and oil pressure. The ECU holds VTEC off and raises idle until the engine warms up.").small().color(Color32::from_gray(150)));
 
         ui.separator();

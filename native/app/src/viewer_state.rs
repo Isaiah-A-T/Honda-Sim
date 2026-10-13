@@ -99,8 +99,17 @@ pub fn viewer_state(sim: &Sim) -> SimState {
         stress,
         part_materials: Some(pm),
         readouts,
+        turbo_water_cooled: t.turbo.water_cooled,
         coolant_c: e.ect as f32,
-        // Oil temperature, oil pressure, thermostat and fan aren't modelled yet; the viewer estimates or defaults them.
-        ..SimState::default()
+        coolant_out_c: Some(e.thermal.radiator_out_c as f32),
+        oil_c: e.oil_c as f32,
+        oil_kpa: Some(if running { e.oil_kpa as f32 } else { 0.0 }),
+        thermostat: e.thermal.thermostat as f32,
+        fan: if e.thermal.fan_on { 1.0 } else { 0.0 },
+        block: Some(e.bottom.crank.block.unwrap_or("K20Z3").to_string()),
+        bore_mm: (!e.bottom.stock).then_some(e.bottom.bore_mm as f32),
+        stroke_mm: (!e.bottom.stock).then_some(e.bottom.stroke_mm as f32),
+        rod_mm: (!e.bottom.stock).then_some(e.bottom.rod_mm as f32),
+        deck_mm: (!e.bottom.stock).then_some(e.bottom.deck_mm as f32),
     }
 }

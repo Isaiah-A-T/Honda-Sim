@@ -59,3 +59,16 @@ turbine housing, which soaks into the bearing housing; the oil and water carry t
 coolant. Switch off straight after hard driving and the oil stops while the housing is still hot, so the
 bearing heat-soaks: about 165 °C water-cooled, about 255 °C oil-cooled only. Above 280 °C with no oil
 moving, the sim counts time as oil coking. Thermal masses and heat paths are estimates.
+
+## Rotating assembly
+
+As on the K20: the main gallery feeds the five main bearings; oil holes cross-drilled through the crank carry
+it from the mains to the four rod journals (which main feeds which journal isn't published; rod n from main n
+is assumed); four squirters spray the piston undersides once oil pressure passes 200 kPa; oil flung off the
+crank and rods splashes the bores and wrist pins and drains back to the pan. The rod journals need more
+supply pressure as rpm rises (about 50 kPa + 0.03 kPa per rpm, an estimate); below that they starve. Each
+bearing's film runs hotter than the sump from shear heating, more so when loaded or starved. Film strength
+(viscosity at the film temperature, times supply) sets the rod bearing load and so its wear; the squirters
+set how hot the pistons run. `renderState().cooling.rotating` and the native `Internals::lube` carry the
+feed, film temperature and strength per bearing and the flow per squirter; `COMPONENTS` places main1–5,
+rod1–4 and jet1–4 at a 98 mm bore pitch (approximate).
