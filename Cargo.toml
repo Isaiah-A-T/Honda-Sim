@@ -1,0 +1,18 @@
+# Honda Sim, every Rust build in one workspace:
+#   shared/core    the sim (honda-sim-core), ported from web/src and tested against it
+#   shared/viewer  the 3D engine view
+#   shared/phone   the phone app, shared by Android and iOS
+#   windows/       HondaSim.exe
+#   android/       the Android entry point and APK settings (cargo apk build)
+#   ios/           the iOS entry point, the OpenGL ES surface and the Xcode project
+[workspace]
+resolver = "2"
+members = ["shared/core", "shared/viewer", "shared/phone", "windows", "android", "ios"]
+
+[profile.release]
+opt-level = 3
+lto = "thin"
+strip = true
+
+[profile.dev.package."*"]
+opt-level = 3

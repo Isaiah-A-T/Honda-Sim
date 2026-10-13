@@ -1,7 +1,7 @@
-# Builds the iOS app (mobile/ios) on a Mac: once for the simulator, to check everything compiles and links,
+# Builds the iOS app (ios/) on a Mac: once for the simulator, to check everything compiles and links,
 # and once for iPhone without signing, published as HondaSim-unsigned.ipa in the "ios-latest" pre-release.
 # An unsigned app can't be installed as is; sign it with your Apple ID using a sideloading tool, or build and
-# install from Xcode on a Mac (mobile/README.md). Runs when the iOS files change and from the Actions tab
+# install from Xcode on a Mac (shared/phone/README.md). Runs when the iOS files change and from the Actions tab
 # (iOS app, Run workflow); not on every change to the shared code, because Mac runners use GitHub Actions
 # minutes ten times as fast.
 name: iOS app
@@ -11,7 +11,7 @@ permissions:
 
 on:
   push:
-    paths: ['mobile/ios/**', '.github/workflows/ios.yml']
+    paths: ['ios/**', '.github/workflows/ios.yml']
   workflow_dispatch:
 
 jobs:
@@ -26,15 +26,15 @@ jobs:
           brew install xcodegen
 
       - name: Generate the Xcode project
-        working-directory: mobile/ios/xcode
+        working-directory: ios/xcode
         run: xcodegen
 
       - name: Build for the simulator
-        working-directory: mobile/ios/xcode
+        working-directory: ios/xcode
         run: xcodebuild -project HondaSim.xcodeproj -scheme HondaSim -sdk iphonesimulator -configuration Release -derivedDataPath build CODE_SIGNING_ALLOWED=NO build
 
       - name: Build for iPhone (unsigned)
-        working-directory: mobile/ios/xcode
+        working-directory: ios/xcode
         run: |
           xcodebuild -project HondaSim.xcodeproj -scheme HondaSim -sdk iphoneos -configuration Release -derivedDataPath build CODE_SIGNING_ALLOWED=NO build
           mkdir -p Payload
@@ -48,4 +48,4 @@ jobs:
           gh release delete ios-latest --cleanup-tag -y || true
           gh release create ios-latest HondaSim-unsigned.ipa --target "$GITHUB_SHA" --prerelease \
             --title "Honda Sim for iOS (latest build, unsigned)" \
-            --notes "Built from ${GITHUB_REF_NAME} at ${GITHUB_SHA::7}. Unsigned: sign it with your Apple ID in a sideloading tool, or build from Xcode (mobile/README.md)."
+            --notes "Built from ${GITHUB_REF_NAME} at ${GITHUB_SHA::7}. Unsigned: sign it with your Apple ID in a sideloading tool, or build from Xcode (shared/phone/README.md)."

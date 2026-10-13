@@ -30,21 +30,19 @@ jobs:
           rustup target add x86_64-pc-windows-gnu
 
       - name: Test the sim against the JavaScript model
-        working-directory: native
         run: |
           sudo apt-get install -y libudev-dev pkg-config
           cargo test --release -p honda-sim-core
 
       - name: Build HondaSim.exe
-        working-directory: native
-        run: cargo build --release --target x86_64-pc-windows-gnu
+        run: cargo build --release --target x86_64-pc-windows-gnu -p honda-sim-app
 
       - name: Publish the release
         env:
           GH_TOKEN: ${{ github.token }}
           TAG: ${{ inputs.version || github.ref_name }}
         run: |
-          exe=native/target/x86_64-pc-windows-gnu/release/HondaSim.exe
+          exe=target/x86_64-pc-windows-gnu/release/HondaSim.exe
           notes=.github/release-notes/$TAG.md
           if [ -f "$notes" ]; then
             sed -i "s/^SHA-256 of .*$/SHA-256 of \`HondaSim.exe\`: \`$(sha256sum "$exe" | cut -d' ' -f1)\`/" "$notes"

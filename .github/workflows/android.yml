@@ -1,4 +1,4 @@
-# Builds the Android app (mobile/android) into HondaSim.apk. Runs when the phone code or anything it uses
+# Builds the Android app (android/) into HondaSim.apk. Runs when the phone code or anything it uses
 # changes, and from the Actions tab (Android APK, Run workflow). The newest APK is published as the
 # "android-latest" pre-release on the Releases page: open it on the phone and tap HondaSim.apk to install.
 #
@@ -12,7 +12,7 @@ permissions:
 
 on:
   push:
-    paths: ['mobile/**', 'native/sim/**', 'native/app/src/**', 'viewer/**', '.github/workflows/android.yml']
+    paths: ['android/**', 'shared/**', 'windows/src/**', 'Cargo.toml', 'Cargo.lock', '.github/workflows/android.yml']
   workflow_dispatch:
 
 jobs:
@@ -31,18 +31,17 @@ jobs:
           KEYSTORE: ${{ secrets.ANDROID_KEYSTORE_BASE64 }}
           PASSWORD: ${{ secrets.ANDROID_KEYSTORE_PASSWORD }}
         run: |
-          mkdir -p mobile/target
+          mkdir -p target
           if [ -n "$KEYSTORE" ]; then
-            echo "$KEYSTORE" | base64 -d > mobile/target/honda-sim-release.keystore
-            echo "CARGO_APK_RELEASE_KEYSTORE=$PWD/mobile/target/honda-sim-release.keystore" >> "$GITHUB_ENV"
+            echo "$KEYSTORE" | base64 -d > target/honda-sim-release.keystore
+            echo "CARGO_APK_RELEASE_KEYSTORE=$PWD/target/honda-sim-release.keystore" >> "$GITHUB_ENV"
             echo "CARGO_APK_RELEASE_KEYSTORE_PASSWORD=$PASSWORD" >> "$GITHUB_ENV"
           else
-            keytool -genkeypair -v -keystore mobile/target/honda-sim-release.keystore -alias androiddebugkey -keyalg RSA -keysize 2048 \
+            keytool -genkeypair -v -keystore target/honda-sim-release.keystore -alias androiddebugkey -keyalg RSA -keysize 2048 \
               -validity 10000 -storepass android -keypass android -dname "CN=Honda Sim"
           fi
 
       - name: Build HondaSim.apk
-        working-directory: mobile
         env:
           ANDROID_HOME: ${{ env.ANDROID_SDK_ROOT }}
         run: |

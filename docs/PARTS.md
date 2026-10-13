@@ -2,7 +2,7 @@
 
 The **Bottom end** panel under Engine internals swaps the crank, rods and pistons. Every aftermarket part
 is a real, purchasable part from `docs/parts-catalog.json`, with the manufacturer's or a retailer's page as the
-source. Regenerate `src/parts-catalog.js` with `node tools/build-parts.mjs` after editing the JSON.
+source. Regenerate `web/src/parts-catalog.js` with `node web/tools/build-parts.mjs` after editing the JSON.
 
 What changes when you swap parts:
 

@@ -1,6 +1,6 @@
 # Air and exhaust flow model
 
-`src/gasflow.js` follows one cylinder through a whole four-stroke cycle, one crank degree at a time. The engine
+`web/src/gasflow.js` follows one cylinder through a whole four-stroke cycle, one crank degree at a time. The engine
 runs a cycle every 10 ms of sim time with the current rpm, manifold pressure, cam, cam angle, spark and mixture, so
 everything below reacts to the tune as you drive.
 
@@ -50,7 +50,7 @@ and scaled once (`knockScale`) so the stock engine on 91 octane is knock limited
 up top, which is how K20s behave.
 
 A lumped model like this overstates wave effects in long pipes, so runner and primary lengths are "effective" lengths
-(about half the physical pipe). After that, `tools/calibrate.mjs` fits a per-rpm correction to the airflow so the
+(about half the physical pipe). After that, `web/tools/calibrate.mjs` fits a per-rpm correction to the airflow so the
 stock engine lands on Honda's rating. The fitted corrections are 0.98–1.06 on the high cam from 5,800 rpm up and 0.79–0.89 on the low cam from 3,000 to
 5,800 rpm (1.0 would mean the flow model alone is exact). Below 2,000 rpm they drop to 0.7, where the flow model is
 too optimistic.
@@ -59,4 +59,4 @@ too optimistic.
 
 In the tune settings: throttle body diameter, intake runner effective length, exhaust effective diameter, and for
 turbos the turbine and wastegate areas and compressor wheel size. Advanced: `tune.flow` in a saved tune JSON can
-override any field of `FLOW` in `src/gasflow.js` (cam lobes, valve sizes, volumes).
+override any field of `FLOW` in `web/src/gasflow.js` (cam lobes, valve sizes, volumes).

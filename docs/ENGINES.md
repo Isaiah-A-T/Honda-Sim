@@ -5,9 +5,9 @@ can build any K-series combination. Saved as `tune.engine = { block, head, oilPu
 K20Z3 the car came with.
 
 Data: `docs/k-series-specs.json` is the research file. Every number in it has its source pages, and anything not
-found is null with a note. `tools/build-engines.py` turns it into `docs/engines.json`, the catalog the sim uses.
+found is null with a note. `web/tools/build-engines.py` turns it into `docs/engines.json`, the catalog the sim uses.
 Any value the sim needs that wasn't published is filled in there and listed under `estimated`, and the panel
-shows it as an estimate. Rebuild with `python3 tools/build-engines.py && node tools/build-parts.mjs`.
+shows it as an estimate. Rebuild with `python3 web/tools/build-engines.py && node web/tools/build-parts.mjs`.
 
 ## What each part brings
 

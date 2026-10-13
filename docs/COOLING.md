@@ -1,6 +1,6 @@
 # Cooling and oil
 
-`src/thermal.js` (native: `native/sim/src/thermal.rs`) models the K20Z3's coolant and oil systems so the
+`web/src/thermal.js` (native: `shared/core/src/thermal.rs`) models the K20Z3's coolant and oil systems so the
 engine model can use real coolant and oil temperatures instead of fixed ones.
 
 ## Coolant circuit

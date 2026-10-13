@@ -1,7 +1,7 @@
 # Fuel, injectors and boost
 
 How the fuel you pick, the injectors and pump you fit, and the boost you run change what the engine
-makes (src/fuels.js, src/engine.js, src/gasflow.js; ported to native/sim/src/fuels.rs). The data and
+makes (web/src/fuels.js, web/src/engine.js, web/src/gasflow.js; ported to shared/core/src/fuels.rs). The data and
 sources are in docs/boost-fuel-data.json.
 
 ## What already worked

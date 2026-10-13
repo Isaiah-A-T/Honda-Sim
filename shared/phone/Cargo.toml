@@ -1,0 +1,27 @@
+[package]
+name = "honda-sim-mobile"
+version = "0.9.0"
+edition = "2021"
+description = "Honda Sim on phones: the desktop sim, tune panels and 3D engine view with touch pedals and phone menus"
+license = "MIT"
+
+[lib]
+path = "src/lib.rs"
+
+# A phone-sized window on a desktop, for trying the phone layout without a phone (mouse = one finger).
+[[bin]]
+name = "honda-sim-phone-preview"
+path = "src/preview.rs"
+
+[dependencies]
+honda-sim-core = { path = "../core" }
+honda-sim-viewer = { path = "../viewer" }
+serde = { version = "1", features = ["derive"] }
+serde_json = "1"
+winit = "0.28"
+
+[target.'cfg(not(target_os = "ios"))'.dependencies]
+three-d = { version = "0.19", features = ["egui-gui", "window"] }
+
+[target.'cfg(target_os = "ios")'.dependencies]
+three-d = { version = "0.19", default-features = false, features = ["egui-gui"] }

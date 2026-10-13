@@ -22,8 +22,8 @@ factors; they are used only for where the peaks fall (torque near 6,200, power n
 ## What was tuned
 
 - **Breathing** comes from the gas exchange model ([GASFLOW.md](GASFLOW.md)): cams, cam phasing, valves, runners
-  and exhaust. `node tools/calibrate.mjs` then fits a per-rpm, per-cam correction on top so the stock engine hits the
-  crank torque targets in `src/k20z3.js` (`TORQUE_TARGETS`). The anchors are the Honda rating, the peak torque rpm,
+  and exhaust. `node web/tools/calibrate.mjs` then fits a per-rpm, per-cam correction on top so the stock engine hits the
+  crank torque targets in `web/src/k20z3.js` (`TORQUE_TARGETS`). The anchors are the Honda rating, the peak torque rpm,
   and the 5,600 rpm cam crossover. The low cam shape between anchors is an estimate.
 - **Timing and knock** come from the same model (burn phasing and an end-gas autoignition model). Its knock scale was
   set once so the stock engine on 91 octane is knock limited at low rpm and near best timing above about 6,000 rpm.
@@ -40,7 +40,7 @@ factors; they are used only for where the peaks fall (torque near 6,200, power n
 | 0–60 mph (1 ft rollout) | 6.5–7.2 s | 6.8 s |
 | ¼ mile | 14.9–15.6 s @ 93–94.4 mph | 15.2 s @ 94.3 mph |
 
-These checks run as tests (`npm test`), so a change that breaks them gets caught.
+These checks run as tests (`npm test` in `web/`), so a change that breaks them gets caught.
 
 ## What isn't calibrated yet
 
