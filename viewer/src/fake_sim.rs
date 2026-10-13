@@ -114,6 +114,7 @@ impl FakeSim {
             lambda,
             turbo: self.turbo,
             intercooler: self.intercooler,
+            turbo_water_cooled: true,
             iat_c: self.iat,
             coolant_c: self.coolant,
             coolant_out_c: None,

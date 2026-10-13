@@ -40,6 +40,8 @@ pub struct SimState {
     pub turbo: bool,
     /// Turbo build has an intercooler between the compressor and the throttle body (ignored when N/A).
     pub intercooler: bool,
+    /// Turbo centre section is water-cooled (coolant lines to the block), as well as oil-fed (ignored when N/A).
+    pub turbo_water_cooled: bool,
     /// Intake air temperature at the throttle body, °C.
     pub iat_c: f32,
     /// Coolant temperature leaving the engine (water outlet), °C.
@@ -84,6 +86,7 @@ impl Default for SimState {
             lambda: 1.0,
             turbo: false,
             intercooler: true,
+            turbo_water_cooled: true,
             iat_c: 25.0,
             coolant_c: 88.0,
             coolant_out_c: None,

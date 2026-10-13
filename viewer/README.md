@@ -95,6 +95,7 @@ for 1.5 seconds the viewer falls back to its demo.
 | `lambda` | number | Air-fuel ratio as lambda |
 | `turbo` | bool | Turbo build (shows the turbo and its plumbing); false draws the N/A intake with a cone filter |
 | `intercooler` | bool | Turbo build has a front-mount intercooler (default true); false runs the charge pipe straight to the throttle body |
+| `turboWaterCooled` | bool | Turbo centre section is water-cooled (default true): draws its coolant lines as well as the oil feed and drain |
 | `iatC` | number | Intake air temperature at the throttle body, °C |
 | `cams` | object | Cam card: `intakeLow`, `intakeHigh`, `exhaustLow`, `exhaustHigh`, each `{ liftMm, durationDeg, centerlineDeg }` (valve lift; duration at 1 mm lift; centreline ATDC for intake, BTDC for exhaust, at 0° VTC). The lobes are redrawn to match. Without it the viewer uses stand-in figures |
 | `vtecPin` | 0–1, or an array of 4 | VTEC lock pin travel (all cylinders, or per cylinder), if the sim models it. Without it the viewer moves each cylinder's pins itself when `vtec` changes, only while that cylinder's followers are on the base circle |

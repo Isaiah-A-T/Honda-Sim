@@ -310,6 +310,13 @@ pub fn run(mut opts: Options) {
                         }
                         Mode::Cooling => {
                             ui.label("Coolant and oil, coloured by temperature. Coolant runs from the water pump through the block's water jacket and up into the head, out to the radiator once the thermostat opens (round the bypass until then) and through the heater core. Oil runs from the pan through the filter to the main bearings and the head.");
+                            if state.turbo {
+                                ui.label(if state.turbo_water_cooled {
+                                    "Turbo: oil fed from a sandwich plate under the filter, drained into the pan; coolant from the block's exhaust side, returned to the heater hose."
+                                } else {
+                                    "Turbo: oil fed from a sandwich plate under the filter, drained into the pan (oil-cooled centre section)."
+                                });
+                            }
                             let tp = crate::engine::Temps::of(&state);
                             let swatch_row = |ui: &mut egui::Ui, label: &str, c: [u8; 3], text: String| {
                                 ui.horizontal(|ui| {

@@ -37,6 +37,10 @@ pub enum Sys {
     CoolPassage,
     /// Oil passages inside the engine: pickup, galleries, main bearing feeds, head gallery, drain.
     Oil,
+    /// Turbo oil feed and drain lines (turbo builds).
+    TurboOil,
+    /// Turbo coolant lines (turbo builds with a water-cooled centre section).
+    TurboWater,
 }
 
 /// Which builds a part or flow belongs to.
@@ -47,11 +51,13 @@ enum When {
     Turbo,
     TurboIc,
     TurboDirect,
+    TurboWater,
 }
 
 impl When {
-    fn holds(self, turbo: bool, ic: bool) -> bool {
+    fn holds(self, turbo: bool, ic: bool, water: bool) -> bool {
         match self {
+            When::TurboWater => turbo && water,
             When::Always => true,
             When::Na => !turbo,
             When::Turbo => turbo,
@@ -65,6 +71,8 @@ impl When {
             Sys::NaIntake => When::Na,
             Sys::Intercooled => When::TurboIc,
             Sys::DirectCharge => When::TurboDirect,
+            Sys::TurboOil => When::Turbo,
+            Sys::TurboWater => When::TurboWater,
             _ => When::Always,
         }
     }
@@ -98,7 +106,7 @@ impl Mode {
         match self {
             Mode::Internals => sys == Sys::Internals,
             Mode::Block => sys == Sys::Casting,
-            Mode::Cooling => matches!(sys, Sys::Casting | Sys::Cooling | Sys::CoolPassage | Sys::Oil),
+            Mode::Cooling => matches!(sys, Sys::Casting | Sys::Cooling | Sys::CoolPassage | Sys::Oil | Sys::Turbo | Sys::TurboOil | Sys::TurboWater),
             // The passages are inside the castings; only the cooling view shows them.
             _ => !matches!(sys, Sys::CoolPassage | Sys::Oil),
         }
@@ -788,6 +796,32 @@ impl Engine {
             paths.push(cf(pts, Fluid::Oil));
         }
 
+        // ---------- Turbo oil and coolant lines ----------
+        // Oil feed: a braided line from a sandwich plate under the oil filter (intake side), down under the oil pan
+        // to the exhaust side and up behind the centre section, between the turbine and compressor housings. Drain: a fat hose from
+        // the bottom of the centre section, falling all the way into the exhaust side of the oil pan.
+        // Coolant (water-cooled centre section): fed from a block water jacket port on the exhaust side below the
+        // runners, returned under the turbo and round the timing end into the heater return hose.
+        let ct = |x: f32, y: f32, z: f32| [to.x + x, to.y + y, to.z + z];
+        let braided = || metal(0xa9aeb4, 0.8, 0.4);
+        let feed = [[60.0, -30.0, 108.0], [60.0, -80.0, 130.0], [40.0, -178.0, 80.0], [15.0, -185.0, -120.0], [8.0, -130.0, -345.0], [8.0, 40.0, -345.0], [8.0, 85.0, -320.0], ct(8.0, 27.0, -27.0)];
+        let i = b.pipe(&feed, 5.0, braided(), None, "Turbo oil feed line", Sys::TurboOil);
+        b.parts[i].heat = Heat::Oil;
+        let drain = [ct(8.0, -36.0, 0.0), ct(8.0, -77.0, 45.0), [8.0, -80.0, -140.0], [8.0, -95.0, -80.0]];
+        let i = b.pipe(&drain, 10.0, hose(), None, "Turbo oil drain", Sys::TurboOil);
+        b.parts[i].heat = Heat::Oil;
+        let water_in = [[-60.0, 95.0, -93.0], [-20.0, 75.0, -150.0], [15.0, 40.0, -195.0], ct(10.0, -12.0, 36.0)];
+        let i = b.pipe(&water_in, 7.0, hose(), None, "Turbo coolant feed", Sys::TurboWater);
+        b.parts[i].heat = Heat::Hot;
+        let water_out = [ct(10.0, -12.0, -36.0), [-5.0, -60.0, -285.0], [-35.0, -205.0, -255.0], [-150.0, -180.0, -240.0], [-280.0, -60.0, -150.0], [-310.0, 100.0, -20.0], [-300.0, 150.0, 40.0]];
+        let i = b.pipe(&water_out, 7.0, hose(), None, "Turbo coolant return", Sys::TurboWater);
+        b.parts[i].heat = Heat::Hot;
+        let tl = |pts: &[[f32; 3]], fluid: Fluid, when: When| FlowPath { fluid, pts: pts.to_vec(), intake: false, cyl: None, when, hot: false };
+        paths.push(tl(&feed, Fluid::Oil, When::Turbo));
+        paths.push(tl(&drain, Fluid::Oil, When::Turbo));
+        paths.push(tl(&water_in, Fluid::Coolant, When::TurboWater));
+        paths.push(tl(&water_out, Fluid::Coolant, When::TurboWater));
+
         let flows = paths
             .into_iter()
             .map(|p| {
@@ -927,7 +961,7 @@ impl Engine {
 
             // Visibility for this mode.
             let mut vis = mode.shows(p.sys);
-            vis &= When::of(p.sys).holds(s.turbo, s.intercooler);
+            vis &= When::of(p.sys).holds(s.turbo, s.intercooler, s.turbo_water_cooled);
             let cast_mode = match mode {
                 Mode::Block => Castings::Solid,
                 Mode::Airflow | Mode::Cooling => Castings::SeeThrough,
@@ -937,7 +971,7 @@ impl Engine {
             p.visible = vis;
 
             // Transparency: castings follow the setting; airflow mode ghosts the plumbing.
-            let ghost = mode == Mode::Airflow && matches!(p.sys, Sys::Intake | Sys::Exhaust | Sys::Turbo | Sys::NaIntake | Sys::Intercooled | Sys::DirectCharge | Sys::Cooling);
+            let ghost = mode == Mode::Airflow && matches!(p.sys, Sys::Intake | Sys::Exhaust | Sys::Turbo | Sys::NaIntake | Sys::Intercooled | Sys::DirectCharge | Sys::Cooling | Sys::TurboOil | Sys::TurboWater);
             let (alpha, transparent) = if p.sys == Sys::Casting {
                 match (mode, cast_mode) {
                     (Mode::Airflow | Mode::Cooling, _) => ((p.base_alpha as f32 * 0.45) as u8, true),
@@ -1041,7 +1075,7 @@ impl Engine {
             let mut colors = Vec::new();
             let pumping = if s.rpm > 100.0 { 60.0 + 420.0 * (s.rpm / 8000.0).min(1.1) } else { 0.0 };
             for f in self.flows.iter_mut() {
-                if !f.when.holds(s.turbo, s.intercooler) { continue; }
+                if !f.when.holds(s.turbo, s.intercooler, s.turbo_water_cooled) { continue; }
                 let air = matches!(f.fluid, Fluid::Air | Fluid::Exhaust);
                 if air != (mode == Mode::Airflow) { continue; }
                 if !air {
@@ -1096,16 +1130,28 @@ impl Engine {
     pub fn clearance_problems(&self) -> Vec<String> {
         let mut out = Vec::new();
         for (turbo, ic, build) in [(false, true, "N/A"), (true, true, "turbo + intercooler"), (true, false, "turbo, no intercooler")] {
-            let shown = |i: usize| When::of(self.parts[i].sys).holds(turbo, ic);
+            let shown = |i: usize| When::of(self.parts[i].sys).holds(turbo, ic, true);
+            // Another pipe is checked against its own centreline (its box would cover everything it bends round).
+            let along: std::collections::HashMap<usize, (Vec<Vec3>, f32)> =
+                self.pipes.iter().map(|pc| (pc.part, ((0..=400).map(|k| pc.curve.point_at(k as f32 / 400.0)).collect(), pc.radius))).collect();
             for pc in self.pipes.iter().filter(|pc| shown(pc.part)) {
                 let len = pc.curve.length();
                 let end_skip = (pc.radius * 2.5).min(len * 0.25);
                 for (j, part) in self.parts.iter().enumerate() {
                     if j == pc.part || !shown(j) || part.label.starts_with("Fuel injector") { continue; }
                     let Some((lo, hi)) = self.bounds[j] else { continue };
-                    let dist = |p: Vec3| vec3((lo.x - p.x).max(0.0).max(p.x - hi.x), (lo.y - p.y).max(0.0).max(p.y - hi.y), (lo.z - p.z).max(0.0).max(p.z - hi.z)).magnitude();
+                    let other = along.get(&j);
+                    let dist = |p: Vec3| match other {
+                        Some((pts, r)) => pts.iter().map(|q| (p - q).magnitude()).fold(f32::MAX, f32::min) - r,
+                        None => vec3((lo.x - p.x).max(0.0).max(p.x - hi.x), (lo.y - p.y).max(0.0).max(p.y - hi.y), (lo.z - p.z).max(0.0).max(p.z - hi.z)).magnitude(),
+                    };
                     // What a pipe's ends sit in is what it connects to (runner into plenum, charge pipe into throttle body).
                     if dist(pc.curve.point_at(0.0)) < pc.radius || dist(pc.curve.point_at(1.0)) < pc.radius { continue; }
+                    // Likewise a pipe teed into this one.
+                    if let Some((pts, r)) = other {
+                        let on_me = |q: Vec3| (0..=400).any(|k| (pc.curve.point_at(k as f32 / 400.0) - q).magnitude() < pc.radius + r);
+                        if on_me(pts[0]) || on_me(*pts.last().unwrap()) { continue; }
+                    }
                     let hit = (0..=240).map(|k| k as f32 / 240.0).filter(|u| u * len > end_skip && (1.0 - u) * len > end_skip).find(|&u| {
                         dist(pc.curve.point_at(u)) < pc.radius - 1.0
                     });
