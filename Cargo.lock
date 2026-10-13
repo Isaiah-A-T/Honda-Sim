@@ -771,7 +771,7 @@ checksum = "ed5909b6e89a2db4456e54cd5f673791d7eca6732202bbf2a9cc504fe2f9b84a"
 
 [[package]]
 name = "honda-sim-android"
-version = "0.9.0"
+version = "0.11.1"
 dependencies = [
  "android_logger",
  "honda-sim-mobile",
@@ -782,7 +782,7 @@ dependencies = [
 
 [[package]]
 name = "honda-sim-app"
-version = "0.11.0"
+version = "0.11.1"
 dependencies = [
  "gilrs",
  "honda-sim-core",
@@ -793,7 +793,7 @@ dependencies = [
 
 [[package]]
 name = "honda-sim-core"
-version = "0.11.0"
+version = "0.11.1"
 dependencies = [
  "serde",
  "serde_json",
@@ -801,7 +801,7 @@ dependencies = [
 
 [[package]]
 name = "honda-sim-ios"
-version = "0.9.0"
+version = "0.11.1"
 dependencies = [
  "honda-sim-mobile",
  "libc",
@@ -811,7 +811,7 @@ dependencies = [
 
 [[package]]
 name = "honda-sim-mobile"
-version = "0.9.0"
+version = "0.11.1"
 dependencies = [
  "honda-sim-core",
  "honda-sim-viewer",
