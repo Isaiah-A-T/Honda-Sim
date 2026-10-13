@@ -17,7 +17,7 @@
 import { clamp, lookup1 } from './tables.js';
 import { MATERIALS } from './materials.js';
 import { bottomEnd } from './parts.js';
-import { viscRatio } from './thermal.js';
+import { rotatingOil } from './thermal.js';
 export { MATERIALS };
 
 export const GEOMETRY = {
@@ -145,8 +145,11 @@ export function stepInternals(s, e, dt) {
   s.load.rod = Math.max(s.rodCompN / (G.rodBeamAreaM2 * M.rod.yieldMPa * 1e6 * 0.75), s.rodTensionN / (G.rodBeamAreaM2 * 1e6) / M.rod.fatigueMPa);
   // Rod bolts: stress amplitude in the thread from the inertia load (the joint takes most of it).
   s.load.rodBolt = (0.25 * s.rodTensionN / G.rodBoltStressAreaM2 / 2 / 1e6) / M.rodBolt.threadFatigueMPa;
-  // Oil film strength scales with viscosity: thin hot oil carries less load.
-  const film = clamp(viscRatio(e.oilC ?? 100, e.thermal?.g) ** 0.3, 0.5, 1.6);
+  // Rod bearing oil film: oil fed through the crank from the mains, thinned by its own shear heating and by
+  // a starved supply when oil pressure can't keep up with rpm (thermal.js rotatingOil).
+  const lube = rotatingOil(rpm, e.oilKpa ?? 300, e.oilC ?? 100, e.thermal?.g, clamp(s.load.bearing ?? 0.5, 0, 1.5));
+  s.lube = lube;
+  const film = lube.rods[0].film;
   s.load.bearing = Math.max(s.rodCompN, s.rodTensionN) / (G.bigEndM * G.bearingWidthM) / 1e6 / (M.bearing.loadRatingMPa * film);
   s.load.crank = 0.0035 * (s.rodCompN + 0.5 * s.rodTensionN) / M.crank.fatigueMPa;   // MPa per N at the pin fillet, estimated
 

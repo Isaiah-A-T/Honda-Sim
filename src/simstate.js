@@ -10,7 +10,7 @@
 import { PARTS, partMaterial, engineGeometry } from './internals.js';
 import { bottomEnd } from './parts.js';
 import { FLOW, valveLiftM, camCard } from './gasflow.js';
-import { circuits, viscosityCst, boilingC } from './thermal.js';
+import { circuits, viscosityCst, boilingC, rotatingOil } from './thermal.js';
 import { turboLines } from './sim.js';
 
 export const FIRING_ORDER = [1, 3, 4, 2];
@@ -84,6 +84,9 @@ function coolingState(sim) {
       cooler: g.oilCooler, coolerKw: th.oilCoolerKw, toCoolantKw: th.oilToCoolantKw, sumpKw: th.sumpKw },
     turbo: tl ? { oilFeedLpm: th.turboOilLpm, oilKw: th.turboOilKw, waterKw: th.turboWaterKw, waterCooled: tl.waterCooled,
       housingC: th.turboHousingC, bearingC: th.turboBearingC, cokingS: th.turboCokeS } : null,
+    // Rotating assembly: feed to each main and rod bearing, film temperature and strength (1 = hot oil at
+    // full supply), and each piston squirter.
+    rotating: (sim.running && sim.internals.lube) || rotatingOil(0, 0, th.oilC, g),
     coolantCircuit: c.coolant, oilCircuit: c.oil,
   };
 }

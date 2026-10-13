@@ -199,6 +199,36 @@ export function oilPressureKpa(rpm, oilC, g = COOLING) {
   return clamp(hot * viscRatio(oilC, g) ** 0.5, 0, g.oilReliefKpa);
 }
 
+// Rotating assembly lubrication, the K20 way: the main gallery feeds the five main bearings; oil holes
+// cross-drilled through the crank carry it from the mains to the four rod journals; four squirters (one per
+// cylinder, check balls open at 200 kPa) spray the piston undersides; oil flung off the crank and rods
+// splashes the bores and wrist pins and drains back to the pan. Which main feeds which rod journal isn't
+// published; here rod journal n takes oil from main n (inferred).
+//
+// The rod journals need more supply pressure as rpm rises: centrifugal force in the crank's oil holes works
+// against the feed, and the bearings pass more oil. Below that, the rod bearings start to starve and their
+// film thins. Each bearing's oil film runs hotter than the sump with shear heating, which thins the oil there.
+// Supply need and shear heating are estimates.
+export function rotatingOil(rpm, oilKpa, oilC, g = COOLING, loadRatio = 0.5) {
+  rpm = Math.max(rpm, 0);
+  const lpm = rpm > 0 ? Math.min(60, 4 + g.pumpLpmPerKrpm * rpm / 1000 * 0.25) : 0;
+  const mainsLpm = lpm * 0.5, mainLpm = mainsLpm / 5, rodLpm = mainLpm * 0.6;
+  const rodNeedKpa = 50 + 0.03 * rpm;
+  const supply = rpm > 0 ? clamp(oilKpa / rodNeedKpa, 0, 1) ** 0.5 : 0;
+  const shear = (rpm / 8000) ** 1.5;
+  const mainFilmC = oilC + 8 + 15 * shear;
+  const rodFilmC = oilC + 10 + 30 * shear * (0.5 + loadRatio) + 40 * (1 - supply) * shear;
+  const film = (c, sup) => clamp(viscRatio(c, g) ** 0.3, 0.5, 1.6) * (0.4 + 0.6 * sup);
+  const jetLpm = oilKpa >= g.oilJetKpa ? lpm * 0.1 / 4 : 0;
+  return {
+    feedLpm: lpm, rodNeedKpa, supply,
+    mains: [1, 2, 3, 4, 5].map(n => ({ n, feedLpm: mainLpm, filmC: mainFilmC, film: film(mainFilmC, 1) })),
+    rods: [1, 2, 3, 4].map(n => ({ n, fromMain: n, feedLpm: rodLpm * supply, filmC: rodFilmC, film: film(rodFilmC, supply) })),
+    jets: [1, 2, 3, 4].map(n => ({ n, flowLpm: jetLpm, open: jetLpm > 0 })),
+    splashLpm: mainsLpm + jetLpm * 4,
+  };
+}
+
 // Circuits for renderers: each segment's name, the parts it joins, and what flows in it right now.
 export function circuits(th, oilKpa = 0, turbo = null) {
   const g = th.g, oilLpm = Math.min(60, 4 + Math.max(0, th.pumpLpm) * 0.25);
@@ -219,12 +249,15 @@ export function circuits(th, oilKpa = 0, turbo = null) {
     ['sump', 'oilPump', 'Pickup', oilLpm],
     ['oilPump', 'filter', 'Pump to filter', oilLpm],
     ['filter', 'mainGallery', 'Filter to main gallery', oilLpm],
-    ['mainGallery', 'mainBearings', 'Main bearings, then through the crank to the rod bearings', oilLpm * 0.5],
-    ['mainGallery', 'pistonJets', 'Piston oil jets (open above 200 kPa)', oilKpa >= g.oilJetKpa ? oilLpm * 0.1 : 0],
     ['mainGallery', 'head', 'Up to the head: cam journals, rocker shafts, VTEC spool and pins', oilLpm * 0.3],
     ['mainGallery', 'vtc', 'VTC actuator and chain tensioner', oilLpm * 0.1],
     ['head', 'sump', 'Drain back', oilLpm * 0.4],
   ].map(([from, to, name, lpm]) => ({ from, to, name, flowLpm: lpm, tempC: th.oilC }));
+  const rot = rotatingOil(th.pumpLpm / g.pumpLpmPerKrpm * 1000, oilKpa, th.oilC, g);
+  for (const m of rot.mains) oil.push({ from: 'mainGallery', to: `main${m.n}`, name: `Main bearing ${m.n} feed`, flowLpm: m.feedLpm, tempC: th.oilC });
+  for (const r of rot.rods) oil.push({ from: `main${r.fromMain}`, to: `rod${r.n}`, name: `Crank oil hole, main ${r.fromMain} to rod journal ${r.n}`, flowLpm: r.feedLpm, tempC: r.filmC });
+  for (const j of rot.jets) oil.push({ from: 'mainGallery', to: `jet${j.n}`, name: `Piston oil squirter ${j.n} (opens at 200 kPa)`, flowLpm: j.flowLpm, tempC: th.oilC });
+  oil.push({ from: 'mainBearings', to: 'sump', name: 'Splash off the crank, rods and piston undersides, back to the pan', flowLpm: rot.splashLpm, tempC: th.oilC });
   if (g.oilCooler !== 'none') {
     // Oil passes through the cooler on its way to the filter; the water cooler takes coolant from a port on
     // the water pump and returns it to the pump's inlet side.
@@ -272,9 +305,18 @@ export const COMPONENTS = {
   filter:      { circuit: 'oil', name: 'Oil filter', pos: [-0.05, 0.02, -0.16], size: [0.08, 0.09, 0.08] },
   oilCooler:   { circuit: 'oil', name: 'Water-to-oil cooler (15500-RBC-004), sandwiched under the filter', pos: [-0.05, 0.02, -0.12], size: [0.09, 0.04, 0.09] },
   mainGallery: { circuit: 'oil', name: 'Main oil gallery along the block', pos: [0, 0.03, -0.08], size: [0.40, 0.012, 0.012] },
-  mainBearings:{ circuit: 'oil', name: 'Main and rod bearings', pos: [0, 0, 0], size: [0.40, 0.06, 0.06] },
-  pistonJets:  { circuit: 'oil', name: 'Piston oil jets (15280-PRB-A00), one per cylinder', pos: [0, 0.06, -0.05], size: [0.36, 0.02, 0.02] },
+  mainBearings:{ circuit: 'oil', name: 'Crankshaft and its bearings (the splash zone)', pos: [0, 0, 0], size: [0.40, 0.12, 0.12] },
   head:        { circuit: 'oil', name: 'Cam journals, rocker shafts, VTEC spool valve and pressure switch', pos: [0, 0.32, 0], size: [0.42, 0.06, 0.18] },
   turbo:       { circuit: 'oil', name: 'Turbo centre section (oil feed and drain, water ports), on the exhaust side (turbo builds)', pos: [0.05, 0.22, -0.32], size: [0.20, 0.18, 0.20] },
   vtc:         { circuit: 'oil', name: 'VTC oil control valve (15830-RBB-003) and intake cam actuator', pos: [0.22, 0.32, 0.06], size: [0.05, 0.10, 0.10] },
 };
+
+// Bore spacing 98 mm: cylinder 1 at +x (timing end). Main journals sit between and outside the cylinders;
+// rod journals at each cylinder (shown on the crank axis; they swing with the crank at half the stroke).
+const PITCH = 0.098;
+for (let n = 1; n <= 5; n++) COMPONENTS[`main${n}`] = { circuit: 'oil', name: `Main bearing ${n}`, pos: [(3 - n) * PITCH, 0, 0], size: [0.02, 0.06, 0.06] };
+for (let n = 1; n <= 4; n++) {
+  const x = (2.5 - n) * PITCH;
+  COMPONENTS[`rod${n}`] = { circuit: 'oil', name: `Rod bearing ${n} (big end)`, pos: [x, 0, 0], size: [0.02, 0.05, 0.05] };
+  COMPONENTS[`jet${n}`] = { circuit: 'oil', name: `Piston oil squirter ${n} (15280-PRB-A00)`, pos: [x, 0.07, -0.045], size: [0.015, 0.03, 0.015] };
+}

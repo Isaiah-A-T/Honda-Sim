@@ -1,7 +1,7 @@
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
 import { createSim, step, coldEngine } from '../src/sim.js';
-import { createThermal, stepThermal, viscosityCst, oilPressureKpa, COOLING, circuits } from '../src/thermal.js';
+import { createThermal, stepThermal, viscosityCst, oilPressureKpa, COOLING, circuits, rotatingOil } from '../src/thermal.js';
 import { stepEngine } from '../src/engine.js';
 import { renderState } from '../src/simstate.js';
 
@@ -100,4 +100,17 @@ test('turbo oil feed and drain flow while running; a water-cooled turbo heat-soa
   const water = soak(true), oilOnly = soak(false);
   assert.ok(oilOnly > water + 40, `oil-only ${oilOnly} vs water-cooled ${water}`);
   assert.ok(!circuits(createThermal(25, true)).oil.some(s => s.to === 'turbo'));
+});
+
+test('rotating assembly: mains feed the rod journals through the crank; low oil pressure starves the rods', () => {
+  const ok = rotatingOil(7000, 500, 100), starved = rotatingOil(7000, 100, 100);
+  assert.equal(ok.mains.length, 5); assert.equal(ok.rods.length, 4); assert.equal(ok.jets.length, 4);
+  assert.equal(ok.supply, 1);
+  assert.ok(starved.supply < 0.7 && starved.rods[0].film < ok.rods[0].film * 0.8);
+  assert.ok(starved.rods[0].filmC > ok.rods[0].filmC);
+  assert.ok(ok.jets.every(j => j.open) && starved.jets.every(j => !j.open));
+  const hot = rotatingOil(7000, 500, 140);
+  assert.ok(hot.rods[0].film < ok.rods[0].film);
+  const c = circuits(createThermal(25, true), 500);
+  for (const k of ['main1', 'main5', 'rod1', 'rod4', 'jet1']) assert.ok(c.oil.some(s => s.to === k), k);
 });
