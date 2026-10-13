@@ -11,6 +11,7 @@ pub struct FakeSim {
     pub k24: bool,
     /// Warm-up: coolant and oil start cold, the thermostat opens, the fans cycle.
     pub coolant: f32,
+    fan_on: bool,
     pub oil: f32,
     pub knock_until: f32,
     rpm: f32,
@@ -28,7 +29,7 @@ pub struct ManualInput {
 
 impl FakeSim {
     pub fn new() -> Self {
-        FakeSim { t: 0.0, turbo: true, intercooler: true, k24: false, coolant: 30.0, oil: 30.0, knock_until: 0.0, rpm: 800.0, boost: 0.0, vtc: 0.0, iat: 25.0, knock_retard: 0.0 }
+        FakeSim { t: 0.0, turbo: true, intercooler: true, k24: false, coolant: 30.0, fan_on: false, oil: 30.0, knock_until: 0.0, rpm: 800.0, boost: 0.0, vtc: 0.0, iat: 25.0, knock_retard: 0.0 }
     }
 
     pub fn step(&mut self, dt: f32, input: Option<&ManualInput>, strength: &dyn Fn(&str) -> f32) -> SimState {
@@ -74,7 +75,9 @@ impl FakeSim {
         // Cooling, sped up so the demo warms up in about a minute: heat in with load, out through the radiator
         // once the thermostat opens (it starts at 78 °C, full at 90), fans on above 96 °C.
         let thermostat = ((self.coolant - 78.0) / 12.0).clamp(0.0, 1.0);
-        let fan = if self.coolant > 96.0 { 1.0 } else { 0.0 };
+        // Fans as in the sim: on at 93 °C, off again at 88 °C.
+        if self.coolant > 93.0 { self.fan_on = true } else if self.coolant < 88.0 { self.fan_on = false }
+        let fan = if self.fan_on { 1.0 } else { 0.0 };
         let heat_in = 1.2 + 2.5 * torque / 230.0 * rpm / 7000.0;
         let heat_out = thermostat * (self.coolant - 25.0) * (0.06 + 0.04 * fan);
         self.coolant = (self.coolant + (heat_in - heat_out) * dt).clamp(20.0, 118.0);
