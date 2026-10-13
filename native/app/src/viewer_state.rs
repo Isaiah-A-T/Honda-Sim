@@ -47,7 +47,7 @@ pub fn viewer_state(sim: &Sim) -> SimState {
     put("flywheel", spin * 0.5);
 
     let mut pm = HashMap::new();
-    for (key, part) in [("pistons", "piston"), ("rods", "rod"), ("crank", "crank"), ("valves", "valvetrain"), ("cams", "valvetrain")] {
+    for (key, part) in [("pistons", "piston"), ("rods", "rod"), ("crank", "crank"), ("valves", "valvetrain"), ("cams", "valvetrain"), ("block", "block")] {
         let p = &PARTS[part_index(part)];
         let m = part_material(t, &e.bottom, p);
         pm.insert(key.to_string(), PartMaterial {
@@ -66,6 +66,10 @@ pub fn viewer_state(sim: &Sim) -> SimState {
         ("Piston crown".to_string(), format!("{:.0} °C", s.piston_c)),
         ("EGT".to_string(), format!("{:.0} °C", e.egt_c)),
     ];
+    readouts.push(("Oil pressure".to_string(), format!("{:.0} kPa", e.oil_kpa)));
+    if turbo_on && !t.turbo.fixed {
+        readouts.push(("Turbo shaft".to_string(), format!("{:.0}k rpm", e.turbo_rad_s * 30.0 / std::f64::consts::PI / 1000.0)));
+    }
     if let Some(f) = s.failed {
         readouts.push(("FAILED".to_string(), f.to_string()));
     }
@@ -82,8 +86,9 @@ pub fn viewer_state(sim: &Sim) -> SimState {
         knock: e.knocking,
         fuel_cut: e.rev_cut || e.dfco || e.boost_cut,
         lambda: if e.lambda > 5.0 { 1.0 } else { e.lambda as f32 },
-        turbo: turbo_on,
-        intercooler: turbo_on && t.turbo.intercooler,
+        // A supercharger has no turbo to draw; the viewer shows it as N/A for now.
+        turbo: turbo_on && !t.turbo.fixed,
+        intercooler: turbo_on && !t.turbo.fixed && t.turbo.intercooler,
         iat_c: e.iat as f32,
         cams: Some(CamSpecs { intake_low: spec(card.intake_low), intake_high: spec(card.intake_high), exhaust_low: spec(card.exhaust_low), exhaust_high: spec(card.exhaust_high) }),
         vtec_pin: Some(StressValue::PerCylinder(e.vtec_pins.iter().map(|p| *p as f32).collect())),
