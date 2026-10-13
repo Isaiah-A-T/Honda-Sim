@@ -48,21 +48,25 @@ export const TORQUE_TARGETS = {
 // wall heat). Edit TORQUE_TARGETS or the geometry in gasflow.js and rerun the tool, not these.
 export const VE_RPM = TORQUE_TARGETS.low.map(([r]) => r);
 export const VE_HIGH_RPM = TORQUE_TARGETS.high.map(([r]) => r);
-export const VE_CORR_LOW = [0.6826, 0.7286, 0.7796, 0.8165, 0.8581, 0.896, 0.8922, 0.877, 0.8708, 0.8562, 0.8152, 0.7613, 0.8078];
-export const VE_CORR_HIGH = [0.4266, 0.6116, 0.7452, 0.8249, 0.8538, 0.9311, 1.0284, 1.0093, 1.0296, 0.9981, 0.9605, 0.9346, 0.9484];
+export const VE_CORR_LOW = [0.7341, 0.7517, 0.79, 0.8202, 0.8548, 0.8865, 0.8779, 0.8585, 0.8513, 0.8326, 0.8293, 0.7882, 0.8374];
+export const VE_CORR_HIGH = [0.4828, 0.6297, 0.7594, 0.8318, 0.8564, 0.9369, 1.0294, 1.0149, 1.0621, 1.0406, 1.0059, 0.9784, 0.9937];
 
 export function veCorrection(rpm, highCam) {
   return highCam ? lookup1(VE_HIGH_RPM, VE_CORR_HIGH, rpm) : lookup1(VE_RPM, VE_CORR_LOW, rpm);
 }
+
+// The engine itself finds best timing and knock in the gas exchange model (combustion phasing and an
+// end-gas autoignition model). These two are quick fits to what that model does, used to build the
+// placeholder tune and as the reference shown on the dash.
 
 // Spark advance for best torque (degrees BTDC).
 export function mbt(rpm, mapKpa) {
   return clamp(17 + 3.0 * Math.min(rpm, 6500) / 1000 + (100 - mapKpa) * 0.13, 8, 45);
 }
 
-// Highest advance before knock on 91 octane (degrees BTDC). Higher octane adds margin.
+// Highest advance before knock (degrees BTDC). Higher octane adds margin; hot intake air takes it away.
 export function knockLimit(rpm, mapKpa, iatC = 25, octane = 91) {
-  return 21 + 2.4 * rpm / 1000 - (mapKpa - 60) * 0.15 - Math.max(0, iatC - 30) * 0.12 + (octane - 91) * 1.2;
+  return 4 + 5.5 * rpm / 1000 - (mapKpa - 100) * 0.25 - Math.max(0, iatC - 30) * 0.12 + (octane - 91) * 1.2;
 }
 
 // Mechanical friction torque (Nm): rings, bearings, valvetrain, oil and water pumps. Pumping losses
@@ -109,6 +113,14 @@ export const TURBO_GT35 = {
   name: 'GT35-class turbo (estimated)',
   turbineAreaCm2: 9.5, wastegateAreaCm2: 9.0, compressorTipMm: 41, inertiaKgM2: 3.0e-5,
   turbineEff: 0.68, compressorEff: 0.72, maxBoostKpa: 160, springKpa: 48,
+};
+
+// Precision 6262 Gen2 (62 mm compressor inducer, 62 mm turbine) on a 0.82 A/R housing, as on the PRL kit.
+// Areas, efficiencies and inertia are estimates in the same way as the GT35.
+export const TURBO_6262 = {
+  name: 'Precision 6262 (estimated)',
+  turbineAreaCm2: 10.5, wastegateAreaCm2: 9.0, compressorTipMm: 44, inertiaKgM2: 3.5e-5,
+  turbineEff: 0.70, compressorEff: 0.75, maxBoostKpa: 200, springKpa: 48,
 };
 
 // Turbo build on stock internals: GT35-class turbo, 1000 cc injectors, 4-bar MAP, overboost cut and a torque

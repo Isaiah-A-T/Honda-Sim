@@ -45,8 +45,17 @@ export const FLOW = {
   // diameter, sized for about 20 kPa of back pressure at the 7,800 rpm power peak.
   exhaustDiaM: 0.052,
   chargeHeatK: 30,        // how much the intake air warms up in the hot ports at 3,000 rpm (less at higher rpm)
-  burnDeg: 55,            // spark to end of burn
-  heatLoss: 0.25,         // share of the fuel's heat that goes into the walls during combustion
+  // Combustion. burnDeg is spark to end of burn for a clean, stoichiometric charge at 4,000 rpm; it gets
+  // longer with leftover exhaust in the cylinder (part throttle, big overlap), lean or very rich
+  // mixtures, and a little with rpm. Typical spark-ignition values (Heywood, Internal Combustion Engine
+  // Fundamentals, ch. 9); the K20's own burn rate isn't published.
+  burnDeg: 62,
+  heatLoss: 0.30,         // share of the fuel's heat lost to the walls, crevices and incomplete burning
+  // Knock: the end gas (unburned mixture ahead of the flame) autoignites when the Livengood–Wu
+  // integral of 1/τ reaches 1 before the flame has burned it. τ is the Douaud–Eyzat (1978)
+  // autoignition delay for a fuel of a given octane: τ = 17.68 ms × (ON/100)^3.402 × p^-1.7 × e^(3800/T).
+  // knockScale shifts it to land the stock engine near where K20s are known to be knock limited.
+  knockScale: 2,
 };
 
 const R = 287, GAMMA = 1.35, CV = R / (GAMMA - 1), CP = CV + R;   // in-cylinder gas
@@ -142,7 +151,9 @@ export function runCycle(s, c, stepDeg = 1) {
   let mFresh = s.m * (1 - s.xb), mTot = s.m;   // fresh and total mass in the cylinder
   let pumpW = 0, grossW = 0, pmax = 0, pmaxDeg = 0, qTotal = 0, xbPrev = 0, trappedFresh = 0, trappedTot = 0;
   let inFresh = 0, exOutMass = 0, exOutEnergy = 0, colOut = 0, colP = 0, colPT = 0, n = 0;
-  const thetaS = -(c.ignDeg ?? 20), burn = G.burnDeg;
+  const thetaS = -(c.ignDeg ?? 20), octane = c.octane ?? 91;
+  let refTaken = false, pRef = 0, tRef = 0, residual = 0, burnDur = G.burnDeg, ca50 = null;
+  let knockI = 0, knockAt = null, knockUnburned = 0;
   let mEx = s.pEx * vEx / (R * s.TEx), mCol = s.pCol * vCol / (R * s.TCol);
   let mInPort = s.pIn * vIn / (R * T0);
 
@@ -185,23 +196,42 @@ export function runCycle(s, c, stepDeg = 1) {
     if (fIv > 0) inFresh += fIv * (1 - s.xbIn);
     else inFresh += fIv * freshFrac;
 
-    // Combustion (Wiebe), only with fuel.
-    if (c.fire && th >= thetaS && th < thetaS + burn + stepDeg) {
+    // Trapped charge, and the reference point the end gas is compressed from.
+    if (!refTaken && (th >= -60 || (c.fire && th >= thetaS))) {
+      refTaken = true; trappedFresh = mFresh; trappedTot = mTot;
+      pRef = p; tRef = s.T - (c.fire ? 30 * clamp((1 - (c.lambda ?? 1)) / 0.2, 0, 1) : 0);   // rich mixtures cool the charge as the fuel evaporates
+      residual = 1 - mFresh / Math.max(mTot, 1e-9);
+    }
+
+    // Combustion: a Wiebe heat-release curve that starts at the spark, only with fuel.
+    if (c.fire && th >= thetaS && xbPrev < 0.9999) {
       if (qTotal === 0) {
-        const air = mFresh, fuel = air / (STOICH * Math.max(c.lambda ?? 1, 0.5));
-        qTotal = Math.min(fuel, air / STOICH) * LHV * (1 - G.heatLoss) * (c.lambda > 1.4 ? 0.6 : 1);
-        trappedFresh = mFresh; trappedTot = mTot;
+        const lam = Math.max(c.lambda ?? 1, 0.5);
+        burnDur = G.burnDeg * (1 + 2.5 * Math.max(0, residual - 0.04)) * (1 + 1.5 * Math.max(0, lam - 1) + 0.8 * Math.max(0, 0.8 - lam)) * (rpm / 4000) ** 0.25;
+        // Heat released: the fuel that can burn (rich mixtures are short of air). Mixtures a little rich of
+        // stoichiometric make the most power (charge cooling, more gas moles, less dissociation).
+        const richGain = lam < 1 ? clamp(1 + 0.045 * (1 - ((lam - 0.87) / 0.13) ** 2), 0.85, 1.045) : 1;
+        const misfire = lam > 1.35 ? clamp(1 - (lam - 1.35) * 4, 0, 1) : 1;
+        qTotal = Math.min(trappedFresh / (STOICH * lam), trappedFresh / STOICH) * LHV * (1 - G.heatLoss) * richGain * misfire;
       }
-      const x = clamp((th + stepDeg - thetaS) / burn, 0, 1), xb = 1 - Math.exp(-5 * x ** 3);
+      const x = clamp((th + stepDeg - thetaS) / burnDur, 0, 1), xb = 1 - Math.exp(-6.9 * x ** 3);
       dU += qTotal * (xb - xbPrev);
       mFresh -= trappedFresh * (xb - xbPrev) * Math.min(1, 1 / Math.max(c.lambda ?? 1, 1));
       xbPrev = xb;
-    } else if (!c.fire && th >= -60 && trappedTot === 0) { trappedFresh = mFresh; trappedTot = mTot; }
+      if (xb > 0.1 && xb < 0.9) ca50 = ca50 ?? (xb >= 0.5 ? th + stepDeg : null);
+    }
+    // Knock integral over the end gas until 90% of the charge has burned.
+    if (c.fire && refTaken && xbPrev < 0.9 && p > pRef) {
+      const tU = tRef * (p / pRef) ** ((GAMMA - 1) / GAMMA);
+      const tau = G.knockScale * 17.68e-3 * (octane / 100) ** 3.402 * (p / 101325) ** -1.7 * Math.exp(3800 / tU);
+      knockI += dt / tau;
+      if (knockI >= 1 && knockAt === null) { knockAt = th; knockUnburned = 1 - xbPrev; }
+    }
 
     const U = CV * mTot * s.T + dU;
     mTot = Math.max(1e-7, mTot + fIv - fEv);
     mFresh = clamp(mFresh, 0, mTot);
-    s.T = clamp(U / (CV * mTot), 250, 3200);
+    s.T = clamp(U / (CV * mTot), 250, 4500);
     const p2 = mTot * R * s.T / V2;
     if (th >= -180 && th < 180) grossW += 0.5 * (p + p2) * dV; else pumpW += 0.5 * (p + p2) * dV;
     if (p2 > pmax) { pmax = p2; pmaxDeg = th + stepDeg; }
@@ -227,7 +257,10 @@ export function runCycle(s, c, stepDeg = 1) {
   s.out = {
     ve: trappedFresh / (rho0 * s.vd),                // fresh air trapped ÷ what the swept volume holds at MAP/IAT
     veDelivered: inFresh / (rho0 * s.vd),            // fresh air through the intake valve, including any that blows through
-    residual: trappedTot > 0 ? 1 - trappedFresh / trappedTot : 0,
+    residual,
+    burnDeg: burnDur, ca50Deg: ca50 ?? NaN,          // combustion phasing: crank angle where half the charge has burned
+    knockIndex: knockI,                               // ≥ 1: the end gas autoignites before the flame reaches it
+    knockAtDeg: knockAt ?? NaN, knockUnburned,        // when, and how much charge was left to detonate
     imepKpa: grossW / s.vd / 1000,
     pmepKpa: -pumpW / s.vd / 1000,                    // positive = work spent pumping
     pmaxBar: pmax / 1e5, pmaxDeg,

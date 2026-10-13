@@ -12,8 +12,6 @@ import { ENGINE, veCorrection, mbt, knockLimit, frictionNm } from './k20z3.js';
 import { FLOW, createGasflow, runCycle, settle, vtcFor } from './gasflow.js';
 
 const AIR_DENSITY_G_PER_L = 1.184;   // 25 °C, sea level
-const FUEL_LHV_J_PER_G = 44000;
-const INDICATED_EFF = 0.40;
 const STOICH = 14.7;
 const DECEL_AIR = 4.5;                 // % opening the idle valve holds on decel so the manifold doesn't go to near-vacuum
 const FUEL_DENSITY_G_PER_CC = 0.745;
@@ -31,7 +29,7 @@ function gasConditions(e) {
   const t = e.tune, cut = e.revCut || e.dfco || e.boostCut;
   e.vtc = vtcFor(t, e.rpm, e.map, e.highCam);
   return { rpm: Math.max(e.rpm, 300), mapKpa: e.map, iatC: e.iat, highCam: e.highCam, vtc: e.vtc, ignDeg: e.ign,
-    lambda: Math.min(e.lambda, 3), fire: !cut && e.rpm > 200, ...exhaustOutlet(e) };
+    lambda: Math.min(e.lambda, 3), fire: !cut && e.rpm > 200, octane: t.octane ?? 91, ...exhaustOutlet(e) };
 }
 function updateGas(e, dt, force = false) {
   if (!e.gas || e.gasFlowRef !== e.tune.flow) { e.gas = createGasflow(flowGeom(e.tune)); e.gasFlowRef = e.tune.flow; force = true; }
@@ -139,7 +137,7 @@ export function stepEngine(e, pedal, dt) {
   const airPerCycle = ve * density;
   e.airGs = airPerCycle * rpm / 120;
   e.airDeliveredGs = Math.max(g.veDelivered * corr, ve) * density * rpm / 120;
-  e.pmepKpa = g.pmepKpa; e.exhKpa = g.exhKpa; e.egtC = g.egtC; e.residual = g.residual; e.cylPmaxBar = g.pmaxBar;
+  e.pmepKpa = g.pmepKpa; e.exhKpa = g.exhKpa; e.egtC = g.egtC; e.residual = g.residual;
 
   // Fuel the ECU commands from the tune.
   const fuelTable = (e.highCam && t.fuelHigh) || t.fuelLow;
@@ -165,38 +163,37 @@ export function stepEngine(e, pedal, dt) {
   e.lambda = fuel > 0 ? airPerCycle / (fuel * STOICH) : 9.99;
   e.afr = e.lambda * STOICH;
 
-  // Ignition from the tune, minus knock retard; compare to what the engine wants.
+  // Ignition from the tune, minus knock retard. Timing works through the gas exchange model: it sets
+  // when the burn starts, so it decides combustion phasing, peak pressure, exhaust temperature, torque
+  // and whether the end gas autoignites (knock).
   e.ignTable = lookup2((e.highCam && t.ignHigh) || t.ignLow, rpm, e.map);
   e.ign = e.ignTable - e.knockRetard;
-  const best = mbt(rpm, e.map);
-  e.knockLimit = knockLimit(rpm, e.map, e.iat, t.octane ?? 91) + (e.lambda < 0.9 ? (0.9 - e.lambda) * 10 : 0);
-  const over = e.ign - e.knockLimit;
-  e.knocking = !e.revCut && !e.dfco && !e.boostCut && over > 0 && e.map > 50;
+  e.mbt = mbt(rpm, e.map);
+  const fired = !e.revCut && !e.dfco && !e.boostCut;
+  e.knockIndex = fired ? g.knockIndex : 0;
+  // How far past the knock limit this is: the knock integral grows about 5.5% per degree of advance.
+  e.knockLimit = clamp(e.ign - Math.log(Math.max(e.knockIndex, 1e-3)) / 0.055, e.ign - 15, e.ign + 15);
+  e.knocking = fired && e.knockIndex >= 1 && e.map > 50;
   if (e.knocking) {
-    e.knockAcc += dt * (1 + over);
+    e.knockAcc += dt * (1 + e.ign - e.knockLimit);
     if (e.knockAcc > 0.1) { e.knockAcc = 0; e.knockCount++; e.knockRetard = Math.min(e.knockRetard + 1, 8); }
   } else e.knockRetard = Math.max(0, e.knockRetard - dt * 0.5);
 
-  // Torque: energy from the fuel that burns, scaled by spark and mixture efficiency, minus losses.
-  const burned = Math.min(fuel, airPerCycle / STOICH);
-  const sparkEff = clamp(1 - ((e.ign - best) / 28) ** 2, 0.2, 1);
-  const richBonus = e.lambda < 1 ? clamp(1 + 0.045 * (1 - ((e.lambda - 0.87) / 0.13) ** 2), 0.85, 1.045) : 1;
-  const leanMisfire = e.lambda > 1.35 ? clamp(1 - (e.lambda - 1.35) * 4, 0, 1) : 1;
-  const loadEff = 0.75 + 0.25 * Math.min(e.map, 100) / 100;          // part load burns less efficiently
-  const indicated = burned * FUEL_LHV_J_PER_G * INDICATED_EFF * loadEff * sparkEff * richBonus * leanMisfire / (4 * Math.PI);
-  // Losses: mechanical friction, and the work spent pumping air in and exhaust out (gas exchange model).
+  // Torque: indicated work from the cylinder pressure trace, less pumping work and mechanical friction.
+  e.ca50 = g.ca50Deg; e.burnDeg = g.burnDeg;
+  e.cylPmaxBar = g.pmaxBar * corr;
+  const indicated = fired ? g.imepKpa * corr * ENGINE.displacementL / (4 * Math.PI) : g.imepKpa * ENGINE.displacementL / (4 * Math.PI);
   e.pumpingNm = e.pmepKpa * ENGINE.displacementL / (4 * Math.PI);
   e.torqueNm = indicated - frictionNm(rpm) - e.pumpingNm;
+  e.sparkEff = clamp(1 - ((e.ign - e.mbt) / 28) ** 2, 0.2, 1);   // display only
   e.overTorque = e.torqueNm > (t.torqueLimitNm ?? Infinity);
-  e.sparkEff = sparkEff;
-  e.mbt = best;
   return e.torqueNm;
 }
 
 // Throttle body: 62 mm bore by default (estimate; tune.flow.throttleDiaM changes it), plate closed at 7°, discharge coefficient 0.75, plus a small
 // leak past the closed plate. Flow through it is compressible orifice flow, choked below ~53% of the
 // upstream pressure. The engine pumps VE × displacement × rpm/120 of manifold air.
-const THROTTLE_D_M = 0.062, PLATE_CLOSED_DEG = 7, THROTTLE_CD = 0.75, LEAK_M2 = 8e-6, R_AIR = 287, GAMMA = 1.4;
+const THROTTLE_D_M = 0.062, PLATE_CLOSED_DEG = 7, THROTTLE_CD = 0.75, LEAK_M2 = 5e-6, R_AIR = 287, GAMMA = 1.4;
 export function throttleAreaM2(tps, diaM = THROTTLE_D_M) {
   const full = Math.PI / 4 * diaM ** 2;
   const a = (PLATE_CLOSED_DEG + clamp(tps, 0, 100) / 100 * (90 - PLATE_CLOSED_DEG)) * Math.PI / 180;
