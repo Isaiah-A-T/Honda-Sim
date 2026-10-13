@@ -10,6 +10,7 @@ Views, picked from the tabs along the top:
 - **Internals**: pistons, rods, crank and the valvetrain with cam lobes, VTEC switching to the high lobe and VTC phasing.
 - **Block**: the castings on their own with the main dimensions.
 - **Airflow**: intake and exhaust flow, through the turbo on a turbo build, gated by valve lift.
+- **Cooling & oil**: the water pump, block water jacket, head passages, thermostat, bypass, upper and lower hoses, radiator, two fans, heater core, and the oil pump, filter, main gallery, main bearings, crank drillings to the rod bearings, piston oil squirters, head galleries and drain-back, plus the turbo's oil and coolant lines, with flow coloured by coolant and oil temperature.
 - **Stress**: each part tinted green, yellow, orange, red as it nears or passes its limit.
 - **Materials**: each part colored by alloy family; hover for the exact material.
 
@@ -25,7 +26,7 @@ Either can start first; the sim retries every 2 seconds. The viewer only listens
 reachable from other machines.
 
 Command-line options: `--mode stress` (or internals, block, airflow, materials) and `--view intake` (or exhaust,
-front, side, top, valvetrain) pick the starting view; `--build na`, `turbo` or `ic` sets the demo's build;
+front, side, top, valvetrain) pick the starting view; `--build na`, `turbo` or `ic` sets the demo's build; `--block k24` starts the demo on a K24A block;
 `--check-clearance` prints any pipe that passes through another part in any build and exits (non-zero if any).
 
 ## Layout
@@ -94,9 +95,18 @@ for 1.5 seconds the viewer falls back to its demo.
 | `lambda` | number | Air-fuel ratio as lambda |
 | `turbo` | bool | Turbo build (shows the turbo and its plumbing); false draws the N/A intake with a cone filter |
 | `intercooler` | bool | Turbo build has a front-mount intercooler (default true); false runs the charge pipe straight to the throttle body |
+| `turboWaterCooled` | bool | Turbo centre section is water-cooled (default true): draws its coolant lines as well as the oil feed and drain |
 | `iatC` | number | Intake air temperature at the throttle body, °C |
 | `cams` | object | Cam card: `intakeLow`, `intakeHigh`, `exhaustLow`, `exhaustHigh`, each `{ liftMm, durationDeg, centerlineDeg }` (valve lift; duration at 1 mm lift; centreline ATDC for intake, BTDC for exhaust, at 0° VTC). The lobes are redrawn to match. Without it the viewer uses stand-in figures |
 | `vtecPin` | 0–1, or an array of 4 | VTEC lock pin travel (all cylinders, or per cylinder), if the sim models it. Without it the viewer moves each cylinder's pins itself when `vtec` changes, only while that cylinder's followers are on the base circle |
+| `coolantC` | number | Coolant temperature leaving the head, °C (default 88) |
+| `coolantOutC` | number | Coolant back from the radiator, °C. Without it the viewer estimates it from `coolantC`, thermostat and fan |
+| `oilC` | number | Oil temperature, °C (default 95) |
+| `oilKpa` | number | Oil pressure, kPa. Without it the viewer estimates it from rpm and oil temperature |
+| `thermostat` | 0–1 | Thermostat opening; 0 sends all coolant round the bypass, 1 all through the radiator (default 1) |
+| `fan` | 0–1 | Radiator fan speed (default 0) |
+| `block` | string | Block fitted: `K20Z3` (default, 86 × 86 mm, 139 mm rods, 212 mm deck) or `K24A` (87 × 99 mm, 152 mm rods, 231.5 mm deck). The viewer rebuilds the engine when it changes |
+| `boreMm`, `strokeMm`, `rodMm`, `deckMm` | number | Bottom-end dimensions when the parts differ from the block's stock ones. Without `deckMm` the deck follows a changed stroke or rod (30 mm compression height) |
 | `stress` | object | Part key to load (1 = at the limit), or an array of 4 for per-cylinder parts |
 | `partMaterials` | object | Part key to `{ part, label, family, detail }`. When present the Materials view is read-only |
 | `readouts` | array | Extra `[label, value]` rows for the side panel |

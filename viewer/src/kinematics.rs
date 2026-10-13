@@ -4,11 +4,40 @@
 
 use serde::{Deserialize, Serialize};
 
-pub const BORE: f32 = 86.0;
-pub const STROKE: f32 = 86.0;
-pub const ROD_LENGTH: f32 = 139.0;
 pub const BORE_SPACING: f32 = 96.0;
-pub const DECK_HEIGHT: f32 = 212.0;
+
+/// Bottom-end dimensions, mm. The sim can swap parts (a K24 block, a stroker crank, longer rods); the viewer
+/// rebuilds the engine to match. Piston compression height stays 30 mm, so deck = stroke / 2 + rod + 30.
+#[derive(Clone, Copy, PartialEq, Debug)]
+pub struct Geometry {
+    pub bore: f32,
+    pub stroke: f32,
+    pub rod: f32,
+    pub deck: f32,
+}
+
+impl Geometry {
+    pub const K20Z3: Geometry = Geometry { bore: 86.0, stroke: 86.0, rod: 139.0, deck: 212.0 };
+    pub const K24A: Geometry = Geometry { bore: 87.0, stroke: 99.0, rod: 152.0, deck: 231.5 };
+}
+
+thread_local! {
+    static GEOMETRY: std::cell::Cell<Geometry> = const { std::cell::Cell::new(Geometry::K20Z3) };
+}
+
+/// The geometry the engine is built and moved with (per thread; the viewer runs on one).
+pub fn geometry() -> Geometry {
+    GEOMETRY.with(|g| g.get())
+}
+
+pub fn set_geometry(g: Geometry) {
+    GEOMETRY.with(|c| c.set(g));
+}
+
+pub fn bore() -> f32 { geometry().bore }
+pub fn stroke() -> f32 { geometry().stroke }
+pub fn rod_length() -> f32 { geometry().rod }
+pub fn deck_height() -> f32 { geometry().deck }
 pub const VTC_MAX_DEG: f32 = 50.0;
 pub const FIRING_ORDER: [usize; 4] = [1, 3, 4, 2];
 
@@ -102,15 +131,15 @@ pub fn throw_angle(cyl: usize) -> f32 {
 
 /// Crank centre to wrist pin, for a crank rotation `theta` from TDC.
 pub fn piston_pin_height(theta_deg: f32) -> f32 {
-    let r = STROKE / 2.0;
+    let r = stroke() / 2.0;
     let t = theta_deg.to_radians();
-    r * t.cos() + (ROD_LENGTH * ROD_LENGTH - (r * t.sin()).powi(2)).sqrt()
+    r * t.cos() + (rod_length() * rod_length() - (r * t.sin()).powi(2)).sqrt()
 }
 
 /// The rod's lean from vertical in radians (crank pin sideways offset over rod length).
 pub fn rod_angle(theta_deg: f32) -> f32 {
-    let r = STROKE / 2.0;
-    (r * theta_deg.to_radians().sin() / ROD_LENGTH).asin()
+    let r = stroke() / 2.0;
+    (r * theta_deg.to_radians().sin() / rod_length()).asin()
 }
 
 pub fn event_lift(cycle_deg: f32, ev: CamEvent) -> f32 {
@@ -174,7 +203,7 @@ mod tests {
 
     #[test]
     fn piston_travel_is_the_stroke() {
-        assert!((piston_pin_height(0.0) - piston_pin_height(180.0) - STROKE).abs() < 1e-3);
+        assert!((piston_pin_height(0.0) - piston_pin_height(180.0) - stroke()).abs() < 1e-3);
     }
 
     #[test]
@@ -189,7 +218,7 @@ mod tests {
     fn firing_cylinder_is_at_the_top() {
         for (cyl, crank) in [(1, 0.0), (3, 180.0), (4, 360.0), (2, 540.0)] {
             let h = piston_pin_height(crank + throw_angle(cyl));
-            assert!((h - (STROKE / 2.0 + ROD_LENGTH)).abs() < 1e-3, "cyl {cyl}");
+            assert!((h - (stroke() / 2.0 + rod_length())).abs() < 1e-3, "cyl {cyl}");
         }
     }
 

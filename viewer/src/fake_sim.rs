@@ -7,6 +7,12 @@ pub struct FakeSim {
     pub t: f32,
     pub turbo: bool,
     pub intercooler: bool,
+    /// Demo a K24A block (87 × 99 mm, 152 mm rods) instead of the K20Z3.
+    pub k24: bool,
+    /// Warm-up: coolant and oil start cold, the thermostat opens, the fans cycle.
+    pub coolant: f32,
+    fan_on: bool,
+    pub oil: f32,
     pub knock_until: f32,
     rpm: f32,
     boost: f32,
@@ -23,7 +29,7 @@ pub struct ManualInput {
 
 impl FakeSim {
     pub fn new() -> Self {
-        FakeSim { t: 0.0, turbo: true, intercooler: true, knock_until: 0.0, rpm: 800.0, boost: 0.0, vtc: 0.0, iat: 25.0, knock_retard: 0.0 }
+        FakeSim { t: 0.0, turbo: true, intercooler: true, k24: false, coolant: 30.0, fan_on: false, oil: 30.0, knock_until: 0.0, rpm: 800.0, boost: 0.0, vtc: 0.0, iat: 25.0, knock_retard: 0.0 }
     }
 
     pub fn step(&mut self, dt: f32, input: Option<&ManualInput>, strength: &dyn Fn(&str) -> f32) -> SimState {
@@ -66,6 +72,17 @@ impl FakeSim {
         let torque: f32 = if dfco || rev_cut { 0.0 } else { (235.0 * ve * map / 100.0 - 15.0).max(0.0) };
         let firing = !rev_cut && !dfco;
 
+        // Cooling, sped up so the demo warms up in about a minute: heat in with load, out through the radiator
+        // once the thermostat opens (it starts at 78 °C, full at 90), fans on above 96 °C.
+        let thermostat = ((self.coolant - 78.0) / 12.0).clamp(0.0, 1.0);
+        // Fans as in the sim: on at 93 °C, off again at 88 °C.
+        if self.coolant > 93.0 { self.fan_on = true } else if self.coolant < 88.0 { self.fan_on = false }
+        let fan = if self.fan_on { 1.0 } else { 0.0 };
+        let heat_in = 1.2 + 2.5 * torque / 230.0 * rpm / 7000.0;
+        let heat_out = thermostat * (self.coolant - 25.0) * (0.06 + 0.04 * fan);
+        self.coolant = (self.coolant + (heat_in - heat_out) * dt).clamp(20.0, 118.0);
+        self.oil += ((self.coolant + 8.0 + 10.0 * rpm / 8000.0) - self.oil) * (dt * 0.04).min(1.0);
+
         let spin = (rpm / 8600.0).powi(2);
         let knock_hit = if knocking { 0.35 } else { 0.0 };
         let rod_limit = 350.0;
@@ -102,7 +119,19 @@ impl FakeSim {
             lambda,
             turbo: self.turbo,
             intercooler: self.intercooler,
+            turbo_water_cooled: true,
+            block: Some(if self.k24 { "K24A" } else { "K20Z3" }.to_string()),
+            bore_mm: None,
+            stroke_mm: None,
+            rod_mm: None,
+            deck_mm: None,
             iat_c: self.iat,
+            coolant_c: self.coolant,
+            coolant_out_c: None,
+            oil_c: self.oil,
+            oil_kpa: None,
+            thermostat,
+            fan,
             cams: None,
             vtec_pin: None,
             stress: stress.into_iter().map(|(k, v)| (k.to_string(), StressValue::One(v))).collect(),

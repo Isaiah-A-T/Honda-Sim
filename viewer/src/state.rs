@@ -2,7 +2,7 @@
 //! Field names match the sim's src/viewer-link.js.
 
 use serde::{Deserialize, Serialize};
-use crate::kinematics::CamSpecs;
+use crate::kinematics::{CamSpecs, Geometry};
 use std::collections::HashMap;
 
 #[derive(Serialize, Deserialize, Clone, Debug)]
@@ -40,8 +40,22 @@ pub struct SimState {
     pub turbo: bool,
     /// Turbo build has an intercooler between the compressor and the throttle body (ignored when N/A).
     pub intercooler: bool,
+    /// Turbo centre section is water-cooled (coolant lines to the block), as well as oil-fed (ignored when N/A).
+    pub turbo_water_cooled: bool,
     /// Intake air temperature at the throttle body, °C.
     pub iat_c: f32,
+    /// Coolant temperature leaving the engine (water outlet), °C.
+    pub coolant_c: f32,
+    /// Coolant temperature leaving the radiator, °C. None = estimated from the thermostat and fan.
+    pub coolant_out_c: Option<f32>,
+    /// Oil temperature, °C.
+    pub oil_c: f32,
+    /// Oil pressure, kPa. None = estimated from rpm.
+    pub oil_kpa: Option<f32>,
+    /// Thermostat opening, 0 (shut, coolant goes round the bypass) to 1 (fully open, through the radiator).
+    pub thermostat: f32,
+    /// Radiator fan speed, 0 (off) to 1 (full).
+    pub fan: f32,
     /// The K20Z3 cam card. None = the viewer's stand-in figures.
     pub cams: Option<CamSpecs>,
     /// VTEC lock pin travel, 0 (low cam) to 1 (locked to the VTEC lobe), when the sim models it: one value for all
@@ -53,6 +67,13 @@ pub struct SimState {
     pub part_materials: Option<HashMap<String, PartMaterial>>,
     /// Extra readouts the sim wants shown, label → value text.
     pub readouts: Vec<(String, String)>,
+    /// Block fitted: "K20Z3" (default) or "K24A". Sets the bore, stroke, rod length and deck height below default to.
+    pub block: Option<String>,
+    /// Bottom-end dimensions, mm, when the sim's parts differ from the block's stock ones.
+    pub bore_mm: Option<f32>,
+    pub stroke_mm: Option<f32>,
+    pub rod_mm: Option<f32>,
+    pub deck_mm: Option<f32>,
 }
 
 impl Default for SimState {
@@ -72,17 +93,45 @@ impl Default for SimState {
             lambda: 1.0,
             turbo: false,
             intercooler: true,
+            turbo_water_cooled: true,
             iat_c: 25.0,
+            coolant_c: 88.0,
+            coolant_out_c: None,
+            oil_c: 95.0,
+            oil_kpa: None,
+            thermostat: 1.0,
+            fan: 0.0,
             cams: None,
             vtec_pin: None,
             stress: HashMap::new(),
             part_materials: None,
             readouts: Vec::new(),
+            block: None,
+            bore_mm: None,
+            stroke_mm: None,
+            rod_mm: None,
+            deck_mm: None,
         }
     }
 }
 
 impl SimState {
+    /// The engine's dimensions: the block's stock ones with any the sim sent on top. The deck follows a changed
+    /// stroke or rod (compression height kept) unless the sim sent it too.
+    pub fn geometry(&self) -> Geometry {
+        let base = match self.block.as_deref().map(|b| b.to_ascii_uppercase()) {
+            Some(b) if b.starts_with("K24") => Geometry::K24A,
+            _ => Geometry::K20Z3,
+        };
+        let ok = |v: Option<f32>, lo: f32, hi: f32| v.filter(|x| x.is_finite() && (lo..=hi).contains(x));
+        let bore = ok(self.bore_mm, 70.0, 95.0).unwrap_or(base.bore);
+        let stroke = ok(self.stroke_mm, 70.0, 110.0).unwrap_or(base.stroke);
+        let rod = ok(self.rod_mm, 120.0, 170.0).unwrap_or(base.rod);
+        let comp = base.deck - base.stroke / 2.0 - base.rod;
+        let deck = ok(self.deck_mm, 190.0, 250.0).unwrap_or(stroke / 2.0 + rod + comp);
+        Geometry { bore, stroke, rod, deck }
+    }
+
     /// Stress for a part (worst cylinder when `index` is None and the sim sent one value per cylinder).
     /// Pin travel for cylinder `cyl` (1–4), if the sim sent it.
     pub fn vtec_pin_of(&self, cyl: usize) -> Option<f32> {
@@ -123,8 +172,20 @@ mod tests {
         assert_eq!(s.stress_of("pistons", Some(2)), 0.7);
         assert_eq!(s.stress_of("pistons", None), 0.8);
         assert_eq!(s.vtec_pin_of(2), Some(0.5));
-        assert_eq!(s.part_materials.unwrap()["pistons"].family, "aluminum");
+        assert_eq!(s.part_materials.as_ref().unwrap()["pistons"].family, "aluminum");
         assert_eq!(s.readouts[0].1, "95 bar");
         assert_eq!(s.ign_deg, 15.0); // default kept
+        assert_eq!(s.geometry(), crate::kinematics::Geometry::K20Z3);
+    }
+
+    #[test]
+    fn geometry_follows_the_block_and_parts() {
+        let s: SimState = serde_json::from_str(r#"{"block":"K24A"}"#).unwrap();
+        assert_eq!(s.geometry(), crate::kinematics::Geometry::K24A);
+        // Longer rods on a K24: the deck follows (compression height kept) unless the sim sends it.
+        let s: SimState = serde_json::from_str(r#"{"block":"K24A","rodMm":160}"#).unwrap();
+        assert!((s.geometry().deck - (49.5 + 160.0 + 30.0)).abs() < 1e-3);
+        let s: SimState = serde_json::from_str(r#"{"boreMm":87,"strokeMm":99,"rodMm":152,"deckMm":231.5}"#).unwrap();
+        assert_eq!(s.geometry(), crate::kinematics::Geometry::K24A);
     }
 }

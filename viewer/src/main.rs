@@ -16,10 +16,12 @@ fn main() {
         Some("turbo") => (true, false),
         _ => (true, true),
     };
+    // `--block k24` starts the demo on a K24A block.
     // `--view intake` (or exhaust, front, side, top, valvetrain) sets the starting camera.
     let view = args.windows(2).find(|w| w[0] == "--view")
         .and_then(|w| ["exhaust", "intake", "front", "side", "top", "valvetrain"].iter().position(|v| *v == w[1]))
         .unwrap_or(0);
+    let demo_k24 = args.windows(2).any(|w| w[0] == "--block" && w[1].to_lowercase().starts_with("k24"));
     let check_clearance = args.iter().any(|a| a == "--check-clearance");
-    run(Options { link: Link::listen(), mode, check_clearance, demo_build, view, ..Default::default() });
+    run(Options { link: Link::listen(), mode, check_clearance, demo_build, demo_k24, view, ..Default::default() });
 }

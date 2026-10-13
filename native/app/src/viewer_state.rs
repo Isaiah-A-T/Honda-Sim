@@ -99,5 +99,8 @@ pub fn viewer_state(sim: &Sim) -> SimState {
         stress,
         part_materials: Some(pm),
         readouts,
+        coolant_c: e.ect as f32,
+        // Oil temperature, oil pressure, thermostat and fan aren't modelled yet; the viewer estimates or defaults them.
+        ..SimState::default()
     }
 }
