@@ -243,3 +243,38 @@ fn rotating_assembly_oil_matches() {
         }
     }
 }
+
+#[test]
+fn k_series_blocks_heads_and_pumps_match() {
+    for case in data()["engines"].as_array().unwrap() {
+        let eng: honda_sim_core::tune::EngineSel = serde_json::from_value(case["engine"].clone()).unwrap();
+        let parts: Parts = serde_json::from_value(case["parts"].clone()).unwrap();
+        let t = Tune { engine: eng, parts, vtec_rpm: 5500.0, ..placeholder_tune() };
+        let b = bottom_end(&t);
+        let tag = format!("{} {}", case["engine"], case["parts"]);
+        assert_eq!(b.head.id, case["head"].as_str().unwrap(), "{tag}");
+        assert_eq!(b.pump.id, case["pump"].as_str().unwrap(), "{tag}");
+        assert_eq!(b.head_fit.works, case["headWorks"].as_str().unwrap(), "{tag}");
+        assert_eq!(b.pump_fit.works, case["pumpWorks"].as_str().unwrap(), "{tag}");
+        assert_eq!(b.requires_sleeves, case["requiresSleeves"].as_bool().unwrap(), "{tag}");
+        assert_eq!(b.issues.len() as f64, f(case, "issues"), "{tag}: {:?}", b.issues);
+        for (k, v) in [("boreMm", b.bore_mm), ("strokeMm", b.stroke_mm), ("rodMm", b.rod_mm), ("compression", b.compression),
+                       ("displacementL", b.displacement_l), ("deckClearanceMm", b.deck_clearance_mm)] {
+            close(&format!("{k} {tag}"), v, f(case, k), 1e-9, 1e-9);
+        }
+        for run in case["runs"].as_array().unwrap() {
+            let rpm = f(run, "rpm");
+            let mut e = Engine::new(t.clone());
+            let mut s = 0.0;
+            while s < 1.0 {
+                e.rpm = rpm;
+                e.step(1.0, 0.001);
+                s += 0.001;
+            }
+            close(&format!("torque {tag} {rpm}"), e.torque_nm, f(run, "torqueNm"), 1e-6, 1e-6);
+            close(&format!("friction {tag} {rpm}"), e.friction_nm, f(run, "frictionNm"), 1e-6, 1e-6);
+            close(&format!("oil {tag} {rpm}"), e.oil_kpa, f(run, "oilKpa"), 1e-6, 1e-6);
+            close(&format!("vtec {tag} {rpm}"), e.cam_f, f(run, "camF"), 1e-6, 1e-6);
+        }
+    }
+}

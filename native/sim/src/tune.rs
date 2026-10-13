@@ -53,6 +53,18 @@ pub struct Parts {
     pub rod: Option<String>,
 }
 
+/// Fitted K-series block, head and oil pump by id (docs/engines.json). None = the K20Z3's own.
+#[derive(Serialize, Deserialize, Clone, Debug, Default, PartialEq)]
+#[serde(default, rename_all = "camelCase")]
+pub struct EngineSel {
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub block: Option<String>,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub head: Option<String>,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub oil_pump: Option<String>,
+}
+
 #[derive(Serialize, Deserialize, Clone, Debug, PartialEq)]
 #[serde(default, rename_all = "camelCase")]
 pub struct Tune {
@@ -82,6 +94,7 @@ pub struct Tune {
     /// Alloy picked per part (internals part key → material id).
     pub materials: BTreeMap<String, String>,
     pub parts: Parts,
+    pub engine: EngineSel,
     pub flow: FlowOverrides,
     /// Cooling and oil system changes (thermostat, fans, oil grade, oil cooler); None = stock.
     pub cooling: Option<Cooling>,
@@ -121,6 +134,7 @@ impl Tune {
             ambient_c: None,
             materials: BTreeMap::new(),
             parts: Parts::default(),
+            engine: EngineSel::default(),
             flow: FlowOverrides::default(),
             cooling: None,
         }

@@ -102,7 +102,7 @@ pub fn part_material(tune: &Tune, bottom: &BottomEnd, part: &Part) -> &'static M
 /// Geometry with the fitted crank, rods and pistons. Stock sleeves thin as the bore grows; a re-sleeved
 /// block (any non-stock sleeve material) has its full wall.
 pub fn engine_geometry(tune: &Tune, b: &BottomEnd) -> Geometry {
-    if b.stock {
+    if b.geom_stock {
         return GEOMETRY;
     }
     let resleeved = tune.materials.get("sleeve").map(|s| s != "sleeve").unwrap_or(false);
@@ -115,7 +115,7 @@ pub fn engine_geometry(tune: &Tune, b: &BottomEnd) -> Geometry {
         big_end_m: b.big_end_bearing_mm / 1000.0,
         piston_kg: b.piston_kg,
         rod_small_end_kg: b.rod_recip_kg,
-        sleeve_wall_m: if resleeved { GEOMETRY.sleeve_wall_m } else { (GEOMETRY.sleeve_wall_m - (b.bore_mm - 86.0) / 2000.0).max(0.0015) },
+        sleeve_wall_m: if resleeved { GEOMETRY.sleeve_wall_m } else { (GEOMETRY.sleeve_wall_m - (b.bore_mm - b.block.bore_mm) / 2000.0).max(0.0015) },
         ..GEOMETRY
     }
 }

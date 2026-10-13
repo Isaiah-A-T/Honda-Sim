@@ -106,10 +106,10 @@ pub fn viewer_state(sim: &Sim) -> SimState {
         oil_kpa: Some(if running { e.oil_kpa as f32 } else { 0.0 }),
         thermostat: e.thermal.thermostat as f32,
         fan: if e.thermal.fan_on { 1.0 } else { 0.0 },
-        block: Some(e.bottom.crank.block.unwrap_or("K20Z3").to_string()),
-        bore_mm: (!e.bottom.stock).then_some(e.bottom.bore_mm as f32),
-        stroke_mm: (!e.bottom.stock).then_some(e.bottom.stroke_mm as f32),
-        rod_mm: (!e.bottom.stock).then_some(e.bottom.rod_mm as f32),
-        deck_mm: (!e.bottom.stock).then_some(e.bottom.deck_mm as f32),
+        block: Some(e.bottom.block.id.clone()),
+        bore_mm: (!e.bottom.geom_stock).then_some(e.bottom.bore_mm as f32),
+        stroke_mm: (!e.bottom.geom_stock).then_some(e.bottom.stroke_mm as f32),
+        rod_mm: (!e.bottom.geom_stock).then_some(e.bottom.rod_mm as f32),
+        deck_mm: (!e.bottom.geom_stock).then_some(e.bottom.deck_mm as f32),
     }
 }

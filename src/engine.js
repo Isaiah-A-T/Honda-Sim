@@ -10,6 +10,7 @@
 import { clamp, lookup2, guessFuelUnits } from './tables.js';
 import { ENGINE, TURBO_GT35, veCorrection, mbt, frictionNm } from './k20z3.js';
 import { bottomEnd, flowGeometry } from './parts.js';
+import { balancerNm } from './engines.js';
 import { createThermal, oilPressureKpa, viscRatio, COOLING } from './thermal.js';
 import { FLOW, createGasflow, runCycle, settle, vtcFor, valveLiftM } from './gasflow.js';
 
@@ -41,9 +42,9 @@ const blend = (a, b, f) => Object.fromEntries(Object.keys(a).map(k => [k, Number
 // One gas state per cam lobe set. While VTEC is switching, some cylinders are on each, so both run and
 // their results are mixed by the share of cylinders locked to the VTEC lobe.
 function updateGas(e, dt, force = false) {
-  if (!e.gas || e.gasFlowRef !== e.tune.flow || e.gasPartsRef !== e.tune.parts) {
+  if (!e.gas || e.gasFlowRef !== e.tune.flow || e.gasPartsRef !== e.tune.parts || e.gasEngineRef !== e.tune.engine) {
     e.gas = createGasflow(flowGeom(e.tune)); e.gasHi = createGasflow(flowGeom(e.tune));
-    e.gasFlowRef = e.tune.flow; e.gasPartsRef = e.tune.parts; e.dispL = bottomEnd(e.tune).displacementL; force = true;
+    e.gasFlowRef = e.tune.flow; e.gasPartsRef = e.tune.parts; e.gasEngineRef = e.tune.engine; e.dispL = bottomEnd(e.tune).displacementL; force = true;
   }
   e.gasT += dt;
   if (!force && e.gasT < GAS_EVERY_S) return;
@@ -69,7 +70,7 @@ function stepVtec(e, dt) {
   const want = rpm >= t.vtecRpm && e.map >= t.vtecMinMap && e.ect >= (t.cooling?.ectVtecMinC ?? COOLING.ectVtecMinC);
   // Hysteresis: once on, stay on until rpm or load fall clearly below the switch point.
   e.vtecCmd = e.vtecCmd ? rpm >= t.vtecRpm - 150 && e.map >= t.vtecMinMap - 5 : want;
-  e.oilKpa = oilPressureKpa(rpm, e.oilC, { ...COOLING, ...(t.cooling || {}) });
+  e.oilKpa = oilPressureKpa(rpm, e.oilC, { ...COOLING, ...(t.cooling || {}) }, bottomEnd(t).pump);
   const pressurised = e.vtecCmd && e.oilKpa >= VTEC_OIL_KPA;
   for (let i = 0; i < 4; i++) {
     const theta = e.crankDeg - CYL_OFFSET[i];
@@ -251,7 +252,8 @@ export function stepEngine(e, pedal, dt) {
   const indicated = fired ? g.imepKpa * corr * e.dispL / (4 * Math.PI) : g.imepKpa * e.dispL / (4 * Math.PI);
   e.pumpingNm = e.pmepKpa * e.dispL / (4 * Math.PI);
   // Friction rises with oil viscosity (the hydrodynamic part; the fixed part is seals and mixed contact).
-  e.frictionNm = 5 + (frictionNm(rpm) - 5) * viscRatio(e.oilC, e.thermal.g) ** 0.35;
+  const pump = bottomEnd(e.tune).pump;
+  e.frictionNm = 5 + (frictionNm(rpm) - 5 - (pump.balanceShafts ? 0 : balancerNm(rpm))) * viscRatio(e.oilC, e.thermal.g) ** 0.35;
   e.torqueNm = indicated - e.frictionNm - e.pumpingNm;
   e.sparkEff = clamp(1 - ((e.ign - e.mbt) / 28) ** 2, 0.2, 1);   // display only
   e.overTorque = e.torqueNm > (t.torqueLimitNm ?? Infinity);

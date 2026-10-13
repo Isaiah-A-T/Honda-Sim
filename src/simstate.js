@@ -8,7 +8,7 @@
 // See docs/MODULES.md.
 
 import { PARTS, partMaterial, engineGeometry } from './internals.js';
-import { bottomEnd } from './parts.js';
+import { bottomEnd, flowGeometry } from './parts.js';
 import { FLOW, valveLiftM, camCard } from './gasflow.js';
 import { circuits, viscosityCst, boilingC, rotatingOil } from './thermal.js';
 import { turboLines } from './sim.js';
@@ -20,7 +20,7 @@ export const FIRING_OFFSET_DEG = [0, 540, 180, 360];
 export function renderState(sim) {
   const e = sim.eng, s = sim.internals, t = e.tune;
   const firing = sim.running && !e.revCut && !e.dfco && !e.boostCut;
-  const geom = { ...FLOW, ...(t.flow || {}) }, G = engineGeometry(t), b = bottomEnd(t);
+  const geom = { ...FLOW, ...flowGeometry(t), ...(t.flow || {}) }, G = engineGeometry(t), b = bottomEnd(t);
   return {
     running: sim.running,
     rpm: e.rpm,
@@ -64,7 +64,7 @@ export function renderState(sim) {
     geometry: { boreM: G.boreM, strokeM: G.strokeM, rodM: G.rodM, compression: G.compression, displacementL: b.displacementL,
       deckM: b.deckMm / 1000, deckClearanceM: b.deckClearanceMm / 1000, inValveM: geom.inValveM, exValveM: geom.exValveM },
     cooling: coolingState(sim),
-    bottomEnd: { stock: b.stock, crank: b.crank.name, pistons: b.pistonName, rods: b.rodName, block: b.crank.block ?? 'K20Z3', issues: b.issues },
+    bottomEnd: { stock: b.stock, crank: b.crank.name, pistons: b.pistonName, rods: b.rodName, block: b.block.id, head: b.head.id, oilPump: b.pump.id, issues: b.issues },
   };
 }
 

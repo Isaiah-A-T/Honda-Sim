@@ -5,6 +5,7 @@
 use crate::gasflow::{flow_defaults, valve_lift_m, vtc_for, Cond, Flow, Gas, GasOut};
 use crate::internals::{engine_geometry, Geometry};
 use crate::k20z3::{friction_nm, mbt, ve_correction, ENGINE};
+use crate::engines::{balancer_nm, head_lobes};
 use crate::parts::{bottom_end, BottomEnd};
 use crate::tables::{clamp, guess_fuel_units, lookup2};
 use crate::thermal::{oil_pressure_kpa, visc_ratio, Thermal};
@@ -25,11 +26,15 @@ pub const CYL_OFFSET: [f64; 4] = [0.0, 540.0, 180.0, 360.0];
 /// Gas model geometry: defaults, then what the fitted parts add up to, then the flow settings.
 pub fn flow_geom(t: &Tune, b: &BottomEnd) -> Flow {
     let mut g = flow_defaults();
-    if !b.stock {
+    if !b.geom_stock {
         g.bore_m = b.bore_mm / 1000.0;
         g.stroke_m = b.stroke_mm / 1000.0;
         g.rod_m = b.rod_mm / 1000.0;
         g.compression = b.compression;
+        g.in_valve_m = b.head.in_valve_mm / 1000.0;
+        g.ex_valve_m = b.head.ex_valve_mm / 1000.0;
+        g.cams_low = head_lobes(&b.head.cams.low);
+        g.cams_high = head_lobes(&b.head.cams.high);
     }
     if let Some(v) = t.flow.throttle_dia_m { g.throttle_dia_m = v }
     if let Some(v) = t.flow.runner_m { g.runner_m = v }
@@ -206,7 +211,7 @@ impl Engine {
 
     /// Swap the tune. Changes to parts or flow settings rebuild the gas model on the next step.
     pub fn set_tune(&mut self, tune: Tune) {
-        let geometry_changed = tune.parts != self.tune.parts || tune.flow != self.tune.flow || tune.materials != self.tune.materials;
+        let geometry_changed = tune.parts != self.tune.parts || tune.engine != self.tune.engine || tune.flow != self.tune.flow || tune.materials != self.tune.materials;
         self.tune = tune;
         self.thermal.g = self.tune.cooling();
         if geometry_changed {
@@ -292,7 +297,7 @@ impl Engine {
         let rpm = self.rpm;
         let want = rpm >= t.vtec_rpm && self.map >= t.vtec_min_map && self.ect >= self.thermal.g.ect_vtec_min_c;
         self.vtec_cmd = if self.vtec_cmd { rpm >= t.vtec_rpm - 150.0 && self.map >= t.vtec_min_map - 5.0 } else { want };
-        self.oil_kpa = oil_pressure_kpa(rpm, self.oil_c, &self.thermal.g);
+        self.oil_kpa = oil_pressure_kpa(rpm, self.oil_c, &self.thermal.g, Some(self.bottom.pump));
         let pressurised = self.vtec_cmd && self.oil_kpa >= VTEC_OIL_KPA;
         let g = &self.gas.g;
         for i in 0..4 {
@@ -471,7 +476,8 @@ impl Engine {
         let indicated = if fired { g.imep_kpa * corr * self.disp_l / (4.0 * PI) } else { g.imep_kpa * self.disp_l / (4.0 * PI) };
         self.pumping_nm = self.pmep_kpa * self.disp_l / (4.0 * PI);
         // Friction rises with oil viscosity (the hydrodynamic part; the fixed part is seals and mixed contact).
-        self.friction_nm = 5.0 + (friction_nm(rpm) - 5.0) * visc_ratio(self.oil_c, &self.thermal.g).powf(0.35);
+        let balancer = if self.bottom.pump.balance_shafts { 0.0 } else { balancer_nm(rpm) };
+        self.friction_nm = 5.0 + (friction_nm(rpm) - 5.0 - balancer) * visc_ratio(self.oil_c, &self.thermal.g).powf(0.35);
         self.torque_nm = indicated - self.friction_nm - self.pumping_nm;
         self.spark_eff = clamp(1.0 - ((self.ign - self.mbt) / 28.0).powi(2), 0.2, 1.0);
         self.over_torque = self.torque_nm > self.tune.torque_limit_nm.unwrap_or(f64::INFINITY);

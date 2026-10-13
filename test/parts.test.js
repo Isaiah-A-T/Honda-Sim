@@ -70,7 +70,8 @@ test('the bigger engine makes more torque, and the sim state shows the new geome
   assert.ok(b.e.torqueNm > a.e.torqueNm * 1.1, `${a.e.torqueNm} -> ${b.e.torqueNm}`);
   const st = renderState({ eng: b.e, internals: b.s, running: true, car: { gear: 3, speedMs: 20 }, pedal: 1 });
   assert.equal(st.geometry.strokeM, 0.099);
-  assert.equal(st.bottomEnd.block, 'K24A');
+  assert.equal(st.bottomEnd.block, 'K24A2');
+  assert.equal(st.bottomEnd.head, 'K20Z3');
   JSON.stringify(st);
 });
 
