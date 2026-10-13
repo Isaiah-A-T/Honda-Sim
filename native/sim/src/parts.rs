@@ -3,7 +3,7 @@
 //! Every aftermarket part is a real part from docs/parts-catalog.json.
 
 use crate::tune::Tune;
-use serde::{Deserialize, Serialize};
+use serde::Serialize;
 use serde_json::Value;
 use std::collections::BTreeMap;
 use std::sync::OnceLock;
