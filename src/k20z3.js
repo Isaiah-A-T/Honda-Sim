@@ -115,6 +115,8 @@ export const TURBO_GT35 = {
   turbineEff: 0.68, compressorEff: 0.72, maxBoostKpa: 160, springKpa: 48,
   // Front-mount intercooler: effectiveness and pressure drop at 250 g/s are typical bar-and-plate values (estimates).
   intercooler: true, icEffectiveness: 0.75, icDropKpaAt250Gs: 8,
+  // Ball-bearing centre section with water ports (GT3582R-style; the Precision 6262 is water-cooled too).
+  waterCooled: true,
 };
 
 // Precision 6262 Gen2 (62 mm compressor inducer, 62 mm turbine) on a 0.82 A/R housing, as on the PRL kit.

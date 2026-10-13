@@ -50,6 +50,13 @@ export function startEngine(sim) {
   sim.eng.knockRetard = 0;
 }
 
+// Turbo builds: what the turbo's oil and coolant lines see (null with no turbo or a supercharger).
+export function turboLines(e, on) {
+  const tb = e.tune.turbo;
+  if (!tb?.enabled || tb.fixed) return null;
+  return { gasGs: on ? e.airGs + e.fuelGs : 0, egtC: e.egtC ?? 600, oilKpa: on ? e.oilKpa ?? 0 : 0, waterCooled: tb.waterCooled ?? true };
+}
+
 // Engine cold (coolant and oil at the outside air temperature), as after sitting overnight.
 export function coldEngine(sim) {
   const e = sim.eng;
@@ -111,7 +118,7 @@ export function step(sim, input, dt) {
     th.g = e.tune.cooling ? { ...COOLING, ...e.tune.cooling } : COOLING;
     const on = sim.running;
     stepThermal(th, { rpm: e.rpm, fuelGs: on ? e.fuelGs : 0, frictionW: on ? e.frictionNm * e.rpm * Math.PI / 30 : 0,
-      heatLoss: 0.30, speedMs: sim.car.speedMs, mapKpa: e.map, ambientC: e.tune.ambientC ?? 25 }, h);
+      heatLoss: 0.30, speedMs: sim.car.speedMs, mapKpa: e.map, ambientC: e.tune.ambientC ?? 25, turbo: turboLines(e, on) }, h);
     e.ect = th.coolantC; e.oilC = th.oilC;
     if (!sim.running && sim.eng.rpm < 1) sim.eng.rpm = 0;
     sim.t += h;

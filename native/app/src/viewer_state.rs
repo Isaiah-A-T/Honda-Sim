@@ -72,6 +72,7 @@ pub fn viewer_state(sim: &Sim) -> SimState {
     readouts.push(("Fans".to_string(), if e.thermal.fan_on { "on".to_string() } else { "off".to_string() }));
     if turbo_on && !t.turbo.fixed {
         readouts.push(("Turbo shaft".to_string(), format!("{:.0}k rpm", e.turbo_rad_s * 30.0 / std::f64::consts::PI / 1000.0)));
+        readouts.push(("Turbo bearing".to_string(), format!("{:.0} °C, oil {:.2} L/min", e.thermal.turbo_bearing_c, e.thermal.turbo_oil_lpm)));
     }
     if let Some(f) = s.failed {
         readouts.push(("FAILED".to_string(), f.to_string()));

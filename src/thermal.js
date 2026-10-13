@@ -58,6 +58,16 @@ export const COOLING = {
   oilHotIdleKpa: 80, oilKpaPerRpm: 0.09,
   oilJetKpa: 200,                                  // piston oil jets' check balls open at 200 kPa (K20A manual)
   ectVtecMinC: 60,                                 // ECU won't engage VTEC on a cold engine (estimate until confirmed)
+  // Turbo lines (turbo builds only). Ball-bearing turbos run a restrictor (about 0.9 mm) in the -4 feed so
+  // they see 40-45 psi; roughly 0.8 L/min at 300 kPa. The drain is a -10 line back into the pan. Water-cooled
+  // centre sections take coolant from the block and return it to the pump inlet; after shutdown the water
+  // keeps moving by thermosiphon. Thermal masses and heat paths below are estimates.
+  turboOilLpmAt300: 0.8,
+  turboHousingJk: 5500, turboBearingJk: 1200,     // ~12 kg iron turbine housing, ~2.5 kg centre section
+  turboGasUaWk: 40,                                // exhaust gas to turbine housing at 50 g/s (scales with flow^0.8)
+  turboHousingToBearingUaWk: 5, turboHousingAirUaWk: 3,
+  turboWaterUaWk: 30, turboThermosiphonUaWk: 10,
+  turboCokeC: 280,                                 // oil starts to coke in a hot, stagnant bearing housing
 };
 
 const CP_COOLANT = 3500, RHO_COOLANT = 1.04;      // 50/50 ethylene glycol, J/kg·K and kg/L
@@ -90,12 +100,13 @@ export function createThermal(ambientC = 25, warm = true, overrides = {}) {
     airMs: 0, radiatorKw: 0, heatToCoolantKw: 0, heatToOilKw: 0, oilToCoolantKw: 0, sumpKw: 0, oilCoolerKw: 0,
     radiatorOutC: warm ? 70 : ambientC, ect2C: warm ? 70 : ambientC, inletC: warm ? 84 : ambientC,
     boiling: false, overheatS: 0,
+    turboHousingC: ambientC + (warm ? 200 : 0), turboBearingC: warm ? 110 : ambientC, turboOilLpm: 0, turboOilKw: 0, turboWaterKw: 0, turboCokeS: 0,
   };
 }
 
 // Step dt seconds. fuelGs: fuel burned (g/s); frictionW: mechanical friction power; heatLoss: share of
 // fuel heat lost to the walls (from the gas model); speedMs: road speed for ram air; ambientC.
-export function stepThermal(th, { rpm, fuelGs, frictionW, heatLoss, speedMs, mapKpa = 100, ambientC = 25 }, dt) {
+export function stepThermal(th, { rpm, fuelGs, frictionW, heatLoss, speedMs, mapKpa = 100, ambientC = 25, turbo = null }, dt) {
   const g = th.g;
   const fuelW = fuelGs / 1000 * 44e6;
   // Wall heat: three quarters of the gas model's heat loss (the rest is crevices and unburned fuel), a larger
@@ -149,14 +160,32 @@ export function stepThermal(th, { rpm, fuelGs, frictionW, heatLoss, speedMs, map
     : g.oilCooler === 'air' ? g.oilCoolerUaWk * (th.airMs / 5) ** 0.6 * (th.oilC - ambientC) : 0;
   const coolerToCoolant = g.oilCooler === 'water' ? cooler : 0;
 
+  // Turbo: exhaust heats the turbine housing, which soaks into the bearing housing; the oil feed and (if
+  // water-cooled) the coolant lines carry it away. With the engine off the oil stops but the housing is
+  // still hot, so the bearing heat-soaks; that's when oil cokes.
+  let turboOil = 0, turboWater = 0;
+  if (turbo) {
+    const gasUa = turbo.gasGs > 0 ? g.turboGasUaWk * (turbo.gasGs / 50) ** 0.8 : 0;
+    const toBearing = g.turboHousingToBearingUaWk * (th.turboHousingC - th.turboBearingC);
+    const toAir = (g.turboHousingAirUaWk + 0.5 * Math.abs(speedMs)) * (th.turboHousingC - ambientC);
+    th.turboOilLpm = g.turboOilLpmAt300 * Math.sqrt(Math.max(turbo.oilKpa, 0) / 300);
+    const cOil = th.turboOilLpm / 60 * 0.85 * 2000;
+    turboOil = cOil * 0.8 * (th.turboBearingC - th.oilC);
+    turboWater = turbo.waterCooled ? (rpm > 0 ? g.turboWaterUaWk : g.turboThermosiphonUaWk) * (th.turboBearingC - th.coolantC) : 0;
+    th.turboHousingC += (gasUa * (turbo.egtC - th.turboHousingC) - toBearing - toAir) / g.turboHousingJk * dt;
+    th.turboBearingC += (toBearing - turboOil - turboWater - 1 * (th.turboBearingC - ambientC)) / g.turboBearingJk * dt;
+    th.turboCokeS = th.turboBearingC > g.turboCokeC && th.turboOilLpm < 0.05 ? th.turboCokeS + dt : th.turboCokeS;
+  } else th.turboOilLpm = 0;
+  th.turboOilKw = turboOil / 1000; th.turboWaterKw = turboWater / 1000;
+
   // Boiling: past the boiling point the hottest walls blanket in steam and stop passing heat well.
   const boil = boilingC(g);
   th.boiling = th.coolantC > boil;
   th.overheatS = th.boiling ? th.overheatS + dt : Math.max(0, th.overheatS - dt);
 
-  th.coolantC += (toCoolant + oilToEngine + coolerToCoolant - exchange) / engineJk * dt;
+  th.coolantC += (toCoolant + oilToEngine + coolerToCoolant + turboWater - exchange) / engineJk * dt;
   th.radiatorC += (exchange - qRad) / radJk * dt;
-  th.oilC += (toOil - oilToEngine - sump - cooler) / g.oilJk * dt;
+  th.oilC += (toOil - oilToEngine - sump - cooler + turboOil) / g.oilJk * dt;
 
   th.heatToCoolantKw = toCoolant / 1000; th.heatToOilKw = toOil / 1000; th.radiatorKw = qRad / 1000;
   th.oilToCoolantKw = (oilToEngine + coolerToCoolant) / 1000; th.sumpKw = sump / 1000; th.oilCoolerKw = cooler / 1000;
@@ -171,7 +200,7 @@ export function oilPressureKpa(rpm, oilC, g = COOLING) {
 }
 
 // Circuits for renderers: each segment's name, the parts it joins, and what flows in it right now.
-export function circuits(th, oilKpa = 0) {
+export function circuits(th, oilKpa = 0, turbo = null) {
   const g = th.g, oilLpm = Math.min(60, 4 + Math.max(0, th.pumpLpm) * 0.25);
   const cool = [
     ['pump', 'blockJacket', 'Water pump to block water jacket', th.pumpLpm, th.radiatorOutC * (th.radiatorLpm / Math.max(th.pumpLpm, 1e-6)) + th.coolantC * (th.bypassLpm / Math.max(th.pumpLpm, 1e-6))],
@@ -205,6 +234,17 @@ export function circuits(th, oilKpa = 0) {
       { from: 'pump', to: 'oilCooler', name: 'Oil cooler in hose (19422-RRB-A01)', flowLpm: th.pumpLpm * 0.05, tempC: th.inletC },
       { from: 'oilCooler', to: 'thermostat', name: 'Oil cooler outlet hose (19423-RRB-A01)', flowLpm: th.pumpLpm * 0.05, tempC: th.inletC + th.oilCoolerKw * 1000 / Math.max(th.pumpLpm * 0.05 / 60 * RHO_COOLANT * CP_COOLANT, 1) });
   }
+  if (turbo) {
+    // Feed from the filter housing's oil pressure port through the restrictor; gravity drain into the pan.
+    const drainC = th.oilC + (th.turboOilLpm > 0 ? th.turboOilKw * 1000 / (th.turboOilLpm / 60 * 0.85 * 2000) : 0);
+    oil.push({ from: 'filter', to: 'turbo', name: 'Turbo oil feed (-4 with restrictor)', flowLpm: th.turboOilLpm, tempC: th.oilC },
+      { from: 'turbo', to: 'sump', name: 'Turbo oil drain (-10 into the pan)', flowLpm: th.turboOilLpm, tempC: drainC });
+    if (turbo.waterCooled) {
+      const lpm = th.pumpLpm > 0 ? 2 : 0.3;
+      cool.push({ from: 'blockJacket', to: 'turbo', name: 'Turbo coolant feed', flowLpm: lpm, tempC: th.coolantC },
+        { from: 'turbo', to: 'thermostat', name: 'Turbo coolant return (to the pump inlet)', flowLpm: lpm, tempC: th.coolantC + th.turboWaterKw * 1000 / (lpm / 60 * RHO_COOLANT * CP_COOLANT) });
+    }
+  }
   return { coolant: cool, oil };
 }
 
@@ -235,5 +275,6 @@ export const COMPONENTS = {
   mainBearings:{ circuit: 'oil', name: 'Main and rod bearings', pos: [0, 0, 0], size: [0.40, 0.06, 0.06] },
   pistonJets:  { circuit: 'oil', name: 'Piston oil jets (15280-PRB-A00), one per cylinder', pos: [0, 0.06, -0.05], size: [0.36, 0.02, 0.02] },
   head:        { circuit: 'oil', name: 'Cam journals, rocker shafts, VTEC spool valve and pressure switch', pos: [0, 0.32, 0], size: [0.42, 0.06, 0.18] },
+  turbo:       { circuit: 'oil', name: 'Turbo centre section (oil feed and drain, water ports), on the exhaust side (turbo builds)', pos: [0.05, 0.22, -0.32], size: [0.20, 0.18, 0.20] },
   vtc:         { circuit: 'oil', name: 'VTC oil control valve (15830-RBB-003) and intake cam actuator', pos: [0.22, 0.32, 0.06], size: [0.05, 0.10, 0.10] },
 };

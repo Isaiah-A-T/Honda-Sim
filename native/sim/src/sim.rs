@@ -6,7 +6,7 @@ use crate::internals::Internals;
 use crate::k20z3::{CAR, ENGINE};
 use crate::tables::clamp;
 use crate::tune::Tune;
-use crate::thermal::{Thermal, ThermalInput};
+use crate::thermal::{Thermal, ThermalInput, TurboLines};
 use crate::vehicle::{overall_ratio, step_drivetrain, Vehicle};
 use serde::Serialize;
 
@@ -153,6 +153,7 @@ impl Sim {
                 speed_ms: self.car.speed_ms,
                 map_kpa: e.map,
                 ambient_c: e.tune.ambient_c.unwrap_or(25.0),
+                turbo: turbo_lines(e, on),
             };
             e.thermal.step(&input, h);
             e.ect = e.thermal.coolant_c;
@@ -232,6 +233,15 @@ impl Sim {
             radiator_kw: r(e.thermal.radiator_kw, 1),
         }
     }
+}
+
+/// Turbo builds: what the turbo's oil and coolant lines see (None with no turbo or a supercharger).
+pub fn turbo_lines(e: &Engine, on: bool) -> Option<TurboLines> {
+    let tb = &e.tune.turbo;
+    if !tb.enabled || tb.fixed {
+        return None;
+    }
+    Some(TurboLines { gas_gs: if on { e.air_gs + e.fuel_gs } else { 0.0 }, egt_c: e.egt_c, oil_kpa: if on { e.oil_kpa } else { 0.0 }, water_cooled: tb.water_cooled })
 }
 
 /// One datalog row; columns match the web app's CSV.

@@ -80,3 +80,24 @@ test('renderState exposes the cooling and oil circuits', () => {
   assert.ok(c.oilCircuit.some(x => x.from === 'sump'));
   JSON.stringify(c);
 });
+
+test('turbo oil feed and drain flow while running; a water-cooled turbo heat-soaks less after shutdown', () => {
+  const soak = waterCooled => {
+    const th = createThermal(25, true);
+    const run = { rpm: 6500, fuelGs: 14, frictionW: 15000, heatLoss: 0.3, speedMs: 40, mapKpa: 180, ambientC: 25,
+      turbo: { gasGs: 220, egtC: 950, oilKpa: 500, waterCooled } };
+    for (let t = 0; t < 120; t += 0.05) stepThermal(th, run, 0.05);
+    assert.ok(th.turboOilLpm > 0.5 && th.turboOilKw > 0);
+    const lines = circuits(th, 500, run.turbo);
+    assert.ok(lines.oil.some(s => s.to === 'turbo') && lines.oil.some(s => s.from === 'turbo' && s.to === 'sump'));
+    assert.equal(lines.coolant.some(s => s.to === 'turbo'), waterCooled);
+    let peak = 0;
+    const off = { ...run, rpm: 0, fuelGs: 0, frictionW: 0, speedMs: 0, turbo: { ...run.turbo, gasGs: 0, oilKpa: 0 } };
+    for (let t = 0; t < 600; t += 0.05) { stepThermal(th, off, 0.05); peak = Math.max(peak, th.turboBearingC); }
+    assert.equal(th.turboOilLpm, 0);
+    return peak;
+  };
+  const water = soak(true), oilOnly = soak(false);
+  assert.ok(oilOnly > water + 40, `oil-only ${oilOnly} vs water-cooled ${water}`);
+  assert.ok(!circuits(createThermal(25, true)).oil.some(s => s.to === 'turbo'));
+});

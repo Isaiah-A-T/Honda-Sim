@@ -47,6 +47,15 @@ pub struct Cooling {
     pub oil_kpa_per_rpm: f64,
     pub oil_jet_kpa: f64,
     pub ect_vtec_min_c: f64,
+    pub turbo_oil_lpm_at300: f64,
+    pub turbo_housing_jk: f64,
+    pub turbo_bearing_jk: f64,
+    pub turbo_gas_ua_wk: f64,
+    pub turbo_housing_to_bearing_ua_wk: f64,
+    pub turbo_housing_air_ua_wk: f64,
+    pub turbo_water_ua_wk: f64,
+    pub turbo_thermosiphon_ua_wk: f64,
+    pub turbo_coke_c: f64,
 }
 
 impl Default for Cooling {
@@ -85,6 +94,15 @@ impl Default for Cooling {
             oil_kpa_per_rpm: 0.09,
             oil_jet_kpa: 200.0,
             ect_vtec_min_c: 60.0,
+            turbo_oil_lpm_at300: 0.8,
+            turbo_housing_jk: 5500.0,
+            turbo_bearing_jk: 1200.0,
+            turbo_gas_ua_wk: 40.0,
+            turbo_housing_to_bearing_ua_wk: 5.0,
+            turbo_housing_air_ua_wk: 3.0,
+            turbo_water_ua_wk: 30.0,
+            turbo_thermosiphon_ua_wk: 10.0,
+            turbo_coke_c: 280.0,
         }
     }
 }
@@ -144,6 +162,22 @@ pub struct Thermal {
     pub inlet_c: f64,
     pub boiling: bool,
     pub overheat_s: f64,
+    pub turbo_housing_c: f64,
+    pub turbo_bearing_c: f64,
+    pub turbo_oil_lpm: f64,
+    pub turbo_oil_kw: f64,
+    pub turbo_water_kw: f64,
+    /// Seconds the turbo bearing has spent hot with no oil moving (coking).
+    pub turbo_coke_s: f64,
+}
+
+/// What a turbo's oil and coolant lines see (turbo builds only).
+#[derive(Clone, Copy, Debug)]
+pub struct TurboLines {
+    pub gas_gs: f64,
+    pub egt_c: f64,
+    pub oil_kpa: f64,
+    pub water_cooled: bool,
 }
 
 pub struct ThermalInput {
@@ -154,6 +188,7 @@ pub struct ThermalInput {
     pub speed_ms: f64,
     pub map_kpa: f64,
     pub ambient_c: f64,
+    pub turbo: Option<TurboLines>,
 }
 
 impl Thermal {
@@ -182,6 +217,12 @@ impl Thermal {
             inlet_c: w(84.0),
             boiling: false,
             overheat_s: 0.0,
+            turbo_housing_c: ambient_c + if warm { 200.0 } else { 0.0 },
+            turbo_bearing_c: w(110.0),
+            turbo_oil_lpm: 0.0,
+            turbo_oil_kw: 0.0,
+            turbo_water_kw: 0.0,
+            turbo_coke_s: 0.0,
         }
     }
 
@@ -240,13 +281,35 @@ impl Thermal {
         };
         let cooler_to_coolant = if g.oil_cooler == "water" { cooler } else { 0.0 };
 
+        // Turbo: exhaust heats the turbine housing, which soaks into the bearing housing; the oil feed and
+        // (if water-cooled) the coolant lines carry it away. After shutdown the bearing heat-soaks.
+        let (mut turbo_oil, mut turbo_water) = (0.0, 0.0);
+        if let Some(tb) = i.turbo {
+            let gas_ua = if tb.gas_gs > 0.0 { g.turbo_gas_ua_wk * (tb.gas_gs / 50.0).powf(0.8) } else { 0.0 };
+            let to_bearing = g.turbo_housing_to_bearing_ua_wk * (self.turbo_housing_c - self.turbo_bearing_c);
+            let to_air = (g.turbo_housing_air_ua_wk + 0.5 * i.speed_ms.abs()) * (self.turbo_housing_c - i.ambient_c);
+            self.turbo_oil_lpm = g.turbo_oil_lpm_at300 * (tb.oil_kpa.max(0.0) / 300.0).sqrt();
+            let c_oil = self.turbo_oil_lpm / 60.0 * 0.85 * 2000.0;
+            turbo_oil = c_oil * 0.8 * (self.turbo_bearing_c - self.oil_c);
+            turbo_water = if tb.water_cooled { (if i.rpm > 0.0 { g.turbo_water_ua_wk } else { g.turbo_thermosiphon_ua_wk }) * (self.turbo_bearing_c - self.coolant_c) } else { 0.0 };
+            self.turbo_housing_c += (gas_ua * (tb.egt_c - self.turbo_housing_c) - to_bearing - to_air) / g.turbo_housing_jk * dt;
+            self.turbo_bearing_c += (to_bearing - turbo_oil - turbo_water - 1.0 * (self.turbo_bearing_c - i.ambient_c)) / g.turbo_bearing_jk * dt;
+            if self.turbo_bearing_c > g.turbo_coke_c && self.turbo_oil_lpm < 0.05 {
+                self.turbo_coke_s += dt;
+            }
+        } else {
+            self.turbo_oil_lpm = 0.0;
+        }
+        self.turbo_oil_kw = turbo_oil / 1000.0;
+        self.turbo_water_kw = turbo_water / 1000.0;
+
         let boil = boiling_c(g);
         self.boiling = self.coolant_c > boil;
         self.overheat_s = if self.boiling { self.overheat_s + dt } else { (self.overheat_s - dt).max(0.0) };
 
-        self.coolant_c += (to_coolant + oil_to_engine + cooler_to_coolant - exchange) / engine_jk * dt;
+        self.coolant_c += (to_coolant + oil_to_engine + cooler_to_coolant + turbo_water - exchange) / engine_jk * dt;
         self.radiator_c += (exchange - q_rad) / rad_jk * dt;
-        self.oil_c += (to_oil - oil_to_engine - sump - cooler) / g.oil_jk * dt;
+        self.oil_c += (to_oil - oil_to_engine - sump - cooler + turbo_oil) / g.oil_jk * dt;
 
         self.heat_to_coolant_kw = to_coolant / 1000.0;
         self.heat_to_oil_kw = to_oil / 1000.0;
@@ -275,7 +338,7 @@ pub struct Circuits {
 }
 
 /// The coolant and oil circuits as segments between named components (see COMPONENTS).
-pub fn circuits(th: &Thermal, oil_kpa: f64) -> Circuits {
+pub fn circuits(th: &Thermal, oil_kpa: f64, turbo: Option<TurboLines>) -> Circuits {
     let g = &th.g;
     let oil_lpm = (4.0 + th.pump_lpm.max(0.0) * 0.25).min(60.0);
     let p = th.pump_lpm.max(1e-6);
@@ -314,6 +377,17 @@ pub fn circuits(th: &Thermal, oil_kpa: f64) -> Circuits {
             coolant.push(seg("pump", "oilCooler", "Oil cooler in hose (19422-RRB-A01)", lpm, Some(th.inlet_c)));
             coolant.push(seg("oilCooler", "thermostat", "Oil cooler outlet hose (19423-RRB-A01)", lpm,
                 Some(th.inlet_c + th.oil_cooler_kw * 1000.0 / (lpm / 60.0 * RHO_COOLANT * CP_COOLANT).max(1.0))));
+        }
+    }
+    if let Some(tb) = turbo {
+        let drain_c = th.oil_c + if th.turbo_oil_lpm > 0.0 { th.turbo_oil_kw * 1000.0 / (th.turbo_oil_lpm / 60.0 * 0.85 * 2000.0) } else { 0.0 };
+        oil.push(seg("filter", "turbo", "Turbo oil feed (-4 with restrictor)", th.turbo_oil_lpm, Some(th.oil_c)));
+        oil.push(seg("turbo", "sump", "Turbo oil drain (-10 into the pan)", th.turbo_oil_lpm, Some(drain_c)));
+        if tb.water_cooled {
+            let lpm = if th.pump_lpm > 0.0 { 2.0 } else { 0.3 };
+            coolant.push(seg("blockJacket", "turbo", "Turbo coolant feed", lpm, Some(th.coolant_c)));
+            coolant.push(seg("turbo", "thermostat", "Turbo coolant return (to the pump inlet)", lpm,
+                Some(th.coolant_c + th.turbo_water_kw * 1000.0 / (lpm / 60.0 * RHO_COOLANT * CP_COOLANT))));
         }
     }
     Circuits { coolant, oil }
@@ -358,5 +432,6 @@ pub const COMPONENTS: &[Component] = &[
     comp!("mainBearings", "oil", "Main and rod bearings", [0.0, 0.0, 0.0], [0.40, 0.06, 0.06]),
     comp!("pistonJets", "oil", "Piston oil jets (15280-PRB-A00), one per cylinder", [0.0, 0.06, -0.05], [0.36, 0.02, 0.02]),
     comp!("head", "oil", "Cam journals, rocker shafts, VTEC spool valve and pressure switch", [0.0, 0.32, 0.0], [0.42, 0.06, 0.18]),
+    comp!("turbo", "oil", "Turbo centre section (oil feed and drain, water ports), on the exhaust side (turbo builds)", [0.05, 0.22, -0.32], [0.20, 0.18, 0.20]),
     comp!("vtc", "oil", "VTC oil control valve (15830-RBB-003) and intake cam actuator", [0.22, 0.32, 0.06], [0.05, 0.10, 0.10]),
 ];

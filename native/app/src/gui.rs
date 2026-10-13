@@ -216,6 +216,9 @@ impl Gui {
             if e.thermal.fan_on {
                 ui.label(RichText::new(" FANS ").strong().background_color(Color32::from_rgb(0x20, 0x60, 0xa0)));
             }
+            if e.thermal.turbo_bearing_c > e.thermal.g.turbo_coke_c && e.tune.turbo.enabled && !e.tune.turbo.fixed {
+                ui.label(RichText::new(" TURBO HEAT SOAK ").strong().background_color(Color32::from_rgb(0xc8, 0x6a, 0x10)));
+            }
             if e.thermal.boiling {
                 ui.label(RichText::new(" OVERHEATING ").strong().background_color(Color32::from_rgb(0xb0, 0x10, 0x10)));
             } else if sim.running && e.ect < 60.0 {
@@ -492,6 +495,11 @@ impl Gui {
                 ui.label("Supercharger mode");
                 c |= ui.checkbox(&mut tb.fixed, "hold boost at target").changed();
                 ui.end_row();
+                if !tb.fixed {
+                    ui.label("Turbo coolant lines");
+                    c |= ui.checkbox(&mut tb.water_cooled, "water-cooled centre section").changed();
+                    ui.end_row();
+                }
                 c |= num_field(ui, "Wastegate spring", &mut tb.spring_kpa, 1.0, 10.0..=300.0, " kPa");
                 c |= num_field(ui, "Max boost", &mut tb.max_boost_kpa, 1.0, 20.0..=350.0, " kPa");
                 c |= num_field(ui, "Wastegate duty gain", &mut tb.wg_gain, 0.05, 0.0..=3.0, "");
@@ -742,6 +750,30 @@ impl Gui {
             ui.label(format!("{:.1} Nm", e.friction_nm));
             ui.end_row();
         });
+        if let Some(tl) = honda_sim_core::sim::turbo_lines(e, sh.sim.running) {
+            ui.add_space(4.0);
+            ui.label(RichText::new("Turbo lines").strong());
+            egui::Grid::new("turbo-lines").num_columns(2).show(ui, |ui| {
+                ui.label(grey("Oil feed"));
+                ui.label(format!("{:.2} L/min through the restrictor, {:.1} kW into the oil", th.turbo_oil_lpm, th.turbo_oil_kw));
+                ui.end_row();
+                ui.label(grey("Coolant lines"));
+                ui.label(if tl.water_cooled { format!("{:.1} kW into the coolant", th.turbo_water_kw) } else { "none (oil-cooled only)".into() });
+                ui.end_row();
+                ui.label(grey("Turbine housing"));
+                ui.label(format!("{:.0} °C", th.turbo_housing_c));
+                ui.end_row();
+                ui.label(grey("Bearing housing"));
+                ui.label(RichText::new(format!("{:.0} °C", th.turbo_bearing_c)).color(temp_color(th.turbo_bearing_c, g.turbo_coke_c)));
+                ui.end_row();
+                if th.turbo_coke_s > 0.0 {
+                    ui.label(grey("Oil coking"));
+                    ui.label(RichText::new(format!("{:.0} s hot with no oil moving", th.turbo_coke_s)).color(Color32::from_rgb(0xe0, 0x50, 0x40)));
+                    ui.end_row();
+                }
+            });
+            ui.label(RichText::new("Idle a minute before switching off after hard driving: the oil stops when the engine does, and the turbine housing soaks into the bearing.").small().color(Color32::from_gray(150)));
+        }
         ui.label(RichText::new("Cold oil is thick: more friction and oil pressure. The ECU holds VTEC off and raises idle until the engine warms up.").small().color(Color32::from_gray(150)));
 
         ui.separator();

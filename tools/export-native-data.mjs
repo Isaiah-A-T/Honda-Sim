@@ -83,5 +83,15 @@ for (let i = 0; i < 4000; i++) {
   if (i % 250 === 249) coldStart.push({ t: cold.t, rpm: cold.eng.rpm, speedMs: cold.car.speedMs, ectC: cold.eng.ect, oilC: cold.eng.oilC, oilKpa: cold.eng.oilKpa, frictionNm: cold.eng.frictionNm });
 }
 
-writeFileSync(out('parity.json'), JSON.stringify({ veCorrLow: VE_CORR_LOW, veCorrHigh: VE_CORR_HIGH, gas, engine, parts, drive, thermal, coldStart }, null, 1));
+// A turbo build pulling hard, then switched off hot: the turbo's oil and water lines and heat soak.
+const tsim = createSim({ ...turboSetup(), materials: { piston: 'piston2618', rod: 'rod4340' } });
+shift(tsim, 2);
+const turboSoak = [];
+for (let i = 0; i < 6000; i++) {
+  if (i === 1500) { shift(tsim, 0); tsim.running = false; }
+  step(tsim, { throttle: i < 1500 ? 1 : 0, brake: 0, clutch: null }, 0.01);
+  if (i % 250 === 249) { const th = tsim.eng.thermal; turboSoak.push({ t: tsim.t, rpm: tsim.eng.rpm, housingC: th.turboHousingC, bearingC: th.turboBearingC, oilLpm: th.turboOilLpm, oilC: th.oilC, ectC: th.coolantC }); }
+}
+
+writeFileSync(out('parity.json'), JSON.stringify({ veCorrLow: VE_CORR_LOW, veCorrHigh: VE_CORR_HIGH, gas, engine, parts, drive, thermal, coldStart, turboSoak }, null, 1));
 console.log(`gas ${gas.length}, engine ${engine.length}, parts ${parts.length}, drive ${drive.length}`);

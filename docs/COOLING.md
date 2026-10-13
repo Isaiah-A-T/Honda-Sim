@@ -48,3 +48,14 @@ thermal masses, pump flow and the VTEC minimum coolant temperature (60 °C) are 
 Highway cruise settles near 88 °C coolant and 93 °C oil. A track session at 150 km/h runs about 101 °C
 coolant and 117 °C oil with the fans off. Full load with no airflow (a dyno with no fan) boils the coolant
 within a minute.
+
+## Turbo lines (turbo builds)
+
+A turbo build adds an oil feed from the filter housing's pressure port through a restrictor (-4 line, about
+0.8 L/min at 300 kPa for a ball-bearing centre section) and a -10 gravity drain into the pan. If the turbo
+is water-cooled (the GT35-class and Precision 6262 kits are), coolant runs from the block to the centre
+section and back to the pump inlet; with the engine off it keeps moving by thermosiphon. Exhaust heats the
+turbine housing, which soaks into the bearing housing; the oil and water carry that heat into the oil and
+coolant. Switch off straight after hard driving and the oil stops while the housing is still hot, so the
+bearing heat-soaks: about 165 °C water-cooled, about 255 °C oil-cooled only. Above 280 °C with no oil
+moving, the sim counts time as oil coking. Thermal masses and heat paths are estimates.

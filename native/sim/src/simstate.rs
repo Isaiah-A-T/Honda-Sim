@@ -31,7 +31,8 @@ pub fn render_state(sim: &Sim) -> Value {
     }
     let th = &e.thermal;
     let tg = &th.g;
-    let c = circuits(th, e.oil_kpa);
+    let tl = crate::sim::turbo_lines(e, sim.running);
+    let c = circuits(th, e.oil_kpa, tl);
     let cooling = json!({
         "coolantC": th.coolant_c, "radiatorInC": th.coolant_c, "radiatorOutC": th.radiator_out_c, "pumpInletC": th.inlet_c,
         "boilingC": boiling_c(tg), "boiling": th.boiling, "overheatS": th.overheat_s,
@@ -43,6 +44,10 @@ pub fn render_state(sim: &Sim) -> Value {
             "tempC": th.oil_c, "pressureKpa": e.oil_kpa, "viscosityCst": viscosity_cst(th.oil_c, tg), "grade": tg.oil_grade,
             "cooler": tg.oil_cooler, "coolerKw": th.oil_cooler_kw, "toCoolantKw": th.oil_to_coolant_kw, "sumpKw": th.sump_kw,
         },
+        "turbo": match tl { Some(tl) => json!({
+            "oilFeedLpm": th.turbo_oil_lpm, "oilKw": th.turbo_oil_kw, "waterKw": th.turbo_water_kw, "waterCooled": tl.water_cooled,
+            "housingC": th.turbo_housing_c, "bearingC": th.turbo_bearing_c, "cokingS": th.turbo_coke_s,
+        }), None => Value::Null },
         "coolantCircuit": c.coolant, "oilCircuit": c.oil,
     });
     let induction = if !t.turbo.enabled { "na" } else if t.turbo.fixed { "supercharger" } else { "turbo" };

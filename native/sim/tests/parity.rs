@@ -133,7 +133,7 @@ fn cooling_matches() {
         let l = &case["load"];
         let input = ThermalInput {
             rpm: f(l, "rpm"), fuel_gs: f(l, "fuelGs"), friction_w: f(l, "frictionW"), heat_loss: f(l, "heatLoss"),
-            speed_ms: f(l, "speedMs"), map_kpa: f(l, "mapKpa"), ambient_c: f(l, "ambientC"),
+            speed_ms: f(l, "speedMs"), map_kpa: f(l, "mapKpa"), ambient_c: f(l, "ambientC"), turbo: None,
         };
         let mut th = Thermal::new(input.ambient_c, name != "dyno", g);
         let rows = case["rows"].as_array().unwrap();
@@ -190,4 +190,35 @@ fn render_state_has_the_web_fields() {
         assert!(!s[k].is_null(), "{k}");
     }
     assert_eq!(s["cams"]["card"]["intakeHigh"]["liftMm"], 11.7);
+}
+
+#[test]
+fn turbo_lines_and_heat_soak_match() {
+    let mut t = turbo_setup(&placeholder_tune());
+    t.materials.insert("piston".into(), "piston2618".into());
+    t.materials.insert("rod".into(), "rod4340".into());
+    let mut sim = Sim::new(t);
+    sim.shift(2);
+    let rows = data()["turboSoak"].as_array().unwrap().clone();
+    let mut k = 0;
+    for i in 0..6000 {
+        if i == 1500 {
+            sim.shift(0);
+            sim.running = false;
+        }
+        sim.step(Input { throttle: if i < 1500 { 1.0 } else { 0.0 }, brake: 0.0, clutch: None }, 0.01);
+        if i % 250 == 249 {
+            let js = &rows[k];
+            let th = &sim.eng.thermal;
+            let tag = format!("turbo at {:.2}", sim.t);
+            close(&format!("{tag} rpm"), sim.eng.rpm, f(js, "rpm"), 1e-4, 1e-3);
+            close(&format!("{tag} housing"), th.turbo_housing_c, f(js, "housingC"), 1e-6, 1e-6);
+            close(&format!("{tag} bearing"), th.turbo_bearing_c, f(js, "bearingC"), 1e-6, 1e-6);
+            close(&format!("{tag} oil flow"), th.turbo_oil_lpm, f(js, "oilLpm"), 1e-6, 1e-6);
+            close(&format!("{tag} oil"), th.oil_c, f(js, "oilC"), 1e-6, 1e-6);
+            close(&format!("{tag} ect"), th.coolant_c, f(js, "ectC"), 1e-6, 1e-6);
+            k += 1;
+        }
+    }
+    assert_eq!(k, rows.len());
 }

@@ -25,6 +25,8 @@ pub struct Turbo {
     pub intercooler: bool,
     pub ic_effectiveness: f64,
     pub ic_drop_kpa_at250_gs: f64,
+    /// Centre section has water ports plumbed into the cooling system.
+    pub water_cooled: bool,
 }
 
 impl Default for Turbo {

@@ -112,6 +112,7 @@ pub fn turbo_gt35() -> Turbo {
         intercooler: true,
         ic_effectiveness: 0.75,
         ic_drop_kpa_at250_gs: 8.0,
+        water_cooled: true,
     }
 }
 
