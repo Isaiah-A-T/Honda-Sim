@@ -103,6 +103,7 @@ function renderSettings() {
   $('setFuelUnits').value = tune.fuelUnits || guessFuelUnits(tune.fuelLow);
   const T = tune.turbo || {};
   $('setTurbo').checked = !!T.enabled;
+  $('setIc').checked = T.intercooler !== false;
   for (const [id, v] of [['setInjCc', tune.injectorCc], ['setDead', tune.injectorDeadMs], ['setOverboost', tune.overboostKpa], ['setTorqueLim', tune.torqueLimitNm],
     ['setClutch', tune.clutchNm], ['setSpring', T.springKpa], ['setMaxBoost', T.maxBoostKpa], ['setTurbArea', T.turbineAreaCm2], ['setWgArea', T.wastegateAreaCm2], ['setCompTip', T.compressorTipMm], ['setWgGain', T.wgGain ?? 1]]) $(id).value = v ?? '';
   const F = { ...FLOW, ...(tune.flow || {}) };
@@ -142,6 +143,7 @@ for (const [id, key] of [['setSpring', 'springKpa'], ['setMaxBoost', 'maxBoostKp
     if (Number.isFinite(v)) { tune.turbo = { ...tune.turbo, [key]: v }; saveTune(tune); }
   });
 }
+$('setIc').addEventListener('change', ev => { tune.turbo = { ...tune.turbo, intercooler: ev.target.checked }; saveTune(tune); });
 $('setTurbo').addEventListener('change', ev => { tune.turbo = { ...tune.turbo, enabled: ev.target.checked }; saveTune(tune); });
 $('btnTurbo').onclick = () => { applyTune(turboSetup(tune)); renderTabs(); };
 $('fileCsv').addEventListener('change', async ev => {

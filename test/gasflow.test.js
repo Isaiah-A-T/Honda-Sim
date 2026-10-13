@@ -82,3 +82,12 @@ test('add-on modules get the sim state as plain data, with real valve lift', asy
   assert.ok(valveLift(st, 1, true, 360 + 100) > 0.005);    // intake open after overlap TDC
   assert.equal(valveLift(st, 1, true, 0), 0);              // closed at firing TDC
 });
+
+test('without an intercooler the hot charge costs power and knock margin', () => {
+  const flat = v => ({ rows: [1000, 9000], cols: [20, 300], data: [[v, v], [v, v]] });
+  const t = { ...turboSetup(), fuelUnits: 'afr', fuelLow: flat(11.5), fuelHigh: flat(11.5), ignLow: flat(14), ignHigh: flat(14), wgDuty: flat(40), overboostKpa: 400 };
+  const ic = wot(t, 6000).e, hot = wot({ ...t, turbo: { ...t.turbo, intercooler: false } }, 6000).e;
+  assert.ok(hot.iat > ic.iat + 30, `${hot.iat} vs ${ic.iat}`);
+  assert.ok(hot.knockIndex > ic.knockIndex);
+  assert.ok(ic.icDropKpa > 0 && hot.icDropKpa === 0);
+});

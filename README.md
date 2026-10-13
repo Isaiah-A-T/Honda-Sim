@@ -59,6 +59,8 @@ The turbine is driven by exhaust energy from the flow model, the compressor take
 spools up from the difference. The wastegate opens past its spring plus whatever the wastegate duty table adds, and the
 turbine's back pressure costs pumping work. How much boost a given duty makes depends on your solenoid and wastegate,
 so set **WG duty gain** until the sim's boost matches a real datalog.
+The compressor heats the air it compresses; the **Intercooler** box cools it back toward ambient (75% effectiveness)
+for a small pressure drop. Untick it and the hot charge costs power and knock margin. Untick **Turbo** for N/A.
 
 ## Air and exhaust flow, timing and cams
 

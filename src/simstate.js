@@ -36,8 +36,11 @@ export function renderState(sim) {
       ve: e.ve, airGs: e.airGs, residual: e.residual ?? 0, pumpingKpa: e.pmepKpa ?? 0,
       exhaustKpa: e.exhKpa ?? 101.3, egtC: e.egtC ?? 0, peakCylinderBar: s.pmaxBar,
     },
+    // 'na' (no turbo), 'turbo', or 'supercharger' (boost held fixed, no turbine)
+    induction: !t.turbo?.enabled ? 'na' : t.turbo.fixed ? 'supercharger' : 'turbo',
+    intercooler: !!t.turbo?.enabled && t.turbo.intercooler !== false,
     turbo: t.turbo?.enabled
-      ? { boostKpa: e.boost, shaftRpm: (e.turboRadS ?? 0) * 30 / Math.PI, wastegateOpen: e.wgOpen ?? 0, turbineKw: e.turbineKw ?? 0, compressorKw: e.compressorKw ?? 0 }
+      ? { chargeTempC: e.chargeOutC ?? e.iat, intercoolerDropKpa: e.icDropKpa ?? 0, boostKpa: e.boost, shaftRpm: (e.turboRadS ?? 0) * 30 / Math.PI, wastegateOpen: e.wgOpen ?? 0, turbineKw: e.turbineKw ?? 0, compressorKw: e.compressorKw ?? 0 }
       : null,
     temps: { pistonC: s.pistonC, iatC: e.iat, ectC: e.ect },
     // One entry per part: load (demand ÷ capacity; 0.8 = endurance limit, 1.5 = breaks), life used 0–1, material.

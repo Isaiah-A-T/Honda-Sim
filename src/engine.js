@@ -54,7 +54,7 @@ export function createEngine(tune) {
     lambda: 1, lambdaTarget: 1, afr: STOICH, ipw: 2,
     torqueNm: 0, airGs: 0, airDeliveredGs: 0,
     iat: 25, ect: 90,
-    boost: 0, boostTarget: NaN, wgDuty: 0, wgOpen: 0, turboRadS: 0, turbineKw: 0, compressorKw: 0, boostCut: false, overTorque: false,
+    boost: 0, icDropKpa: 0, chargeOutC: 25, boostTarget: NaN, wgDuty: 0, wgOpen: 0, turboRadS: 0, turbineKw: 0, compressorKw: 0, boostCut: false, overTorque: false,
     gas: null, gasOut: null, gasT: 0, gasFlowRef: undefined, vtc: 0, pmepKpa: 0, exhKpa: P_AMB, egtC: 600,
   };
   updateGas(e, 0, true);
@@ -112,12 +112,26 @@ export function stepEngine(e, pedal, dt) {
       e.turbineKw = turbineW / 1000; e.compressorKw = compressorW / 1000;
     }
   } else { e.boost = 0; e.turboRadS = 0; }
-  e.iat += ((25 + e.boost * 0.12) - e.iat) * Math.min(1, dt * 0.3);   // intercooled: some heat soak on boost
+  // Charge air. The compressor heats the air it squeezes (isentropic rise ÷ compressor efficiency).
+  // An intercooler takes most of that heat back out (effectiveness) for a pressure drop that grows with
+  // airflow; without one the hot charge goes straight to the throttle body. N/A engines breathe ambient air
+  // plus a little underhood heat. The intake air temperature then lags as the pipes heat up and cool down.
+  const ambC = t.ambientC ?? 25;
+  let chargeC = ambC + 3, icDropKpa = 0;
+  if (tb?.enabled && e.boost > 0.5) {
+    const prC = (P_AMB + e.boost) / (P_AMB - 1);
+    const compOutC = (ambC + 273) * (1 + (prC ** 0.2857 - 1) / (tb.compressorEff ?? 0.7)) - 273;
+    const ic = tb.intercooler !== false;
+    chargeC = ic ? compOutC - (tb.icEffectiveness ?? 0.75) * (compOutC - ambC) : compOutC;
+    if (ic) icDropKpa = (tb.icDropKpaAt250Gs ?? 8) * (e.airDeliveredGs / 250) ** 2;
+  }
+  e.chargeOutC = chargeC; e.icDropKpa = icDropKpa;
+  e.iat += (chargeC - e.iat) * Math.min(1, dt * 0.5);
 
   // Manifold pressure: where airflow through the throttle balances what the engine pumps out.
   updateGas(e, dt);
   const corr = veCorrection(rpm, e.highCam), g = e.gasOut;
-  const mapTarget = manifoldPressure(e.tps, rpm, g.veDelivered * corr, 101.3 + e.boost, e.iat, flowGeom(t).throttleDiaM);
+  const mapTarget = manifoldPressure(e.tps, rpm, g.veDelivered * corr, 101.3 + e.boost - e.icDropKpa, e.iat, flowGeom(t).throttleDiaM);
   e.map += (mapTarget - e.map) * Math.min(1, dt * 12);
 
   // VTEC: switch to high cam above the set rpm at load, with a little hysteresis.

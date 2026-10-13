@@ -34,7 +34,8 @@ view.update(renderState(sim), dtSeconds);
 | `cams` | `highCam` (VTEC engaged), `vtcDeg` (intake cam advance), `vtecRpm` |
 | `combustion` | Spark, best-torque spark, knock limit, crank angle where half the charge has burned (`ca50Deg`), burn duration, `knocking`, knock index (1 = edge), λ |
 | `flow` | VE, airflow g/s, residual exhaust share, pumping loss, exhaust manifold pressure, EGT, peak cylinder pressure |
-| `turbo` | `null` without a turbo, else boost, shaft rpm, wastegate opening 0–1, turbine and compressor power |
+| `induction`, `intercooler` | `'na'`, `'turbo'` or `'supercharger'`; whether a boosted build has an intercooler |
+| `turbo` | `null` without a turbo, else charge temperature after the intercooler (or compressor), intercooler pressure drop, boost, shaft rpm, wastegate opening 0–1, turbine and compressor power |
 | `temps` | Piston crown, intake air, coolant |
 | `parts` | Keyed by part (`piston`, `rod`, `rodBolt`, `bearing`, `crank`, `gasket`, `headBolt`, `sleeve`, `block`, `valvetrain`): `load` (0.8 = endurance limit, 1.5 = breaks), `damage` (life used 0–1), `failed`, and the selected `material` |
 | `failed` | Name of the failed part, or `null` |
