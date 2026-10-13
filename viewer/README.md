@@ -10,7 +10,7 @@ Views, picked from the tabs along the top:
 - **Internals**: pistons, rods, crank and the valvetrain with cam lobes, VTEC switching to the high lobe and VTC phasing.
 - **Block**: the castings on their own with the main dimensions.
 - **Airflow**: intake and exhaust flow, through the turbo on a turbo build, gated by valve lift.
-- **Cooling & oil**: the water pump, block water jacket, head passages, thermostat, bypass, upper and lower hoses, radiator, two fans, heater core, and the oil pump, filter, main gallery, bearing feeds and head galleries, with flow coloured by coolant and oil temperature.
+- **Cooling & oil**: the water pump, block water jacket, head passages, thermostat, bypass, upper and lower hoses, radiator, two fans, heater core, and the oil pump, filter, main gallery, main bearings, crank drillings to the rod bearings, piston oil squirters, head galleries and drain-back, plus the turbo's oil and coolant lines, with flow coloured by coolant and oil temperature.
 - **Stress**: each part tinted green, yellow, orange, red as it nears or passes its limit.
 - **Materials**: each part colored by alloy family; hover for the exact material.
 

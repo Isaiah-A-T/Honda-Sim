@@ -309,7 +309,7 @@ pub fn run(mut opts: Options) {
                             stress_bar(ui, "Turbo", state.stress_of("turbo", None));
                         }
                         Mode::Cooling => {
-                            ui.label("Coolant and oil, coloured by temperature. Coolant runs from the water pump through the block's water jacket and up into the head, out to the radiator once the thermostat opens (round the bypass until then) and through the heater core. Oil runs from the pan through the filter to the main bearings and the head.");
+                            ui.label("Coolant and oil, coloured by temperature. Coolant runs from the water pump through the block's water jacket and up into the head, out to the radiator once the thermostat opens (round the bypass until then) and through the heater core. Oil runs from the pan through the filter into the main gallery: to the main bearings, through drillings in the crank to the rod bearings, out of the piston squirters onto the pistons, and up to the head, then falls back to the pan.");
                             if state.turbo {
                                 ui.label(if state.turbo_water_cooled {
                                     "Turbo: oil fed from a sandwich plate under the filter, drained into the pan; coolant from the block's exhaust side, returned to the heater hose."
