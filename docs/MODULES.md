@@ -1,5 +1,19 @@
 # Plugging modules into the sim
 
+## From another program (the 3D renderer exe)
+
+The sim (the Windows app, or `npm start` with the page open) serves its state on this PC only:
+
+- `ws://127.0.0.1:8080/ws`: a WebSocket. Every message is a JSON text frame
+  `{ "type": "state", "v": 1, "t": <seconds>, "state": { ...renderState... } }`, about 60 a second. The latest frame is
+  sent as soon as you connect.
+- `GET http://127.0.0.1:8080/state`: the latest frame as JSON (HTTP 204 before the sim has sent one).
+
+The port is 8080 unless `HONDA_SIM_PORT` is set or 8080 is taken (the window title shows the port in use). `v`
+changes only if the format changes in a way that breaks readers; new fields can be added at any time.
+
+## Inside the app
+
 Display and logging modules (the 3D engine, extra gauges, a datalogger) read the sim through one interface,
 `src/simstate.js`, so the engine model can change underneath them without breaking them.
 

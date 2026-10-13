@@ -14,6 +14,20 @@ npm start
 
 Then open http://localhost:8080 in Chrome or Edge. No install step: there are no dependencies.
 
+## Windows app
+
+`HondaSim-<version>-portable.exe` is the whole sim in one file: double-click it, no install and no browser. The zip
+build is the same app unpacked (run `Honda Sim.exe`). Wheel and pedals work the same way as in the browser.
+Windows may warn that the app is unrecognised because it isn't code-signed; choose **More info → Run anyway**.
+
+The app also shares its live state with other programs on the same PC, such as the 3D renderer:
+`ws://127.0.0.1:8080/ws` (WebSocket, about 60 updates a second) or `http://127.0.0.1:8080/state`. If port 8080 is
+taken it picks another and shows it in the window title; set `HONDA_SIM_PORT` to choose one. See
+[docs/MODULES.md](docs/MODULES.md).
+
+To build it yourself: `npm install`, then `npm run dist:win` (the exe and zip land in `dist/`). `npm run desktop`
+runs the app without packaging it.
+
 ## Getting your tune in
 
 FlashPro `.fpcal` files are encrypted, so the sim can't read them directly. Copy the tables out of FlashPro Manager instead:

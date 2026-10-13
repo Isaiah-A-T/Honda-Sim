@@ -5,6 +5,7 @@ import { CAR, placeholderTune, turboSetup } from './k20z3.js';
 import { createSim, step, shift, shiftUp, shiftDown, startEngine, rebuildEngine, snapshot, logToCsv, setTune } from './sim.js';
 import { PARTS, MATERIALS, partStatus, materialsFor, partMaterial } from './internals.js';
 import { FLOW } from './gasflow.js';
+import { createBridge } from './bridge.js';
 import { createInput, attachKeyboard, readInput, startLearn, AXES, BUTTONS } from './input.js';
 
 const TUNE_KEY = 'honda-sim.tune.v1';
@@ -397,8 +398,11 @@ function updateDash(input) {
   $('padName').textContent = inp.padName ? `Detected: ${inp.padName}` : 'No wheel or pedals detected yet. Press any pedal or button.';
 }
 
+const bridge = createBridge(sim);
 let last = performance.now(), frame = 0, wasFull = false;
-function loop(now) {
+// fromTimer: the window is hidden (minimized, or behind the 3D view), so animation frames have stopped
+// but the sim and the state stream must keep running.
+function loop(now, fromTimer = false) {
   const dt = Math.min(0.05, (now - last) / 1000);
   last = now;
   const input = readInput(inp, dt);
@@ -413,9 +417,11 @@ function loop(now) {
   highlightCell();
   if (frame++ % 6 === 0) { drawDyno(); updateInternals(); }
   if (r3d && r3dVisible) r3d.update(sim, dt);
+  bridge.tick(now);
   $('btnCsv').disabled = sim.logging || !sim.log.length;
-  requestAnimationFrame(loop);
+  if (!fromTimer) requestAnimationFrame(loop);
 }
+setInterval(() => { if (document.hidden) loop(performance.now(), true); }, 16);
 
 $('carName').textContent = CAR.name;
 renderTabs();
