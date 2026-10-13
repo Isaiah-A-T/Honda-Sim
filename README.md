@@ -55,8 +55,12 @@ solenoid and wastegate, so set **WG duty gain** until the sim's boost matches a 
 | `src/sim.js` | Ties it together: shifting, auto-clutch, stalling, datalog |
 | `src/input.js` | Gamepad API wheel/pedal mapping and keyboard |
 | `src/ui.js` | Dash, table view with the active cell highlighted, dyno chart |
+| `tools/calibrate.mjs` | Re-solves the volumetric efficiency tables from the torque targets |
 
-The engine model is tuned to land near the published K20Z3 numbers (197 hp at 7,800 rpm), but it is a model, not your car.
+The engine and car are calibrated to public data: Honda's 197 hp / 139 lb-ft rating and gear ratios, Hondata's
+VTEC crossover data, and road tests (0–60 in 6.8 s and a 15.2 s quarter mile at 94 mph, against 6.5–7.2 s and
+14.9–15.6 s for the real car). See [docs/CALIBRATION.md](docs/CALIBRATION.md) for sources and what isn't calibrated yet.
+It is still a model, not your car.
 Use it to catch mistakes in a tune (timing past the knock limit, a VTEC point that leaves a hole, lean cells under load), not as a dyno sheet.
 The placeholder tune that loads first is generic and is not Honda's or Hondata's calibration.
 

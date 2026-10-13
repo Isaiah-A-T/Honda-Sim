@@ -21,11 +21,37 @@ test('idles near 750 rpm in neutral', () => {
   assert.ok(s.running);
 });
 
-test('stock-like power: roughly 180–200 hp near 7,800 rpm on the placeholder tune', () => {
-  const e = wot(placeholderTune(), 7800);
-  const p = hp(e.torqueNm, 7800);
-  assert.ok(p > 175 && p < 205, `hp ${p}`);
-  assert.ok(e.highCam);
+test('matches the Honda rating: 197 hp @ 7,800 and 139 lb-ft @ 6,200 (within 3%)', () => {
+  const p = hp(wot(placeholderTune(), 7800).torqueNm, 7800);
+  assert.ok(Math.abs(p - 197) / 197 < 0.03, `hp ${p}`);
+  const lbft = wot(placeholderTune(), 6200).torqueNm * 0.7376;
+  assert.ok(Math.abs(lbft - 139) / 139 < 0.03, `lb-ft ${lbft}`);
+});
+
+test('matches Hondata: VTEC at 4,500 on a stock engine loses power between 4,500 and 5,600', () => {
+  const stock = placeholderTune(), early = { ...stock, vtecRpm: 4500 };
+  for (const rpm of [4800, 5200]) assert.ok(wot(early, rpm).torqueNm < wot(stock, rpm).torqueNm, `at ${rpm}`);
+  assert.ok(wot(early, 6000).torqueNm > wot({ ...stock, vtecRpm: 6500 }, 6000).torqueNm);
+});
+
+test('matches road tests: 0–60 in 6.5–7.2 s and the quarter mile in 14.9–15.6 s at 93–95 mph', () => {
+  const s = createSim();
+  run(s, { throttle: 0 }, 1);
+  run(s, { throttle: 1 }, 0.6);                 // pre-rev, then drop into 1st
+  shift(s, 1); s.shiftT = 0;
+  let g = 1, t = 0, t0 = null, t60 = null, tq = null, mph = 0;
+  const d0 = s.car.distanceM;
+  while (t < 30 && tq === null) {
+    step(s, { throttle: 1 }, 0.005); t += 0.005;
+    if (s.eng.rpm > 7900 && s.car.locked && g < 6) shift(s, ++g);
+    const d = s.car.distanceM - d0;
+    if (t0 === null && d >= 0.3048) t0 = t;     // magazines start the clock after 1 ft of rollout
+    if (t0 !== null && t60 === null && s.car.speedMs * 2.237 >= 60) t60 = t - t0;
+    if (d >= 402.3) { tq = t - t0; mph = s.car.speedMs * 2.237; }
+  }
+  assert.ok(t60 > 6.5 && t60 < 7.2, `0-60 ${t60}`);
+  assert.ok(tq > 14.9 && tq < 15.6, `quarter ${tq}`);
+  assert.ok(mph > 93 && mph < 95.5, `trap ${mph}`);
 });
 
 test('launches, pulls through the gears with the auto-clutch and hits the rev limiter', () => {
@@ -45,7 +71,7 @@ test('launches, pulls through the gears with the auto-clutch and hits the rev li
 test('a VTEC point too high loses power between the cam crossover and the switch', () => {
   const early = { ...placeholderTune(), vtecRpm: 5000 };
   const late = { ...placeholderTune(), vtecRpm: 6500 };
-  assert.ok(wot(early, 5800).torqueNm > wot(late, 5800).torqueNm + 10);
+  assert.ok(wot(early, 6200).torqueNm > wot(late, 6200).torqueNm + 20);
 });
 
 test('too much timing knocks and gets retarded; too little loses torque', () => {

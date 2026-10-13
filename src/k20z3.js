@@ -5,18 +5,20 @@
 // not measurements. The placeholder tune below is generic and is not Honda's or Hondata's calibration;
 // it is only there so the sim runs before real tables are pasted in.
 
-import { clamp } from './tables.js';
+import { clamp, lookup1 } from './tables.js';
 
 export const CAR = {
   name: '2006–2011 Civic Si (K20Z3)',
-  massKg: 1250 + 80,                 // curb weight plus driver
-  gears: [3.267, 2.130, 1.517, 1.147, 0.921, 0.738],
-  reverse: 3.0,
-  finalDrive: 4.764,
+  massKg: 1305 + 80,                 // 2,877 lb curb (Honda spec) plus driver
+  gears: [3.267, 2.130, 1.517, 1.147, 0.921, 0.659],   // Honda spec sheet
+  reverse: 3.583,
+  finalDrive: 4.765,
   tireRadiusM: 0.3127,               // 215/45R17
   drivelineEff: 0.88,
   cd: 0.31, frontalAreaM2: 2.0, crr: 0.012,
   clutchCapacityNm: 320,
+  tractionMu: 1.0,                   // tire grip; 61% of the weight is on the front (driven) wheels
+  frontWeight: 0.61,
 };
 
 export const ENGINE = {
@@ -29,13 +31,26 @@ export const ENGINE = {
   idleRpm: 750,
 };
 
-// Volumetric efficiency (0–1) at wide-open throttle for each cam profile, given rpm.
+// Crank torque targets (Nm) at wide-open throttle on a stock engine, per cam profile. The volumetric
+// efficiency tables below are solved from these by tools/calibrate.mjs, so edit these, not VE_*.
+// Anchors: Honda's rating of 197 hp @ 7,800 and 139 lb-ft (188 Nm) @ 6,200 rpm; Hondata's note that
+// moving VTEC to 4,500 on a stock car loses power from 4,500 to 5,600 rpm (so the high cam only
+// overtakes the low cam around 5,600); the stock VTEC point of 5,800 rpm. The low cam shape between
+// those anchors is an estimate from the usual look of stock K20Z3 dyno charts, not a measurement.
+export const TORQUE_TARGETS = {
+  low: [[1000, 125], [2000, 145], [3000, 158], [3500, 163], [4000, 168], [4500, 171], [5000, 170], [5500, 166], [5800, 162], [6500, 150], [7500, 128], [8500, 105], [9000, 92]],
+  high: [[1000, 80], [3000, 120], [4000, 140], [5000, 152], [5500, 161], [5800, 172], [6200, 188], [6800, 187], [7400, 184], [7800, 180], [8200, 170], [8600, 158], [9000, 145]],
+};
+
+// Volumetric efficiency at wide-open throttle, solved from TORQUE_TARGETS (run tools/calibrate.mjs).
+export const VE_RPM = TORQUE_TARGETS.low.map(([r]) => r);
+export const VE_LOW = [0.5898, 0.6983, 0.7825, 0.8206, 0.8606, 0.8933, 0.9093, 0.9135, 0.9088, 0.8866, 0.7883, 0.7152, 0.679];
+export const VE_HIGH = [0.3867, 0.6028, 0.7213, 0.8115, 0.8739, 0.9379, 1.031, 1.0405, 1.0304, 1.0188, 0.9873, 0.9516, 0.9119];
+
 export function trueVE(rpm, highCam) {
-  const k = rpm / 1000;
-  return highCam
-    ? 0.70 + 0.31 * Math.exp(-(((k - 7.0) / 2.6) ** 2))
-    : 0.58 + 0.29 * Math.exp(-(((k - 4.4) / 2.4) ** 2));
+  return highCam ? lookup1(VE_HIGH_RPM, VE_HIGH, rpm) : lookup1(VE_RPM, VE_LOW, rpm);
 }
+export const VE_HIGH_RPM = TORQUE_TARGETS.high.map(([r]) => r);
 
 // Spark advance for best torque (degrees BTDC).
 export function mbt(rpm, mapKpa) {

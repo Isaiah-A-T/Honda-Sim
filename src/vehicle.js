@@ -8,6 +8,12 @@ import { clamp } from './tables.js';
 import { CAR, ENGINE } from './k20z3.js';
 
 const G = 9.81, RHO = 1.2, RPM_PER_RADS = 60 / (2 * Math.PI);
+const CG_OVER_WHEELBASE = 0.19;      // weight shifts off the front (driven) wheels as the car accelerates
+
+// Most force the front tires can put down at the current acceleration (N).
+export function tractionLimitN(accel) {
+  return CAR.tractionMu * CAR.massKg * G * Math.max(0.3, CAR.frontWeight - CG_OVER_WHEELBASE * accel / G);
+}
 
 export function createVehicle() {
   return { speedMs: 0, gear: 0, locked: false, clutchTorque: 0, accel: 0, distanceM: 0, wheelTorque: 0 };
@@ -46,14 +52,18 @@ export function stepDrivetrain(eng, v, engineTorque, { clutch = 1, brake = 0, ca
   } else if (v.locked) {
     // Engine and car move as one mass.
     const mEff = CAR.massKg + ENGINE.inertiaKgM2 * (ratio / r) ** 2;
-    const drive = engineTorque * ratio * eff / r;
+    let drive = engineTorque * ratio * eff / r;
     let fRes = resist(v.speedMs);
     if (atRest && Math.abs(drive) <= roadLoadN(1, brake)) fRes = drive;   // static friction / brakes hold
+    // Wheelspin: the tires put down only what they can grip; the rest goes into smoke.
+    const grip = tractionLimitN(v.accel);
+    v.wheelspin = Math.abs(drive) > grip;
+    if (v.wheelspin) drive = Math.sign(drive) * grip;
     const a = (drive - fRes) / mEff;
     const engAccel = a / r * ratio;           // rad/s² at the crank
     v.clutchTorque = engineTorque - ENGINE.inertiaKgM2 * engAccel;
     if (Math.abs(v.clutchTorque) > capacity) v.locked = false;
-    else {
+    else if (v.locked) {
       v.accel = a;
       v.speedMs += a * dt;
       eng.rpm = Math.max(0, v.speedMs / r * ratio * RPM_PER_RADS);
@@ -66,9 +76,14 @@ export function stepDrivetrain(eng, v, engineTorque, { clutch = 1, brake = 0, ca
   // Slipping or disengaged.
   const slip = we - wt;
   v.clutchTorque = ratio === 0 ? 0 : Math.sign(slip) * capacity * clamp(Math.abs(slip), 0, 1);
+
   we += (engineTorque - v.clutchTorque) / ENGINE.inertiaKgM2 * dt;
   let fRes = resist(v.speedMs);
-  const drive = v.clutchTorque * ratio * eff / r;
+  let drive = v.clutchTorque * ratio * eff / r;
+  // Spinning tires: the car only gets what the tires can put down (no separate tire speed is modelled).
+  const grip = tractionLimitN(v.accel);
+  v.wheelspin = Math.abs(drive) > grip;
+  if (v.wheelspin) drive = Math.sign(drive) * grip;
   if (atRest && Math.abs(drive) <= roadLoadN(1, brake)) fRes = drive;
   v.accel = (drive - fRes) / CAR.massKg;
   v.speedMs += v.accel * dt;

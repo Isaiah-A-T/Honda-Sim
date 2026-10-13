@@ -6,7 +6,7 @@ import { createEngine, stepEngine, hp } from './engine.js';
 import { createVehicle, stepDrivetrain, overallRatio } from './vehicle.js';
 
 const SUBSTEP = 0.001;
-const SHIFT_TIME = 0.25;                 // seconds the auto-clutch stays open for a shift
+const SHIFT_TIME = 0.2;                 // seconds the auto-clutch stays open for a shift
 const LOG_HZ = 20;
 
 export function createSim(tune = placeholderTune()) {
@@ -17,6 +17,7 @@ export function createSim(tune = placeholderTune()) {
     running: true,
     shiftT: 0,
     ac: 0,
+    launching: false,
     lastClutch: 1,
     log: [],
     logEvery: 1 / LOG_HZ, logT: 0, logging: false,
@@ -53,9 +54,17 @@ function autoClutch(sim, throttle, h) {
   const wheelRpm = Math.abs(sim.car.speedMs / CAR.tireRadiusM * overallRatio(sim.car.gear)) * 60 / (2 * Math.PI);
   if (sim.shiftT > 0 || sim.car.gear === 0) target = 0;
   else if (wheelRpm < 1000 && throttle < 0.05) target = 0;            // rolling to a stop: don't stall
-  else if (wheelRpm < 1100) target = clamp((sim.eng.rpm - 900) / (300 + throttle * 2200), 0, 1) ** 2;  // launch
+  else if (wheelRpm < 1100 || (sim.launching && !sim.car.locked)) {
+    sim.launching = true;
+    // Launch: slip the clutch to hold the engine near a launch rpm that rises with throttle (~4,500 at WOT).
+    const launchRpm = 1300 + throttle * 3200;
+    const cap = sim.eng.tune.clutchNm ?? CAR.clutchCapacityNm;
+    sim.ac = clamp(Math.max(0, sim.eng.torqueNm) / cap + (sim.eng.rpm - launchRpm) * 0.0008, 0, 1);
+    return sim.ac;
+  }
   else target = 1;
-  sim.ac += (target - sim.ac) * Math.min(1, h * (target > sim.ac ? 6 : 30));
+  if (sim.car.locked) sim.launching = false;
+  sim.ac += (target - sim.ac) * Math.min(1, h * (target > sim.ac ? 10 : 30));
   return sim.ac;
 }
 
