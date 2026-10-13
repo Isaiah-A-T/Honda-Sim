@@ -102,6 +102,16 @@ function limit(m, pa, Ta, Va, pb, Tb, Vb) {
   return clamp(m, -0.7 * eq, 0.7 * eq);
 }
 
+// Valve lift (m) for a cylinder at thetaDeg, measured from that cylinder's firing TDC (−360…360,
+// overlap TDC at ±360). Same cam lobes and VTC phasing the flow model uses, for renderers and charts.
+export function valveLiftM(thetaDeg, intake, highCam, vtc = 0, geom = FLOW) {
+  const cam = highCam ? geom.cams.high : geom.cams.low;
+  const th = ((thetaDeg + 360) % 720 + 720) % 720 - 360;
+  return intake
+    ? liftAt(th, -360 + geom.intakeCentre0 - vtc, cam.inDur, cam.inLift)
+    : liftAt(th, 360 - geom.exhaustCentre, cam.exDur, cam.exLift);
+}
+
 export function createGasflow(geom = FLOW) {
   const G = geom;
   const ap = Math.PI / 4 * G.boreM ** 2, vd = ap * G.strokeM;

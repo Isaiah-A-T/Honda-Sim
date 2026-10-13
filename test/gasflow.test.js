@@ -70,3 +70,15 @@ test('forged internals survive boost and timing that break the stock bottom end'
   const worst = s => Math.max(...Object.entries(s.load).filter(([k]) => k !== 'valvetrain').map(([, v]) => v));
   assert.ok(worst(built.s) < worst(stock.s) * 0.75, `${worst(built.s)} vs ${worst(stock.s)}`);
 });
+
+test('add-on modules get the sim state as plain data, with real valve lift', async () => {
+  const { createSim, step } = await import('../src/sim.js');
+  const { renderState, valveLift } = await import('../src/simstate.js');
+  const sim = createSim();
+  for (let i = 0; i < 100; i++) step(sim, { throttle: 0.3 }, 0.01);
+  const st = renderState(sim);
+  assert.deepEqual(JSON.parse(JSON.stringify(st)), st);
+  assert.ok(st.crankDeg >= 0 && st.crankDeg < 720 && st.parts.sleeve && st.parts.piston.material.name);
+  assert.ok(valveLift(st, 1, true, 360 + 100) > 0.005);    // intake open after overlap TDC
+  assert.equal(valveLift(st, 1, true, 0), 0);              // closed at firing TDC
+});

@@ -83,6 +83,7 @@ export function step(sim, input, dt) {
   const h = dt / n;
   for (let i = 0; i < n; i++) {
     sim.shiftT = Math.max(0, sim.shiftT - h);
+    sim.crankDeg = ((sim.crankDeg ?? 0) + Math.max(sim.eng.rpm, 0) * 6 * h) % 720;   // cylinder 1 firing TDC = 0
     const clutch = input.clutch == null
       ? autoClutch(sim, throttle, h)
       : 1 - clamp(input.clutch, 0, 1);
