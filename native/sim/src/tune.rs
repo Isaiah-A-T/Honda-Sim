@@ -2,6 +2,7 @@
 //! between the two.
 
 use crate::tables::Table;
+use crate::thermal::Cooling;
 use serde::{Deserialize, Serialize};
 use std::collections::BTreeMap;
 
@@ -80,9 +81,16 @@ pub struct Tune {
     pub materials: BTreeMap<String, String>,
     pub parts: Parts,
     pub flow: FlowOverrides,
+    /// Cooling and oil system changes (thermostat, fans, oil grade, oil cooler); None = stock.
+    pub cooling: Option<Cooling>,
 }
 
 impl Tune {
+    /// The cooling and oil system as fitted (stock unless the tune changes it).
+    pub fn cooling(&self) -> Cooling {
+        self.cooling.clone().unwrap_or_default()
+    }
+
     /// A tune with empty tables, for filling in field by field.
     pub fn empty() -> Tune {
         let t = Table { rows: vec![0.0], cols: vec![0.0], data: vec![vec![0.0]] };
@@ -112,6 +120,7 @@ impl Tune {
             materials: BTreeMap::new(),
             parts: Parts::default(),
             flow: FlowOverrides::default(),
+            cooling: None,
         }
     }
 }

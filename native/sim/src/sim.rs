@@ -6,6 +6,7 @@ use crate::internals::Internals;
 use crate::k20z3::{CAR, ENGINE};
 use crate::tables::clamp;
 use crate::tune::Tune;
+use crate::thermal::{Thermal, ThermalInput};
 use crate::vehicle::{overall_ratio, step_drivetrain, Vehicle};
 use serde::Serialize;
 
@@ -75,6 +76,14 @@ impl Sim {
         self.eng.knock_retard = 0.0;
     }
 
+    /// Engine cold (coolant and oil at the outside air temperature), as after sitting overnight.
+    pub fn cold_engine(&mut self) {
+        let e = &mut self.eng;
+        e.thermal = Thermal::new(e.tune.ambient_c.unwrap_or(25.0), false, e.tune.cooling());
+        e.ect = e.thermal.coolant_c;
+        e.oil_c = e.thermal.oil_c;
+    }
+
     pub fn rebuild_engine(&mut self) {
         self.internals = Internals::default();
         self.eng.knock_count = 0;
@@ -133,6 +142,21 @@ impl Sim {
             }
             let cap = self.eng.tune.clutch_nm;
             step_drivetrain(&mut self.eng, &mut self.car, tq, clutch, brake, cap, h);
+            // Coolant and oil: heat from combustion and friction while running, then the engine cools down.
+            let on = self.running;
+            let e = &mut self.eng;
+            let input = ThermalInput {
+                rpm: e.rpm,
+                fuel_gs: if on { e.fuel_gs } else { 0.0 },
+                friction_w: if on { e.friction_nm * e.rpm * std::f64::consts::PI / 30.0 } else { 0.0 },
+                heat_loss: 0.30,
+                speed_ms: self.car.speed_ms,
+                map_kpa: e.map,
+                ambient_c: e.tune.ambient_c.unwrap_or(25.0),
+            };
+            e.thermal.step(&input, h);
+            e.ect = e.thermal.coolant_c;
+            e.oil_c = e.thermal.oil_c;
             if !self.running && self.eng.rpm < 1.0 {
                 self.eng.rpm = 0.0;
             }
@@ -200,6 +224,12 @@ impl Sim {
             residual_pct: r(e.residual * 100.0, 1),
             turbo_krpm: (e.turbo_rad_s * 30.0 / std::f64::consts::PI / 1000.0).round(),
             wg_open_pct: (e.wg_open * 100.0).round(),
+            ect_c: r(e.ect, 1),
+            oil_c: r(e.oil_c, 1),
+            oil_kpa: e.oil_kpa.round(),
+            thermostat_pct: (e.thermal.thermostat * 100.0).round(),
+            fan: if e.thermal.fan_on { 1 } else { 0 },
+            radiator_kw: r(e.thermal.radiator_kw, 1),
         }
     }
 }
@@ -250,6 +280,12 @@ pub struct LogRow {
     pub residual_pct: f64,
     pub turbo_krpm: f64,
     pub wg_open_pct: f64,
+    pub ect_c: f64,
+    pub oil_c: f64,
+    pub oil_kpa: f64,
+    pub thermostat_pct: f64,
+    pub fan: i32,
+    pub radiator_kw: f64,
 }
 
 /// CSV of log rows (header from the field names).

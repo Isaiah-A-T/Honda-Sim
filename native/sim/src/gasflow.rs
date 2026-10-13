@@ -205,13 +205,15 @@ pub struct Cond {
     pub fire: bool,
     pub octane: f64,
     pub out_kpa: f64,
+    /// Head and port wall temperature (coolant), °C.
+    pub wall_c: f64,
     /// The whole engine's exhaust outlet; None = the exhaust system orifice.
     pub out_area_m2: Option<f64>,
 }
 
 impl Default for Cond {
     fn default() -> Self {
-        Cond { rpm: 3000.0, map_kpa: 100.0, iat_c: 25.0, high_cam: false, vtc: 0.0, ign_deg: 20.0, lambda: 1.0, fire: true, octane: 91.0, out_kpa: 101.3, out_area_m2: None }
+        Cond { rpm: 3000.0, map_kpa: 100.0, iat_c: 25.0, high_cam: false, vtc: 0.0, ign_deg: 20.0, lambda: 1.0, fire: true, octane: 91.0, out_kpa: 101.3, wall_c: 90.0, out_area_m2: None }
     }
 }
 
@@ -310,7 +312,11 @@ impl Gas {
         let cam = *g.cams(c.high_cam);
         let p0 = c.map_kpa * 1000.0;
         let tm = 273.0 + c.iat_c;
-        let t0 = tm + g.charge_heat_k * (3000.0 / rpm).powf(0.3);
+        // Port walls heat the incoming air in proportion to how hot they are (calibrated at 90 °C), and
+        // cold walls take more heat out of combustion.
+        let wall_f = ((c.wall_c - 25.0) / 65.0).max(0.0);
+        let heat_loss = g.heat_loss * (1.0 + 0.004 * (90.0 - c.wall_c));
+        let t0 = tm + g.charge_heat_k * wall_f * (3000.0 / rpm).powf(0.3);
         let p_out = c.out_kpa * 1000.0;
         let out_area = c.out_area_m2.unwrap_or(PI / 4.0 * g.exhaust_dia_m.powi(2)) / 4.0;
         let in_centre = -360.0 + g.intake_centre0 - c.vtc;
@@ -413,7 +419,7 @@ impl Gas {
                     burn_dur = g.burn_deg * (1.0 + 2.5 * (residual - 0.04).max(0.0)) * (1.0 + 1.5 * (lam - 1.0).max(0.0) + 0.8 * (0.8 - lam).max(0.0)) * (rpm / 4000.0).powf(0.25);
                     let rich_gain = if lam < 1.0 { clamp(1.0 + 0.045 * (1.0 - ((lam - 0.87) / 0.13).powi(2)), 0.85, 1.045) } else { 1.0 };
                     let misfire = if lam > 1.35 { clamp(1.0 - (lam - 1.35) * 4.0, 0.0, 1.0) } else { 1.0 };
-                    q_total = (trapped_fresh / (STOICH * lam)).min(trapped_fresh / STOICH) * LHV * (1.0 - g.heat_loss) * rich_gain * misfire;
+                    q_total = (trapped_fresh / (STOICH * lam)).min(trapped_fresh / STOICH) * LHV * (1.0 - heat_loss) * rich_gain * misfire;
                 }
                 let x = clamp((th + step_deg - theta_s) / burn_dur, 0.0, 1.0);
                 let xb = 1.0 - (-6.9 * x.powi(3)).exp();

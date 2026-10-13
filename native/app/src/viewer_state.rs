@@ -66,7 +66,10 @@ pub fn viewer_state(sim: &Sim) -> SimState {
         ("Piston crown".to_string(), format!("{:.0} °C", s.piston_c)),
         ("EGT".to_string(), format!("{:.0} °C", e.egt_c)),
     ];
-    readouts.push(("Oil pressure".to_string(), format!("{:.0} kPa", e.oil_kpa)));
+    readouts.push(("Coolant".to_string(), format!("{:.0} °C{}", e.ect, if e.thermal.boiling { " BOILING" } else { "" })));
+    readouts.push(("Oil".to_string(), format!("{:.0} °C, {:.0} kPa", e.oil_c, e.oil_kpa)));
+    readouts.push(("Thermostat".to_string(), format!("{:.0}% open", e.thermal.thermostat * 100.0)));
+    readouts.push(("Fans".to_string(), if e.thermal.fan_on { "on".to_string() } else { "off".to_string() }));
     if turbo_on && !t.turbo.fixed {
         readouts.push(("Turbo shaft".to_string(), format!("{:.0}k rpm", e.turbo_rad_s * 30.0 / std::f64::consts::PI / 1000.0)));
     }

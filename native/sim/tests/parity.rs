@@ -7,6 +7,7 @@ use honda_sim_core::internals::Internals;
 use honda_sim_core::k20z3::{placeholder_tune, turbo_setup, VE_CORR_HIGH, VE_CORR_LOW};
 use honda_sim_core::parts::bottom_end;
 use honda_sim_core::sim::{Input, Sim};
+use honda_sim_core::thermal::{Cooling, Thermal, ThermalInput};
 use honda_sim_core::tune::{Parts, Tune};
 use serde_json::Value;
 
@@ -39,7 +40,7 @@ fn gas_exchange_cycle_matches() {
         let cond = Cond {
             rpm: f(c, "rpm"), map_kpa: f(c, "mapKpa"), iat_c: f(c, "iatC"), high_cam: c["highCam"].as_bool().unwrap(), vtc: f(c, "vtc"),
             ign_deg: f(c, "ignDeg"), lambda: f(c, "lambda"), fire: c["fire"].as_bool().unwrap(), octane: f(c, "octane"),
-            out_kpa: c["outKpa"].as_f64().unwrap_or(101.3), out_area_m2: c["outAreaM2"].as_f64(),
+            out_kpa: c["outKpa"].as_f64().unwrap_or(101.3), wall_c: c["wallC"].as_f64().unwrap_or(90.0), out_area_m2: c["outAreaM2"].as_f64(),
         };
         let mut g = Gas::new(flow_defaults());
         let o = g.settle(&cond, 40);
@@ -110,7 +111,7 @@ fn launch_and_pull_matches() {
         }
         sim.step(Input { throttle: 1.0, brake: 0.0, clutch: None }, 0.01);
         if i % 50 == 49 {
-            got.push((sim.t, sim.eng.rpm, sim.car.speed_ms, sim.car.gear));
+            got.push((sim.t, sim.eng.rpm, sim.car.speed_ms, sim.car.gear, sim.eng.ect, sim.eng.oil_c, sim.eng.oil_kpa));
         }
     }
     for (g, js) in got.iter().zip(data()["drive"].as_array().unwrap()) {
@@ -118,7 +119,66 @@ fn launch_and_pull_matches() {
         close(&format!("rpm at {}", g.0), g.1, f(js, "rpm"), 1e-4, 1e-3);
         close(&format!("speed at {}", g.0), g.2, f(js, "speedMs"), 1e-4, 1e-4);
         assert_eq!(g.3 as f64, f(js, "gear"));
+        close(&format!("ect at {}", g.0), g.4, f(js, "ectC"), 1e-6, 1e-6);
+        close(&format!("oil at {}", g.0), g.5, f(js, "oilC"), 1e-6, 1e-6);
+        close(&format!("oil pressure at {}", g.0), g.6, f(js, "oilKpa"), 1e-5, 1e-4);
     }
+}
+
+#[test]
+fn cooling_matches() {
+    for case in data()["thermal"].as_array().unwrap() {
+        let name = case["name"].as_str().unwrap();
+        let g: Cooling = serde_json::from_value(case["overrides"].clone()).unwrap();
+        let l = &case["load"];
+        let input = ThermalInput {
+            rpm: f(l, "rpm"), fuel_gs: f(l, "fuelGs"), friction_w: f(l, "frictionW"), heat_loss: f(l, "heatLoss"),
+            speed_ms: f(l, "speedMs"), map_kpa: f(l, "mapKpa"), ambient_c: f(l, "ambientC"),
+        };
+        let mut th = Thermal::new(input.ambient_c, name != "dyno", g);
+        let rows = case["rows"].as_array().unwrap();
+        let mut k = 0;
+        for i in 1..=rows.len() * 600 {
+            th.step(&input, 0.05);
+            if i % 600 == 0 {
+                let js = &rows[k];
+                let tag = format!("{name} at {}", f(js, "t"));
+                close(&format!("{tag} coolant"), th.coolant_c, f(js, "coolantC"), 1e-7, 1e-7);
+                close(&format!("{tag} radiator"), th.radiator_c, f(js, "radiatorC"), 1e-7, 1e-7);
+                close(&format!("{tag} oil"), th.oil_c, f(js, "oilC"), 1e-7, 1e-7);
+                close(&format!("{tag} thermostat"), th.thermostat, f(js, "thermostat"), 1e-7, 1e-7);
+                assert_eq!(th.fan_on, js["fanOn"].as_bool().unwrap(), "{tag} fan");
+                assert_eq!(th.boiling, js["boiling"].as_bool().unwrap(), "{tag} boiling");
+                k += 1;
+            }
+        }
+    }
+}
+
+#[test]
+fn cold_start_matches() {
+    let mut sim = Sim::new(placeholder_tune());
+    sim.cold_engine();
+    let rows = data()["coldStart"].as_array().unwrap().clone();
+    let mut k = 0;
+    for i in 0..4000 {
+        if i == 2000 {
+            sim.shift(1);
+        }
+        sim.step(Input { throttle: if i < 2000 { 0.0 } else { 0.3 }, brake: 0.0, clutch: None }, 0.01);
+        if i % 250 == 249 {
+            let js = &rows[k];
+            let tag = format!("cold start at {:.2}", sim.t);
+            close(&format!("{tag} rpm"), sim.eng.rpm, f(js, "rpm"), 1e-4, 1e-3);
+            close(&format!("{tag} speed"), sim.car.speed_ms, f(js, "speedMs"), 1e-4, 1e-4);
+            close(&format!("{tag} ect"), sim.eng.ect, f(js, "ectC"), 1e-6, 1e-6);
+            close(&format!("{tag} oil"), sim.eng.oil_c, f(js, "oilC"), 1e-6, 1e-6);
+            close(&format!("{tag} oil pressure"), sim.eng.oil_kpa, f(js, "oilKpa"), 1e-5, 1e-4);
+            close(&format!("{tag} friction"), sim.eng.friction_nm, f(js, "frictionNm"), 1e-5, 1e-5);
+            k += 1;
+        }
+    }
+    assert_eq!(k, rows.len());
 }
 
 #[test]
@@ -126,7 +186,7 @@ fn render_state_has_the_web_fields() {
     let mut sim = Sim::new(placeholder_tune());
     sim.step(Input { throttle: 0.5, ..Default::default() }, 0.05);
     let s = honda_sim_core::simstate::render_state(&sim);
-    for k in ["rpm", "crankDeg", "cams", "combustion", "flow", "induction", "parts", "geometry", "bottomEnd"] {
+    for k in ["rpm", "crankDeg", "cams", "combustion", "flow", "induction", "parts", "geometry", "bottomEnd", "cooling"] {
         assert!(!s[k].is_null(), "{k}");
     }
     assert_eq!(s["cams"]["card"]["intakeHigh"]["liftMm"], 11.7);

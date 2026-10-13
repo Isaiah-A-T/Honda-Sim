@@ -7,6 +7,7 @@ use crate::internals::{engine_geometry, Geometry};
 use crate::k20z3::{friction_nm, mbt, ve_correction, ENGINE};
 use crate::parts::{bottom_end, BottomEnd};
 use crate::tables::{clamp, guess_fuel_units, lookup2};
+use crate::thermal::{oil_pressure_kpa, visc_ratio, Thermal};
 use crate::tune::Tune;
 use std::f64::consts::PI;
 
@@ -36,9 +37,9 @@ pub fn flow_geom(t: &Tune, b: &BottomEnd) -> Flow {
     g
 }
 
-fn oil_pressure_kpa(rpm: f64, ect_c: f64) -> f64 {
-    let warm = clamp((ect_c - 20.0) / 70.0, 0.0, 1.0);
-    clamp(80.0 + rpm * 0.065, 0.0, 600.0) * (1.25 - 0.25 * warm)
+/// Fast idle on a cold engine: up to about 1,350 rpm when freezing, back to 750 by 60 °C (estimate).
+pub fn cold_idle_rpm(ect_c: f64) -> f64 {
+    ENGINE.idle_rpm + 600.0 * clamp((60.0 - ect_c) / 60.0, 0.0, 1.0)
 }
 
 pub fn hp(torque_nm: f64, rpm: f64) -> f64 {
@@ -85,6 +86,10 @@ pub struct Engine {
     pub ve: f64,
     pub iat: f64,
     pub ect: f64,
+    pub oil_c: f64,
+    pub fuel_gs: f64,
+    pub friction_nm: f64,
+    pub thermal: Thermal,
     pub boost: f64,
     pub ic_drop_kpa: f64,
     pub charge_out_c: f64,
@@ -121,6 +126,7 @@ impl Engine {
         let bottom = bottom_end(&tune);
         let geometry = engine_geometry(&tune, &bottom);
         let g = flow_geom(&tune, &bottom);
+        let thermal = Thermal::new(tune.ambient_c.unwrap_or(25.0), true, tune.cooling());
         let mut e = Engine {
             disp_l: bottom.displacement_l,
             bottom,
@@ -160,6 +166,10 @@ impl Engine {
             ve: 0.9,
             iat: 25.0,
             ect: 90.0,
+            oil_c: 100.0,
+            fuel_gs: 0.0,
+            friction_nm: 0.0,
+            thermal,
             boost: 0.0,
             ic_drop_kpa: 0.0,
             charge_out_c: 25.0,
@@ -198,6 +208,7 @@ impl Engine {
     pub fn set_tune(&mut self, tune: Tune) {
         let geometry_changed = tune.parts != self.tune.parts || tune.flow != self.tune.flow || tune.materials != self.tune.materials;
         self.tune = tune;
+        self.thermal.g = self.tune.cooling();
         if geometry_changed {
             self.bottom = bottom_end(&self.tune);
             self.geometry = engine_geometry(&self.tune, &self.bottom);
@@ -233,6 +244,7 @@ impl Engine {
             lambda: self.lambda.min(3.0),
             fire: !cut && self.rpm > 200.0,
             octane: self.tune.octane,
+            wall_c: self.ect,
             out_kpa,
             out_area_m2: Some(out_area),
         }
@@ -278,9 +290,9 @@ impl Engine {
     fn step_vtec(&mut self, dt: f64) {
         let t = &self.tune;
         let rpm = self.rpm;
-        let want = rpm >= t.vtec_rpm && self.map >= t.vtec_min_map && self.ect >= 60.0;
+        let want = rpm >= t.vtec_rpm && self.map >= t.vtec_min_map && self.ect >= self.thermal.g.ect_vtec_min_c;
         self.vtec_cmd = if self.vtec_cmd { rpm >= t.vtec_rpm - 150.0 && self.map >= t.vtec_min_map - 5.0 } else { want };
-        self.oil_kpa = oil_pressure_kpa(rpm, self.ect);
+        self.oil_kpa = oil_pressure_kpa(rpm, self.oil_c, &self.thermal.g);
         let pressurised = self.vtec_cmd && self.oil_kpa >= VTEC_OIL_KPA;
         let g = &self.gas.g;
         for i in 0..4 {
@@ -301,8 +313,9 @@ impl Engine {
     pub fn step(&mut self, pedal: f64, dt: f64) -> f64 {
         let rpm = self.rpm.max(1.0);
 
-        let idle_err = ENGINE.idle_rpm - rpm;
-        if pedal < 0.02 && rpm < ENGINE.idle_rpm + 600.0 {
+        let idle_rpm = cold_idle_rpm(self.ect);
+        let idle_err = idle_rpm - rpm;
+        if pedal < 0.02 && rpm < idle_rpm + 600.0 {
             self.idle_i = clamp(self.idle_i + idle_err * 0.004 * dt, 0.0, 10.0);
             self.idle_air = clamp(self.idle_i + idle_err * 0.006, 0.0, 15.0);
         } else {
@@ -427,6 +440,7 @@ impl Engine {
             fuel_per_cyl = 0.0;
         }
         let fuel = fuel_per_cyl * ENGINE.cylinders;
+        self.fuel_gs = fuel * rpm / 120.0;
         self.lambda = if fuel > 0.0 { air_per_cycle / (fuel * STOICH) } else { 9.99 };
         self.afr = self.lambda * STOICH;
 
@@ -456,7 +470,9 @@ impl Engine {
         self.cyl_pmax_bar = g.pmax_bar * corr;
         let indicated = if fired { g.imep_kpa * corr * self.disp_l / (4.0 * PI) } else { g.imep_kpa * self.disp_l / (4.0 * PI) };
         self.pumping_nm = self.pmep_kpa * self.disp_l / (4.0 * PI);
-        self.torque_nm = indicated - friction_nm(rpm) - self.pumping_nm;
+        // Friction rises with oil viscosity (the hydrodynamic part; the fixed part is seals and mixed contact).
+        self.friction_nm = 5.0 + (friction_nm(rpm) - 5.0) * visc_ratio(self.oil_c, &self.thermal.g).powf(0.35);
+        self.torque_nm = indicated - self.friction_nm - self.pumping_nm;
         self.spark_eff = clamp(1.0 - ((self.ign - self.mbt) / 28.0).powi(2), 0.2, 1.0);
         self.over_torque = self.torque_nm > self.tune.torque_limit_nm.unwrap_or(f64::INFINITY);
         self.torque_nm

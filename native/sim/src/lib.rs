@@ -10,6 +10,7 @@ pub mod parts;
 pub mod sim;
 pub mod simstate;
 pub mod tables;
+pub mod thermal;
 pub mod tune;
 pub mod vehicle;
 

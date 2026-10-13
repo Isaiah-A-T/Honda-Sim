@@ -71,6 +71,13 @@ fn handle_event(sh: &mut Shared, ev: &str) {
         "neutral" => sim.shift(0),
         "reverse" => sim.shift(-1),
         "start" => sim.start_engine(),
+        "coldEngine" => sim.cold_engine(),
+        "warmEngine" => {
+            let e = &mut sim.eng;
+            e.thermal = honda_sim_core::thermal::Thermal::new(e.tune.ambient_c.unwrap_or(25.0), true, e.tune.cooling());
+            e.ect = e.thermal.coolant_c;
+            e.oil_c = e.thermal.oil_c;
+        }
         g if g.starts_with("gear") => {
             if let Ok(n) = g[4..].parse::<i32>() {
                 sim.shift(n)

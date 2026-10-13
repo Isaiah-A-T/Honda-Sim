@@ -10,7 +10,8 @@ import { placeholderTune, turboSetup, VE_CORR_LOW, VE_CORR_HIGH } from '../src/k
 import { createEngine, stepEngine } from '../src/engine.js';
 import { createInternals, stepInternals } from '../src/internals.js';
 import { bottomEnd } from '../src/parts.js';
-import { createSim, step, shift } from '../src/sim.js';
+import { createSim, step, shift, coldEngine } from '../src/sim.js';
+import { createThermal, stepThermal } from '../src/thermal.js';
 
 const out = p => new URL(`../native/sim/data/${p}`, import.meta.url);
 writeFileSync(out('materials.json'), JSON.stringify(MATERIALS, null, 1));
@@ -52,8 +53,35 @@ const drive = [];
 for (let i = 0; i < 600; i++) {
   if (i === 250) shift(sim, 2);
   step(sim, { throttle: 1, brake: 0, clutch: null }, 0.01);
-  if (i % 50 === 49) drive.push({ t: sim.t, rpm: sim.eng.rpm, speedMs: sim.car.speedMs, gear: sim.car.gear });
+  if (i % 50 === 49) drive.push({ t: sim.t, rpm: sim.eng.rpm, speedMs: sim.car.speedMs, gear: sim.car.gear, ectC: sim.eng.ect, oilC: sim.eng.oilC, oilKpa: sim.eng.oilKpa });
 }
 
-writeFileSync(out('parity.json'), JSON.stringify({ veCorrLow: VE_CORR_LOW, veCorrHigh: VE_CORR_HIGH, gas, engine, parts, drive }, null, 1));
+// Cooling on its own: a cold engine on a steady highway load, with and without the oil cooler, and a
+// stationary full-load run that boils.
+const thermal = [];
+for (const [name, overrides, load, seconds] of [
+  ['highway', {}, { rpm: 2500, fuelGs: 2.2, frictionW: 4000, heatLoss: 0.3, speedMs: 27, mapKpa: 55, ambientC: 20 }, 900],
+  ['highway-no-cooler', { oilCooler: 'none' }, { rpm: 2500, fuelGs: 2.2, frictionW: 4000, heatLoss: 0.3, speedMs: 27, mapKpa: 55, ambientC: 20 }, 900],
+  ['dyno', {}, { rpm: 7000, fuelGs: 14, frictionW: 20000, heatLoss: 0.3, speedMs: 0, mapKpa: 100, ambientC: 30 }, 120],
+]) {
+  const th = createThermal(load.ambientC, name !== 'dyno', overrides);
+  const rows = [];
+  for (let i = 1; i <= seconds * 20; i++) {
+    stepThermal(th, load, 0.05);
+    if (i % 600 === 0) rows.push({ t: i * 0.05, coolantC: th.coolantC, radiatorC: th.radiatorC, oilC: th.oilC, thermostat: th.thermostat, fanOn: th.fanOn, boiling: th.boiling });
+  }
+  thermal.push({ name, overrides, load, rows });
+}
+
+// A cold start: idle 20 s, then pull away gently.
+const cold = createSim(placeholderTune());
+coldEngine(cold);
+const coldStart = [];
+for (let i = 0; i < 4000; i++) {
+  if (i === 2000) shift(cold, 1);
+  step(cold, { throttle: i < 2000 ? 0 : 0.3, brake: 0, clutch: null }, 0.01);
+  if (i % 250 === 249) coldStart.push({ t: cold.t, rpm: cold.eng.rpm, speedMs: cold.car.speedMs, ectC: cold.eng.ect, oilC: cold.eng.oilC, oilKpa: cold.eng.oilKpa, frictionNm: cold.eng.frictionNm });
+}
+
+writeFileSync(out('parity.json'), JSON.stringify({ veCorrLow: VE_CORR_LOW, veCorrHigh: VE_CORR_HIGH, gas, engine, parts, drive, thermal, coldStart }, null, 1));
 console.log(`gas ${gas.length}, engine ${engine.length}, parts ${parts.length}, drive ${drive.length}`);

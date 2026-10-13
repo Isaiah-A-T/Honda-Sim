@@ -10,6 +10,7 @@ use honda_sim_core::k20z3::{placeholder_tune, turbo_6262, turbo_gt35, turbo_setu
 use honda_sim_core::materials::{material, materials_for};
 use honda_sim_core::parts::{catalog, piston_problem, rod_problem};
 use honda_sim_core::sim::log_to_csv;
+use honda_sim_core::thermal::{boiling_c, viscosity_cst, Cooling};
 use honda_sim_core::tables::{active_cell, guess_fuel_units, parse_table, Table};
 use honda_sim_core::Tune;
 use honda_sim_viewer::egui::{self, Color32, RichText};
@@ -24,13 +25,14 @@ enum Tab {
     Parts,
     Materials,
     Internals,
+    Cooling,
     Wheel,
     Log,
 }
 
-const TABS: [(Tab, &str); 8] = [
+const TABS: [(Tab, &str); 9] = [
     (Tab::Drive, "Drive"), (Tab::Tune, "Tables"), (Tab::Settings, "Settings"), (Tab::Parts, "Parts"),
-    (Tab::Materials, "Materials"), (Tab::Internals, "Internals"), (Tab::Wheel, "Wheel"), (Tab::Log, "Log"),
+    (Tab::Materials, "Materials"), (Tab::Internals, "Internals"), (Tab::Cooling, "Cooling"), (Tab::Wheel, "Wheel"), (Tab::Log, "Log"),
 ];
 
 // Tables the tune can hold: key, label.
@@ -153,6 +155,7 @@ impl Gui {
                     Tab::Parts => self.parts(ui, sh),
                     Tab::Materials => self.materials(ui, sh),
                     Tab::Internals => { self.internals(ui, sh); false }
+                    Tab::Cooling => self.cooling(ui, sh),
                     Tab::Wheel => { self.wheel(ui, sh); false }
                     Tab::Log => { self.log(ui, sh); false }
                 };
@@ -202,11 +205,21 @@ impl Gui {
             stat(ui, "Torque", format!("{:.0} Nm", tq));
             stat(ui, "Power", format!("{:.0} hp", hp(tq, e.rpm)));
             stat(ui, "IAT", format!("{:.0} °C", e.iat));
+            stat(ui, "Coolant", format!("{:.0} °C", e.ect));
+            stat(ui, "Oil", format!("{:.0} °C  {:.0} kPa", e.oil_c, e.oil_kpa));
             stat(ui, "EGT", format!("{:.0} °C", e.egt_c));
             let vtec = RichText::new(" VTEC ").strong().background_color(if e.high_cam { Color32::from_rgb(0xd0, 0x3a, 0x2e) } else { Color32::from_gray(50) });
             ui.label(vtec);
             if e.knocking {
                 ui.label(RichText::new(" KNOCK ").strong().background_color(Color32::from_rgb(0xc8, 0x6a, 0x10)));
+            }
+            if e.thermal.fan_on {
+                ui.label(RichText::new(" FANS ").strong().background_color(Color32::from_rgb(0x20, 0x60, 0xa0)));
+            }
+            if e.thermal.boiling {
+                ui.label(RichText::new(" OVERHEATING ").strong().background_color(Color32::from_rgb(0xb0, 0x10, 0x10)));
+            } else if sim.running && e.ect < 60.0 {
+                ui.label(RichText::new(" COLD ").strong().background_color(Color32::from_rgb(0x30, 0x50, 0x90)));
             }
             if e.rev_cut {
                 ui.label(RichText::new(" REV LIMIT ").strong().background_color(Color32::from_rgb(0x80, 0x30, 0xa0)));
@@ -664,6 +677,131 @@ impl Gui {
             sh.sim.rebuild_engine();
             sh.sim.start_engine();
         }
+    }
+
+    fn cooling(&mut self, ui: &mut egui::Ui, sh: &mut Shared) -> bool {
+        let e = &sh.sim.eng;
+        let th = &e.thermal;
+        let g = &th.g;
+        ui.heading("Coolant and oil");
+        ui.horizontal(|ui| {
+            if ui.button("Cold start").on_hover_text("Coolant and oil at the outside air temperature, as after sitting overnight").clicked() {
+                sh.events.push("coldEngine".into());
+            }
+            if ui.button("Warm engine").on_hover_text("Coolant at 90 °C and oil at 100 °C").clicked() {
+                sh.events.push("warmEngine".into());
+            }
+        });
+        let grey = |s: &str| RichText::new(s.to_string()).color(Color32::from_gray(160));
+        let temp_color = |c: f64, hot: f64| if c >= hot { Color32::from_rgb(0xe0, 0x50, 0x40) } else if c < 60.0 { Color32::from_rgb(0x70, 0xa0, 0xe0) } else { Color32::from_gray(230) };
+        egui::Grid::new("cooling-live").num_columns(2).show(ui, |ui| {
+            let boil = boiling_c(g);
+            ui.label(grey("Coolant, head (ECT1)"));
+            ui.label(RichText::new(format!("{:.1} °C", th.coolant_c)).color(temp_color(th.coolant_c, 105.0)));
+            ui.end_row();
+            ui.label(grey("Radiator outlet (ECT2)"));
+            ui.label(format!("{:.1} °C", th.ect2_c));
+            ui.end_row();
+            ui.label(grey("Pump inlet"));
+            ui.label(format!("{:.1} °C", th.inlet_c));
+            ui.end_row();
+            ui.label(grey("Thermostat"));
+            ui.label(format!("{:.0}% open (opens {:.0} °C, fully {:.0} °C)", th.thermostat * 100.0, g.thermostat_open_c, g.thermostat_full_c));
+            ui.end_row();
+            ui.label(grey("Coolant flow"));
+            ui.label(format!("pump {:.0} L/min: radiator {:.0}, bypass {:.0}", th.pump_lpm, th.radiator_lpm, th.bypass_lpm));
+            ui.end_row();
+            ui.label(grey("Fans"));
+            ui.label(format!("{} (on at {:.0} °C, off at {:.0} °C on ECT2)", if th.fan_on { "ON" } else { "off" }, g.fan_on_c, g.fan_off_c));
+            ui.end_row();
+            ui.label(grey("Air through the radiator"));
+            ui.label(format!("{:.1} m/s", th.air_ms));
+            ui.end_row();
+            ui.label(grey("Heat into coolant / oil"));
+            ui.label(format!("{:.1} kW / {:.1} kW", th.heat_to_coolant_kw, th.heat_to_oil_kw));
+            ui.end_row();
+            ui.label(grey("Radiator rejecting"));
+            ui.label(format!("{:.1} kW", th.radiator_kw));
+            ui.end_row();
+            ui.label(grey("Boiling point"));
+            ui.label(if th.boiling { RichText::new(format!("{boil:.0} °C, BOILING for {:.0} s", th.overheat_s)).color(Color32::from_rgb(0xe0, 0x50, 0x40)) } else { RichText::new(format!("{boil:.0} °C at {:.0} kPa cap", g.cap_kpa)) });
+            ui.end_row();
+            ui.label(grey("Oil temperature"));
+            ui.label(RichText::new(format!("{:.1} °C", th.oil_c)).color(temp_color(th.oil_c, 130.0)));
+            ui.end_row();
+            ui.label(grey("Oil pressure"));
+            ui.label(format!("{:.0} kPa ({:.0} psi){}", e.oil_kpa, e.oil_kpa * 0.145, if e.oil_kpa >= g.oil_jet_kpa { ", piston jets spraying" } else { "" }));
+            ui.end_row();
+            ui.label(grey("Oil viscosity"));
+            ui.label(format!("{:.1} cSt ({})", viscosity_cst(th.oil_c, g), g.oil_grade));
+            ui.end_row();
+            ui.label(grey("Oil cooler"));
+            ui.label(format!("{:.1} kW", th.oil_cooler_kw));
+            ui.end_row();
+            ui.label(grey("Friction"));
+            ui.label(format!("{:.1} Nm", e.friction_nm));
+            ui.end_row();
+        });
+        ui.label(RichText::new("Cold oil is thick: more friction and oil pressure. The ECU holds VTEC off and raises idle until the engine warms up.").small().color(Color32::from_gray(150)));
+
+        ui.separator();
+        ui.heading("Cooling system parts");
+        let t = &mut sh.tune;
+        let mut c = false;
+        let mut cg = t.cooling();
+        let stock = Cooling::default();
+        egui::Grid::new("cooling-set").num_columns(2).show(ui, |ui| {
+            ui.label("Thermostat");
+            egui::ComboBox::from_id_salt("thermostat").selected_text(if cg.thermostat_open_c == stock.thermostat_open_c && cg.thermostat_full_c == stock.thermostat_full_c { "Stock (78 °C)" } else { "Custom" }).show_ui(ui, |ui| {
+                if ui.selectable_label(false, "Stock 19301-RAF-004 (opens 78 °C, fully 90 °C)").clicked() { cg.thermostat_open_c = 78.0; cg.thermostat_full_c = 90.0; c = true; }
+                if ui.selectable_label(false, "Low-temp (fully open 68 °C)").clicked() { cg.thermostat_open_c = 60.0; cg.thermostat_full_c = 68.0; c = true; }
+            });
+            ui.end_row();
+            c |= num_field(ui, "Thermostat opens", &mut cg.thermostat_open_c, 0.5, 40.0..=100.0, " °C");
+            c |= num_field(ui, "Thermostat fully open", &mut cg.thermostat_full_c, 0.5, 45.0..=110.0, " °C");
+            c |= num_field(ui, "Fans on (ECT2)", &mut cg.fan_on_c, 0.5, 60.0..=115.0, " °C");
+            c |= num_field(ui, "Fans off (ECT2)", &mut cg.fan_off_c, 0.5, 55.0..=110.0, " °C");
+            ui.label("Radiator");
+            let two_row = cg.radiator_ua_wk_at5ms > stock.radiator_ua_wk_at5ms;
+            egui::ComboBox::from_id_salt("radiator").selected_text(if two_row { "Aluminium 2-row" } else { "Stock single-row" }).show_ui(ui, |ui| {
+                if ui.selectable_label(!two_row, "Stock Denso single-row (16 mm core)").clicked() { cg.radiator_ua_wk_at5ms = stock.radiator_ua_wk_at5ms; cg.radiator_metal_jk = stock.radiator_metal_jk; c = true; }
+                if ui.selectable_label(two_row, "Aluminium 2-row (40 mm core)").clicked() { cg.radiator_ua_wk_at5ms = 2600.0; cg.radiator_metal_jk = 7000.0; c = true; }
+            });
+            ui.end_row();
+            ui.label("Radiator cap");
+            egui::ComboBox::from_id_salt("cap").selected_text(format!("{:.0} kPa ({:.0} psi)", cg.cap_kpa, cg.cap_kpa * 0.145)).show_ui(ui, |ui| {
+                if ui.selectable_label(cg.cap_kpa == 110.0, "Stock 16 psi").clicked() { cg.cap_kpa = 110.0; c = true; }
+                if ui.selectable_label(cg.cap_kpa == 130.0, "1.3 bar (19 psi)").clicked() { cg.cap_kpa = 130.0; c = true; }
+            });
+            ui.end_row();
+            ui.label("Oil cooler");
+            egui::ComboBox::from_id_salt("oil-cooler").selected_text(match cg.oil_cooler.as_str() { "water" => "Stock water-to-oil", "air" => "Air-to-oil (aftermarket)", _ => "None" }).show_ui(ui, |ui| {
+                for (k, l) in [("water", "Stock water-to-oil (at the filter)"), ("air", "Air-to-oil (aftermarket)"), ("none", "None")] {
+                    if ui.selectable_label(cg.oil_cooler == k, l).clicked() { cg.oil_cooler = k.into(); c = true; }
+                }
+            });
+            ui.end_row();
+            ui.label("Oil");
+            egui::ComboBox::from_id_salt("oil-grade").selected_text(cg.oil_grade.clone()).show_ui(ui, |ui| {
+                // Typical kinematic viscosity at 40 and 100 °C for each grade.
+                for (gr, v40, v100) in [("0W-20", 44.0, 8.5), ("5W-30", 62.0, 10.5), ("10W-40", 95.0, 14.5), ("15W-50", 130.0, 18.5)] {
+                    if ui.selectable_label(cg.oil_grade == gr, if gr == "5W-30" { "5W-30 (Honda spec)" } else { gr }).clicked() {
+                        cg.oil_grade = gr.into(); cg.oil_visc40 = v40; cg.oil_visc100 = v100; c = true;
+                    }
+                }
+            });
+            ui.end_row();
+            c |= num_field(ui, "VTEC minimum coolant", &mut cg.ect_vtec_min_c, 1.0, -40.0..=110.0, " °C");
+            c |= opt_field(ui, "Outside air", &mut t.ambient_c, 25.0, 0.5, " °C");
+        });
+        if ui.button("Stock cooling system").clicked() {
+            cg = Cooling::default();
+            c = true;
+        }
+        if c {
+            t.cooling = if cg == stock { None } else { Some(cg) };
+        }
+        c
     }
 
     fn wheel(&mut self, ui: &mut egui::Ui, sh: &mut Shared) {

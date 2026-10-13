@@ -4,6 +4,7 @@ use crate::engine::Engine;
 use crate::materials::{material, Material};
 use crate::parts::BottomEnd;
 use crate::tables::{clamp, lookup1};
+use crate::thermal::visc_ratio;
 use crate::tune::Tune;
 use serde::Serialize;
 
@@ -217,7 +218,10 @@ impl Internals {
         let heat = 0.64 * e.air_gs
             + if e.lambda > 0.85 && e.map > 90.0 { 150.0 * (e.lambda - 0.85).min(0.5) } else { 0.0 }
             + if e.knocking { 40.0 * (self.knock_spike - 1.0) / 0.15 } else { 0.0 };
-        let t_target = if cut { 150.0 } else { 150.0 + heat / k_rel.powf(0.5) };
+        // The oil under the crown sets its floor; the oil jets (check balls open at 200 kPa) cool it much better.
+        let jets = clamp((e.oil_kpa - e.thermal.g.oil_jet_kpa) / 50.0, 0.0, 1.0);
+        let base = e.oil_c + 80.0 - 30.0 * jets;
+        let t_target = if cut { base } else { base + heat / k_rel.powf(0.5) };
         self.piston_c += (t_target - self.piston_c) * (dt * 0.25).min(1.0);
 
         let recip_kg = g.piston_kg * (mp.density() / 2700.0) + g.pin_kg + g.rings_kg + g.rod_small_end_kg * (mr.density() / 7780.0);
@@ -229,15 +233,19 @@ impl Internals {
         let brittle = if el < 2.0 { 1.6 } else if el < 5.0 { 1.0 } else { 0.6 };
         let piston_bar = self.pmax_bar / self.knock_spike * (1.0 + (self.knock_spike - 1.0) * brittle);
         let mut load = [0.0; N];
+        // Oil film strength scales with viscosity: thin hot oil carries less load.
+        let film = clamp(visc_ratio(e.oil_c, &e.thermal.g).powf(0.3), 0.5, 1.6);
         load[0] = g.piston_stress_per_bar * piston_bar / (mp.fatigue() * derate(mp, self.piston_c));
         load[1] = (self.rod_comp_n / (g.rod_beam_area_m2 * mr.yld() * 1e6 * 0.75)).max(self.rod_tension_n / (g.rod_beam_area_m2 * 1e6) / mr.fatigue());
         load[2] = (0.25 * self.rod_tension_n / g.rod_bolt_stress_area_m2 / 2.0 / 1e6) / mrb.thread_fatigue_mpa.unwrap_or(1.0);
-        load[3] = self.rod_comp_n.max(self.rod_tension_n) / (g.big_end_m * g.bearing_width_m) / 1e6 / mb.load_rating_mpa.unwrap_or(1.0);
+        load[3] = self.rod_comp_n.max(self.rod_tension_n) / (g.big_end_m * g.bearing_width_m) / 1e6 / (mb.load_rating_mpa.unwrap_or(1.0) * film);
         load[4] = 0.0035 * (self.rod_comp_n + 0.5 * self.rod_tension_n) / mc.fatigue();
 
         let clamp_n = g.head_bolts / 4.0 * 0.75 * mhb.yld() * 1e6 * g.head_bolt_area_m2;
         self.gasket_lift_bar = mg.seal_factor.unwrap_or(1.0) * clamp_n / piston_area / 1e5;
-        load[5] = self.pmax_bar / self.gasket_lift_bar;
+        // Boiling coolant lets the head run hot and grow, which unloads the gasket.
+        let overheat = clamp(e.thermal.overheat_s / 20.0, 0.0, 1.0);
+        load[5] = self.pmax_bar / self.gasket_lift_bar * (1.0 + 0.6 * overheat);
         let bolt_amp = g.head_joint_factor * self.pmax_bar * 1e5 * piston_area / (g.head_bolts / 4.0) / g.head_bolt_area_m2 / 2.0 / 1e6;
         load[6] = bolt_amp / mhb.thread_fatigue_mpa.unwrap_or(1.0);
 

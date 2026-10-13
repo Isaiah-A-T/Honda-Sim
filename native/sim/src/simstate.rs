@@ -4,6 +4,7 @@
 use crate::gasflow::{cam_card, valve_lift_m};
 use crate::internals::{part_material, PARTS};
 use crate::sim::Sim;
+use crate::thermal::{boiling_c, circuits, viscosity_cst, COMPONENTS};
 use serde_json::{json, Map, Value};
 
 pub use crate::engine::CYL_OFFSET as FIRING_OFFSET_DEG;
@@ -28,6 +29,22 @@ pub fn render_state(sim: &Sim) -> Value {
             "material": { "name": m.name, "category": m.category, "densityKgM3": m.density_kg_m3 },
         }));
     }
+    let th = &e.thermal;
+    let tg = &th.g;
+    let c = circuits(th, e.oil_kpa);
+    let cooling = json!({
+        "coolantC": th.coolant_c, "radiatorInC": th.coolant_c, "radiatorOutC": th.radiator_out_c, "pumpInletC": th.inlet_c,
+        "boilingC": boiling_c(tg), "boiling": th.boiling, "overheatS": th.overheat_s,
+        "thermostatOpen": th.thermostat, "thermostatOpenC": tg.thermostat_open_c, "thermostatFullC": tg.thermostat_full_c,
+        "fanOn": th.fan_on, "fans": tg.fans, "fanOnC": tg.fan_on_c, "fanOffC": tg.fan_off_c, "airMs": th.air_ms,
+        "pumpLpm": th.pump_lpm, "radiatorLpm": th.radiator_lpm, "bypassLpm": th.bypass_lpm,
+        "radiatorKw": th.radiator_kw, "heatToCoolantKw": th.heat_to_coolant_kw, "heatToOilKw": th.heat_to_oil_kw,
+        "oil": {
+            "tempC": th.oil_c, "pressureKpa": e.oil_kpa, "viscosityCst": viscosity_cst(th.oil_c, tg), "grade": tg.oil_grade,
+            "cooler": tg.oil_cooler, "coolerKw": th.oil_cooler_kw, "toCoolantKw": th.oil_to_coolant_kw, "sumpKw": th.sump_kw,
+        },
+        "coolantCircuit": c.coolant, "oilCircuit": c.oil,
+    });
     let induction = if !t.turbo.enabled { "na" } else if t.turbo.fixed { "supercharger" } else { "turbo" };
     json!({
         "running": sim.running,
@@ -65,6 +82,7 @@ pub fn render_state(sim: &Sim) -> Value {
             "boreM": g.bore_m, "strokeM": g.stroke_m, "rodM": g.rod_m, "compression": g.compression, "displacementL": b.displacement_l,
             "deckM": b.deck_mm / 1000.0, "deckClearanceM": b.deck_clearance_mm / 1000.0, "inValveM": flow.in_valve_m, "exValveM": flow.ex_valve_m,
         },
+        "cooling": cooling,
         "bottomEnd": {
             "stock": b.stock, "crank": b.crank.name, "pistons": b.piston_name, "rods": b.rod_name,
             "block": b.crank.block.unwrap_or("K20Z3"), "issues": b.issues,
@@ -76,4 +94,9 @@ pub fn render_state(sim: &Sim) -> Value {
 pub fn valve_lift(sim: &Sim, cyl: usize, intake: bool, crank_deg: f64) -> f64 {
     let e = &sim.eng;
     valve_lift_m(crank_deg - FIRING_OFFSET_DEG[cyl - 1], intake, e.high_cam, if intake { e.vtc } else { 0.0 }, e.flow())
+}
+
+/// Where each coolant and oil component sits (approximate, for drawing). Static, so it's not in render_state.
+pub fn cooling_components() -> Value {
+    json!(COMPONENTS)
 }
