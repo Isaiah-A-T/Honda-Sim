@@ -2,6 +2,7 @@
 //! Field names match the sim's src/viewer-link.js.
 
 use serde::{Deserialize, Serialize};
+use crate::kinematics::CamSpecs;
 use std::collections::HashMap;
 
 #[derive(Serialize, Deserialize, Clone, Debug)]
@@ -41,6 +42,11 @@ pub struct SimState {
     pub intercooler: bool,
     /// Intake air temperature at the throttle body, °C.
     pub iat_c: f32,
+    /// The K20Z3 cam card. None = the viewer's stand-in figures.
+    pub cams: Option<CamSpecs>,
+    /// VTEC lock pin travel, 0 (low cam) to 1 (locked to the VTEC lobe), when the sim models it. None = the viewer
+    /// moves the pins itself from `vtec`, each cylinder's only while its followers are on the base circle.
+    pub vtec_pin: Option<f32>,
     pub stress: HashMap<String, StressValue>,
     /// The sim's own materials per part (read-only in the viewer). None = use the placeholder catalog.
     pub part_materials: Option<HashMap<String, PartMaterial>>,
@@ -66,6 +72,8 @@ impl Default for SimState {
             turbo: false,
             intercooler: true,
             iat_c: 25.0,
+            cams: None,
+            vtec_pin: None,
             stress: HashMap::new(),
             part_materials: None,
             readouts: Vec::new(),

@@ -4,7 +4,7 @@
 
 use crate::engine::{material_lookup, Castings, Engine, Mode};
 use crate::fake_sim::{FakeSim, ManualInput};
-use crate::kinematics::{cycle_angle, stroke_name, valve_lift, Side, VTC_MAX_DEG};
+use crate::kinematics::{cycle_angle, stroke_name, Side, VTC_MAX_DEG};
 use crate::link::Link;
 use crate::materials;
 use crate::state::SimState;
@@ -18,15 +18,17 @@ struct View {
     label: &'static str,
     dir: [f32; 3],
     dist: f32,
+    /// What the camera orbits, in scene units (1 = 100 mm).
+    target: Vec3,
 }
 
 const VIEWS: [View; 6] = [
-    View { label: "Exhaust side", dir: [-0.45, 0.62, -0.64], dist: 11.5 },
-    View { label: "Intake side", dir: [0.35, 0.8, 1.0], dist: 18.0 },
-    View { label: "Front", dir: [-1.0, 0.12, 0.001], dist: 10.5 },
-    View { label: "Side", dir: [0.001, 0.1, -1.0], dist: 10.5 },
-    View { label: "Top", dir: [0.001, 1.0, -0.08], dist: 11.0 },
-    View { label: "Valvetrain", dir: [-0.5, 0.85, -0.3], dist: 6.5 },
+    View { label: "Exhaust side", dir: [-0.45, 0.62, -0.64], dist: 11.5, target: TARGET },
+    View { label: "Intake side", dir: [0.35, 0.8, 1.0], dist: 18.0, target: TARGET },
+    View { label: "Front", dir: [-1.0, 0.12, 0.001], dist: 10.5, target: TARGET },
+    View { label: "Side", dir: [0.001, 0.1, -1.0], dist: 10.5, target: TARGET },
+    View { label: "Top", dir: [0.001, 1.0, -0.08], dist: 11.0, target: TARGET },
+    View { label: "Valvetrain", dir: [-0.45, 0.3, -1.0], dist: 3.4, target: Vec3 { x: -1.0, y: 3.25, z: -0.3 } },
 ];
 
 const STRESS_PARTS: [(&str, &str); 12] = [
@@ -43,7 +45,7 @@ enum Source {
 
 fn view_pos(v: &View, aspect: f32) -> Vec3 {
     let fit = (1.3 / aspect.max(0.3)).max(1.0);
-    TARGET + vec3(v.dir[0], v.dir[1], v.dir[2]).normalize() * v.dist * fit
+    v.target + vec3(v.dir[0], v.dir[1], v.dir[2]).normalize() * v.dist * fit
 }
 
 fn level_color(v: f32) -> egui::Color32 {
@@ -132,7 +134,7 @@ pub fn run(opts: Options) {
     let mut selected: Option<String> = None;
     let mut mouse: Option<PhysicalPoint> = None;
     let mut hovered: Option<usize> = None;
-    let mut view_anim: Option<(Vec3, Vec3, f32)> = None;
+    let mut view_anim: Option<(Vec3, Vec3, Vec3, Vec3, f32)> = None;
     let mut frame_no: u64 = 0;
     let started = Instant::now();
 
@@ -175,6 +177,7 @@ pub fn run(opts: Options) {
         let mut clicked_view: Option<usize> = None;
         let mut pointer_over_gui = false;
         let crank = engine.crank;
+        let (lifts, pins, specs) = (engine.lifts, engine.pins, engine.specs);
         let hovered_part = hovered.map(|i| (engine.parts[i].label.clone(), engine.parts[i].key, engine.parts[i].index));
         gui.update(&mut frame_input.events, frame_input.accumulated_time, screen, dpr, |ui| {
             let ectx = ui.ctx().clone();
@@ -234,23 +237,35 @@ pub fn run(opts: Options) {
                         Mode::Internals => {
                             ui.label("Crank, rods, pistons and the valvetrain with the castings and plumbing taken away.");
                             bar(ui, "VTC advance", state.vtc_deg / VTC_MAX_DEG, egui::Color32::from_rgb(0x3f, 0xcf, 0x7f), format!("{:.0}°", state.vtc_deg));
-                            egui::Grid::new("cyls").num_columns(4).spacing([10.0, 4.0]).show(ui, |ui| {
-                                ui.weak("Cyl"); ui.weak("Stroke"); ui.weak("Intake"); ui.weak("Exhaust"); ui.end_row();
+                            egui::Grid::new("cyls").num_columns(5).spacing([10.0, 4.0]).show(ui, |ui| {
+                                ui.weak("Cyl"); ui.weak("Stroke"); ui.weak("Intake"); ui.weak("Exhaust"); ui.weak("Rockers"); ui.end_row();
                                 for c in 1..=4 {
                                     ui.monospace(c.to_string());
                                     ui.label(stroke_name(cycle_angle(c, crank)));
-                                    for (side, col) in [(Side::Intake, egui::Color32::from_rgb(0x6e, 0xc8, 0xff)), (Side::Exhaust, egui::Color32::from_rgb(0xff, 0x8a, 0x3d))] {
-                                        let l = valve_lift(c, crank, side, state.vtec, if side == Side::Intake { state.vtc_deg } else { 0.0 });
+                                    for (k, (side, col)) in [(Side::Intake, egui::Color32::from_rgb(0x6e, 0xc8, 0xff)), (Side::Exhaust, egui::Color32::from_rgb(0xff, 0x8a, 0x3d))].into_iter().enumerate() {
+                                        let l = lifts[c - 1][k];
                                         let (rect, _) = ui.allocate_exact_size(egui::vec2(60.0, 8.0), egui::Sense::hover());
                                         ui.painter().rect_filled(rect, 3.0, egui::Color32::from_gray(45));
                                         let mut f = rect;
-                                        f.set_width(rect.width() * (l / 12.0).min(1.0));
+                                        f.set_width(rect.width() * (l / specs.get(side, true).lift_mm).min(1.0));
                                         ui.painter().rect_filled(f, 3.0, col);
                                     }
+                                    let p = pins[c - 1];
+                                    let (text, col) = if p[0] >= 0.999 && p[1] >= 0.999 { ("VTEC", egui::Color32::from_rgb(0x3f, 0xcf, 0x7f)) }
+                                        else if p[0] > 0.0 || p[1] > 0.0 { ("pin moving", egui::Color32::from_rgb(0xe8, 0xc6, 0x3a)) }
+                                        else { ("low cam", egui::Color32::from_gray(140)) };
+                                    ui.label(egui::RichText::new(text).color(col).small());
                                     ui.end_row();
                                 }
                             });
-                            ui.weak("Firing order 1-3-4-2. Lift bars are full at high-cam peak lift.");
+                            ui.weak("Firing order 1-3-4-2. Lift bars are full at VTEC-lobe peak lift. When VTEC switches on, oil pressure pushes a pin through each cylinder's three rocker followers, but it can only slide while they line up on the base circle, so each cylinder switches at its own point in the cycle.");
+                            heading(ui, if state.cams.is_some() { "Cam card (from the sim)" } else { "Cam card (stand-in until the sim sends it)" });
+                            egui::Grid::new("cams").num_columns(4).spacing([10.0, 2.0]).show(ui, |ui| {
+                                ui.weak("Lobe"); ui.weak("Lift"); ui.weak("Dur @1mm"); ui.weak("Centre"); ui.end_row();
+                                for (name, sp) in [("Intake low", specs.intake_low), ("Intake VTEC", specs.intake_high), ("Exhaust low", specs.exhaust_low), ("Exhaust VTEC", specs.exhaust_high)] {
+                                    ui.label(name); ui.monospace(format!("{:.1} mm", sp.lift_mm)); ui.monospace(format!("{:.0}°", sp.duration_deg)); ui.monospace(format!("{:.0}°", sp.centerline_deg)); ui.end_row();
+                                }
+                            });
                         }
                         Mode::Block => {
                             ui.label("The block, head, cam cover and oil pan as solid castings.");
@@ -271,8 +286,7 @@ pub fn run(opts: Options) {
                             });
                             ui.horizontal(|ui| {
                                 for c in 1..=4 {
-                                    let i = valve_lift(c, crank, Side::Intake, state.vtec, state.vtc_deg);
-                                    let e = valve_lift(c, crank, Side::Exhaust, state.vtec, 0.0);
+                                    let (i, e) = (lifts[c - 1][0], lifts[c - 1][1]);
                                     let (t, col) = if i > e && i > 0.5 { ("in", egui::Color32::from_rgb(0x6e, 0xc8, 0xff)) } else if e > 0.5 { ("out", egui::Color32::from_rgb(0xff, 0x8a, 0x3d)) } else { ("sealed", egui::Color32::from_gray(120)) };
                                     ui.label(egui::RichText::new(format!("{c} {t}")).color(col).monospace());
                                 }
@@ -399,16 +413,23 @@ pub fn run(opts: Options) {
         };
         camera.set_viewport(vp);
         if frame_no == 1 {
-            camera.set_view(view_pos(&VIEWS[opts.view.min(VIEWS.len() - 1)], vp.width as f32 / vp.height as f32), TARGET, vec3(0.0, 1.0, 0.0));
+            let v = &VIEWS[opts.view.min(VIEWS.len() - 1)];
+            camera.set_view(view_pos(v, vp.width as f32 / vp.height as f32), v.target, vec3(0.0, 1.0, 0.0));
+            control = OrbitControl::new(v.target, 1.0, 30.0);
         }
         if let Some(i) = clicked_view {
-            view_anim = Some((camera.position(), view_pos(&VIEWS[i], vp.width as f32 / vp.height as f32), 0.0));
+            let v = &VIEWS[i];
+            view_anim = Some((camera.position(), view_pos(v, vp.width as f32 / vp.height as f32), camera.target(), v.target, 0.0));
         }
-        if let Some((from, to, k)) = view_anim.as_mut() {
+        if let Some((from, to, from_t, to_t, k)) = view_anim.as_mut() {
             *k = (*k + dt / 0.6).min(1.0);
             let e = 1.0 - (1.0 - *k).powi(3);
-            camera.set_view(*from + (*to - *from) * e, TARGET, vec3(0.0, 1.0, 0.0));
-            if *k >= 1.0 { view_anim = None; }
+            let target = *from_t + (*to_t - *from_t) * e;
+            camera.set_view(*from + (*to - *from) * e, target, vec3(0.0, 1.0, 0.0));
+            if *k >= 1.0 {
+                control = OrbitControl::new(target, 1.0, 30.0);
+                view_anim = None;
+            }
         }
         control.handle_events(&mut camera, &mut frame_input.events);
 

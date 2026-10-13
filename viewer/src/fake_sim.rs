@@ -103,6 +103,8 @@ impl FakeSim {
             turbo: self.turbo,
             intercooler: self.intercooler,
             iat_c: self.iat,
+            cams: None,
+            vtec_pin: None,
             stress: stress.into_iter().map(|(k, v)| (k.to_string(), StressValue::One(v))).collect(),
             part_materials: None,
             readouts: vec![],

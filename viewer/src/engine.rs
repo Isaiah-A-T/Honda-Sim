@@ -10,10 +10,13 @@ use three_d::*;
 pub const SCALE: f32 = 0.01;
 const DECK: f32 = DECK_HEIGHT;
 const ROOF: f32 = DECK + 10.0;
-const CAM_Y: f32 = DECK + 128.0;
+const CAM_Y: f32 = DECK + 142.0;
 const CAM_Z: f32 = 38.0;
 const VALVE_SEAT_Z: f32 = 20.0;
-const VALVE_TIP_Y: f32 = CAM_Y - 19.0;
+const VALVE_TIP_Y: f32 = DECK + 109.0;
+/// Rocker followers ride between the cam's base circle and the valve tips; the VTEC pin runs through them.
+const FOLLOWER_Y: f32 = DECK + 118.0;
+const BASE_R: f32 = 17.0;
 const LEN: f32 = 4.0 * BORE_SPACING + 40.0;
 
 #[derive(Clone, Copy, PartialEq, Eq, Debug)]
@@ -110,6 +113,11 @@ enum Mover {
     Butterfly,
     TurbineWheel,
     CompWheel,
+    /// A rocker follower: the two primary ones ride the low lobes (or the VTEC lobe once locked), the middle
+    /// secondary one always rides the VTEC lobe.
+    Follower { cyl: usize, side: Side, secondary: bool },
+    /// The VTEC lock pin, sliding from the primary follower through the other two.
+    Pin { cyl: usize, side: Side },
 }
 
 pub struct Part {
@@ -124,7 +132,8 @@ pub struct Part {
     base_emissive: Srgba,
     base_alpha: u8,
     opaque: bool,
-    vtec_lobe: bool,
+    /// Glows green while this cylinder's rockers on this side are locked to the VTEC lobe.
+    vtec_part: Option<(usize, Side)>,
     pub visible: bool,
 }
 
@@ -177,6 +186,14 @@ pub struct Engine {
     tb_pos: Vec3,
     bounds: Vec<Option<(Vec3, Vec3)>>,
     pipes: Vec<PipeCheck>,
+    ctx: Context,
+    /// The cam card the lobes are drawn from, and each lobe part's (side, high).
+    pub specs: CamSpecs,
+    lobes: Vec<(usize, Side, bool)>,
+    /// VTEC pin travel per cylinder, [intake, exhaust], 0 = low cam, 1 = locked.
+    pub pins: [[f32; 2]; 4],
+    /// Valve lift (mm) per cylinder this frame, [intake, exhaust].
+    pub lifts: [[f32; 2]; 4],
 }
 
 fn srgba(hex: u32, a: u8) -> Srgba {
@@ -248,7 +265,7 @@ impl<'a> Builder<'a> {
             base_emissive: srgba(s.emissive, 255),
             base_alpha: s.alpha,
             opaque: s.alpha == 255,
-            vtec_lobe: false,
+            vtec_part: None,
             visible: true,
         });
         self.parts.len() - 1
@@ -269,15 +286,21 @@ fn t(x: f32, y: f32, z: f32) -> Mat4 {
     Mat4::from_translation(vec3(x, y, z))
 }
 
-/// Cam lobe outline (z, y) with the nose pointing +Y.
-fn lobe_outline(base: f32, lift: f32) -> Vec<(f32, f32)> {
-    (0..48)
+/// Cam lobe outline (z, y) with the nose pointing +Y: the base circle plus the event's lift, so the drawn lobe
+/// has the card's lift and duration (one cam degree is two crank degrees).
+fn lobe_outline(ev: CamEvent) -> Vec<(f32, f32)> {
+    (0..96)
         .map(|i| {
-            let a = i as f32 / 48.0 * std::f32::consts::TAU;
-            let r = base + a.cos().max(0.0).powi(3) * lift;
+            let a = i as f32 / 96.0 * std::f32::consts::TAU;
+            let d = modulo(a.to_degrees() * 2.0 + 360.0, 720.0) - 360.0;
+            let r = BASE_R + event_lift(ev.centre + d, ev);
             (-r * a.sin(), r * a.cos())
         })
         .collect()
+}
+
+fn lobe_mesh(specs: &CamSpecs, side: Side, high: bool) -> CpuMesh {
+    extrude_x(&lobe_outline(cam_event(specs.get(side, high), side)), if high { 10.0 } else { 12.0 })
 }
 
 pub struct FlowPath {
@@ -294,6 +317,7 @@ impl Engine {
         let mut valves = Vec::new();
         let mut glows = Vec::new();
         let mut paths: Vec<FlowPath> = Vec::new();
+        let mut lobes: Vec<(usize, Side, bool)> = Vec::new();
         let id = Mat4::identity();
         let r = STROKE / 2.0;
 
@@ -304,7 +328,7 @@ impl Engine {
         }
         b.add(&boxed(LEN - 30.0, 90.0, 170.0), glass(0x6f7782, 34), None, "Oil pan", None, Sys::Casting, Mover::Fixed, t(0.0, -105.0, 0.0));
         b.add(&boxed(LEN, 120.0, 160.0), glass(0x9fb0c2, 30), Some("head"), "Cylinder head", None, Sys::Casting, Mover::Fixed, t(0.0, DECK + 60.0, 0.0));
-        b.add(&boxed(LEN - 20.0, 45.0, 150.0), glass(0xb3262b, 40), None, "Cam cover", None, Sys::Casting, Mover::Fixed, t(0.0, DECK + 142.0, 0.0));
+        b.add(&boxed(LEN - 20.0, 45.0, 150.0), glass(0xb3262b, 40), None, "Cam cover", None, Sys::Casting, Mover::Fixed, t(0.0, DECK + 156.0, 0.0));
 
         // ---------- Crankshaft ----------
         let steel = || metal(0x9aa0a6, 0.8, 0.3);
@@ -376,19 +400,33 @@ impl Engine {
             b.add(&along_x(cylinder_y(12.0, 12.0, LEN - 10.0, 20)), cam, Some("cams"), &format!("{name} camshaft"), None, Sys::Internals, Mover::Cam(side), id);
             b.add(&along_x(cylinder_y(34.0, 34.0, 14.0, 36)), metal(0x5e656e, 0.6, 0.4), None, &format!("{name} cam sprocket"), None, Sys::Internals, Mover::Cam(side), t(cyl_x(1) - 72.0, 0.0, 0.0));
             b.add(&boxed(16.0, 14.0, 6.0), Spec { emissive: 0x555555, ..metal(0xf4f4f4, 0.2, 0.5) }, None, "Cam timing mark", None, Sys::Internals, Mover::Cam(side), t(cyl_x(1) - 72.0, 28.0, 0.0));
-            let ev_low = cam_event(side, false);
-            let ev_high = cam_event(side, true);
-            let low_mesh = extrude_x(&lobe_outline(17.0, ev_low.lift), 12.0);
-            let high_mesh = extrude_x(&lobe_outline(17.0, ev_high.lift), 10.0);
+            let specs = CamSpecs::default();
+            let low_mesh = lobe_mesh(&specs, side, false);
+            let high_mesh = lobe_mesh(&specs, side, true);
             for c in 1..=4 {
+                // Each lobe is phased so its nose points down at the follower at the event centre.
                 let slot = FIRING_ORDER.iter().position(|&x| x == c).unwrap() as f32;
-                let centre = ev_low.centre + slot * 180.0;
-                let alpha = Mat4::from_angle_x(radians(std::f32::consts::PI - (centre / 2.0).to_radians()));
+                let phase = |high: bool| {
+                    let centre = cam_event(specs.get(side, high), side).centre + slot * 180.0;
+                    Mat4::from_angle_x(radians(std::f32::consts::PI - (centre / 2.0).to_radians()))
+                };
                 for dx in [-17.0, 17.0] {
-                    b.add(&low_mesh, metal(0x7d8590, 0.8, 0.35), Some("cams"), &format!("Cyl {c} {} lobe (low cam)", name.to_lowercase()), None, Sys::Internals, Mover::Cam(side), t(cyl_x(c) + dx, 0.0, 0.0) * alpha);
+                    let i = b.add(&low_mesh, metal(0x7d8590, 0.8, 0.35), Some("cams"), &format!("Cyl {c} {} lobe (low cam)", name.to_lowercase()), None, Sys::Internals, Mover::Cam(side), t(cyl_x(c) + dx, 0.0, 0.0) * phase(false));
+                    lobes.push((i, side, false));
                 }
-                let hi = b.add(&high_mesh, metal(0x8a929c, 0.8, 0.35), Some("cams"), &format!("Cyl {c} {} VTEC lobe (high cam)", name.to_lowercase()), None, Sys::Internals, Mover::Cam(side), t(cyl_x(c), 0.0, 0.0) * alpha);
-                b.parts[hi].vtec_lobe = true;
+                let hi = b.add(&high_mesh, metal(0x8a929c, 0.8, 0.35), Some("cams"), &format!("Cyl {c} {} VTEC lobe (high cam)", name.to_lowercase()), None, Sys::Internals, Mover::Cam(side), t(cyl_x(c), 0.0, 0.0) * phase(true));
+                b.parts[hi].vtec_part = Some((c, side));
+                lobes.push((hi, side, true));
+
+                // Rocker followers and the VTEC lock pin.
+                let fz = |side: Side| if side == Side::Intake { CAM_Z } else { -CAM_Z };
+                for (dx, secondary) in [(-17.0, false), (0.0, true), (17.0, false)] {
+                    let label = if secondary { format!("Cyl {c} {} VTEC rocker (secondary)", name.to_lowercase()) } else { format!("Cyl {c} {} rocker (primary)", name.to_lowercase()) };
+                    let color = if secondary { 0x6a7480 } else { 0x58606a };
+                    b.add(&boxed(12.0, 14.0, 26.0), metal(color, 0.75, 0.35), Some("valves"), &label, Some(c - 1), Sys::Internals, Mover::Follower { cyl: c, side, secondary }, t(cyl_x(c) + dx, FOLLOWER_Y, fz(side)));
+                }
+                let pin = b.add(&along_x(cylinder_y(3.5, 3.5, 48.0, 12)), metal(0xd4a017, 0.85, 0.3), None, &format!("Cyl {c} {} VTEC lock pin", name.to_lowercase()), Some(c - 1), Sys::Internals, Mover::Pin { cyl: c, side }, t(0.0, FOLLOWER_Y, fz(side)));
+                b.parts[pin].vtec_part = Some((c, side));
 
                 for dx in [-17.0, 17.0] {
                     let seat = vec3(cyl_x(c) + dx, ROOF, if side == Side::Intake { VALVE_SEAT_Z } else { -VALVE_SEAT_Z });
@@ -538,6 +576,11 @@ impl Engine {
             tb_pos,
             bounds: b.bounds,
             pipes: b.pipes,
+            ctx: ctx.clone(),
+            specs: CamSpecs::default(),
+            lobes,
+            pins: [[0.0; 2]; 4],
+            lifts: [[0.0; 2]; 4],
         }
     }
 
@@ -562,9 +605,40 @@ impl Engine {
         };
         let world = Mat4::from_scale(SCALE) * Mat4::from_translation(jitter);
 
-        let lifts: Vec<[f32; 2]> = (1..=4)
-            .map(|c| [valve_lift(c, crank, Side::Intake, s.vtec, vtc), valve_lift(c, crank, Side::Exhaust, s.vtec, 0.0)])
-            .collect();
+        // A new cam card from the sim: redraw the lobes to match.
+        if let Some(cams) = s.cams {
+            if cams != self.specs {
+                self.specs = cams;
+                for &(i, side, high) in &self.lobes {
+                    self.parts[i].gm.geometry = Mesh::new(&self.ctx, &lobe_mesh(&cams, side, high));
+                }
+            }
+        }
+        let specs = self.specs;
+
+        // VTEC: oil pressure pushes each pin through its three followers, but a pin can only slide while the
+        // followers line up, which is when both lobes are on the base circle. So each cylinder locks (and unlocks)
+        // at its own moment in the cycle.
+        let sim_dt = dt * slow_mo;
+        for c in 1..=4 {
+            for (k, side) in [Side::Intake, Side::Exhaust].into_iter().enumerate() {
+                let v = if side == Side::Intake { vtc } else { 0.0 };
+                let pin = &mut self.pins[c - 1][k];
+                if let Some(p) = s.vtec_pin {
+                    *pin = p.clamp(0.0, 1.0);
+                } else {
+                    let aligned = lobe_lift(c, crank, side, true, v, &specs) < 0.05 && lobe_lift(c, crank, side, false, v, &specs) < 0.05;
+                    if aligned {
+                        let target = if s.vtec { 1.0 } else { 0.0 };
+                        let step = sim_dt / 0.008;         // ~8 ms of pin travel once the followers line up
+                        *pin = if target > *pin { (*pin + step).min(target) } else { (*pin - step).max(target) };
+                    }
+                }
+                self.lifts[c - 1][k] = lobe_lift(c, crank, side, *pin >= 0.999, v, &specs);
+            }
+        }
+        let lifts = self.lifts;
+        let pins = self.pins;
 
         for p in self.parts.iter_mut() {
             let m = match p.mover {
@@ -590,6 +664,15 @@ impl Engine {
                     t(0.0, CAM_Y, if side == Side::Intake { CAM_Z } else { -CAM_Z }) * Mat4::from_angle_x(degrees(a))
                 }
                 Mover::Butterfly => Mat4::from_translation(self.tb_pos) * Mat4::from_angle_y(radians(0.12 + s.throttle.clamp(0.0, 1.0) * 1.38)),
+                Mover::Follower { cyl, side, secondary } => {
+                    let k = if side == Side::Intake { 0 } else { 1 };
+                    let lift = if secondary { lobe_lift(cyl, crank, side, true, if k == 0 { vtc } else { 0.0 }, &specs) } else { lifts[cyl - 1][k] };
+                    t(0.0, -lift, 0.0)
+                }
+                Mover::Pin { cyl, side } => {
+                    let k = if side == Side::Intake { 0 } else { 1 };
+                    t(cyl_x(cyl) - 30.0 + 30.0 * pins[cyl - 1][k], -lifts[cyl - 1][k], 0.0)
+                }
                 Mover::TurbineWheel => Mat4::from_translation(self.turbo_offset + vec3(-50.0, 0.0, 0.0)) * Mat4::from_angle_x(radians(self.turbo_angle)),
                 Mover::CompWheel => Mat4::from_translation(self.turbo_offset + vec3(70.0, 0.0, 0.0)) * Mat4::from_angle_x(radians(self.turbo_angle)),
             };
@@ -649,7 +732,8 @@ impl Engine {
                 }
                 _ => {}
             }
-            if p.vtec_lobe && s.vtec && mode != Mode::Materials {
+            let locked = p.vtec_part.is_some_and(|(c, side)| pins[c - 1][if side == Side::Intake { 0 } else { 1 }] >= 0.999);
+            if locked && mode != Mode::Materials {
                 emissive = Srgba::new(28, 140, 76, 255);
             }
             albedo.a = alpha;
@@ -698,7 +782,7 @@ impl Engine {
                 let gate = match f.cyl {
                     Some(c) => {
                         let lift = lifts[c - 1][if f.intake { 0 } else { 1 }];
-                        let max = cam_event(if f.intake { Side::Intake } else { Side::Exhaust }, true).lift;
+                        let max = specs.get(if f.intake { Side::Intake } else { Side::Exhaust }, true).lift_mm;
                         (lift / max * 1.6).min(1.0)
                     }
                     None => 1.0,

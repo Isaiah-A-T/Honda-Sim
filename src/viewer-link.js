@@ -87,6 +87,8 @@ export function stateForViewer(sim) {
     turbo: !!e.tune.turbo?.enabled,
     intercooler: e.tune.turbo?.intercooler !== false,   // until the sim models it, turbo builds count as intercooled
     iatC: e.iat,
+    ...(sim.cams && { cams: sim.cams }),                         // K20Z3 cam card, once the sim has one
+    ...(Number.isFinite(e.vtecPin) && { vtecPin: e.vtecPin }),   // VTEC lock pin travel 0–1, if the sim models it
     stress: stressOf(sim),
     partMaterials: partMaterials(),
     readouts: [

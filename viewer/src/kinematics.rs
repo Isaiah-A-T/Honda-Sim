@@ -1,6 +1,8 @@
 //! K20Z3 dimensions and the motion of its parts. Lengths in millimetres, angles in degrees.
 //! Crank angle 0 = cylinder 1 at top dead centre on its power stroke, counted over the 720° cycle.
-//! Cam timing and lift are rough numbers picked to look right, not read from a cam card.
+//! Cam lift, duration and centreline come from the sim (`CamSpecs`); the defaults below stand in until it sends them.
+
+use serde::{Deserialize, Serialize};
 
 pub const BORE: f32 = 86.0;
 pub const STROKE: f32 = 86.0;
@@ -16,6 +18,50 @@ pub enum Side {
     Exhaust,
 }
 
+/// One cam lobe as a cam card gives it. Lift is at the valve; duration is in crank degrees at 1 mm of valve lift;
+/// the centreline is degrees after TDC (intake) or before TDC (exhaust), with VTC at 0.
+#[derive(Serialize, Deserialize, Clone, Copy, Debug, PartialEq)]
+#[serde(rename_all = "camelCase")]
+pub struct CamSpec {
+    pub lift_mm: f32,
+    pub duration_deg: f32,
+    pub centerline_deg: f32,
+}
+
+/// The four K20Z3 lobes: low (primary) and VTEC (secondary) on each cam. The K20Z3 has VTEC on both cams.
+#[derive(Serialize, Deserialize, Clone, Copy, Debug, PartialEq)]
+#[serde(rename_all = "camelCase")]
+pub struct CamSpecs {
+    pub intake_low: CamSpec,
+    pub intake_high: CamSpec,
+    pub exhaust_low: CamSpec,
+    pub exhaust_high: CamSpec,
+}
+
+impl Default for CamSpecs {
+    /// Stand-in figures in the stock K-series range until the sim sends the K20Z3 cam card.
+    fn default() -> Self {
+        CamSpecs {
+            intake_low: CamSpec { lift_mm: 10.2, duration_deg: 210.0, centerline_deg: 110.0 },
+            intake_high: CamSpec { lift_mm: 11.9, duration_deg: 240.0, centerline_deg: 110.0 },
+            exhaust_low: CamSpec { lift_mm: 9.6, duration_deg: 205.0, centerline_deg: 110.0 },
+            exhaust_high: CamSpec { lift_mm: 11.1, duration_deg: 236.0, centerline_deg: 110.0 },
+        }
+    }
+}
+
+impl CamSpecs {
+    pub fn get(&self, side: Side, high: bool) -> CamSpec {
+        match (side, high) {
+            (Side::Intake, false) => self.intake_low,
+            (Side::Intake, true) => self.intake_high,
+            (Side::Exhaust, false) => self.exhaust_low,
+            (Side::Exhaust, true) => self.exhaust_high,
+        }
+    }
+}
+
+/// A lobe's event on the 720° cycle: centre, full (zero-lift) width and peak lift.
 #[derive(Clone, Copy)]
 pub struct CamEvent {
     pub centre: f32,
@@ -23,13 +69,16 @@ pub struct CamEvent {
     pub lift: f32,
 }
 
-pub fn cam_event(side: Side, high: bool) -> CamEvent {
-    match (side, high) {
-        (Side::Exhaust, false) => CamEvent { centre: 250.0, duration: 220.0, lift: 9.5 },
-        (Side::Intake, false) => CamEvent { centre: 470.0, duration: 220.0, lift: 10.0 },
-        (Side::Exhaust, true) => CamEvent { centre: 255.0, duration: 255.0, lift: 11.5 },
-        (Side::Intake, true) => CamEvent { centre: 465.0, duration: 260.0, lift: 12.0 },
-    }
+/// The lobe as a smooth bump whose width at 1 mm lift matches the card's duration.
+pub fn cam_event(spec: CamSpec, side: Side) -> CamEvent {
+    let lift = spec.lift_mm.max(1.1);
+    // lift·(½ + ½cos(πd/h)) = 1 mm at d = duration/2  →  full width 2h.
+    let full = spec.duration_deg * std::f32::consts::PI / (2.0 / lift - 1.0).acos();
+    let centre = match side {
+        Side::Intake => 360.0 + spec.centerline_deg,
+        Side::Exhaust => 360.0 - spec.centerline_deg,
+    };
+    CamEvent { centre, duration: full.min(700.0), lift }
 }
 
 pub fn modulo(a: f32, n: f32) -> f32 {
@@ -72,10 +121,15 @@ pub fn event_lift(cycle_deg: f32, ev: CamEvent) -> f32 {
     ev.lift * (0.5 + 0.5 * (std::f32::consts::PI * d / (ev.duration / 2.0)).cos())
 }
 
-/// Valve lift in mm. `vtc_deg` advances the intake event (K20Z3 VTC).
-pub fn valve_lift(cyl: usize, crank_deg: f32, side: Side, vtec: bool, vtc_deg: f32) -> f32 {
+/// Lift (mm) of one lobe for cylinder `cyl`. `vtc_deg` advances the intake event (K20Z3 VTC).
+pub fn lobe_lift(cyl: usize, crank_deg: f32, side: Side, high: bool, vtc_deg: f32, specs: &CamSpecs) -> f32 {
     let shift = if side == Side::Intake { vtc_deg } else { 0.0 };
-    event_lift(cycle_angle(cyl, crank_deg + shift), cam_event(side, vtec))
+    event_lift(cycle_angle(cyl, crank_deg + shift), cam_event(specs.get(side, high), side))
+}
+
+/// Valve lift in mm: the VTEC lobe when that cylinder's rockers are locked together, else the low lobe.
+pub fn valve_lift(cyl: usize, crank_deg: f32, side: Side, vtec: bool, vtc_deg: f32) -> f32 {
+    lobe_lift(cyl, crank_deg, side, vtec, vtc_deg, &CamSpecs::default())
 }
 
 pub fn stroke_name(cycle_deg: f32) -> &'static str {
@@ -154,6 +208,20 @@ mod tests {
         let b = valve_lift(1, 470.0, Side::Intake, false, 0.0);
         assert!((a - b).abs() < 1e-4);
         assert_eq!(valve_lift(1, 250.0, Side::Exhaust, false, 40.0), valve_lift(1, 250.0, Side::Exhaust, false, 0.0));
+    }
+
+    #[test]
+    fn duration_at_1mm_matches_the_cam_card() {
+        let specs = CamSpecs::default();
+        for side in [Side::Intake, Side::Exhaust] {
+            for high in [false, true] {
+                let spec = specs.get(side, high);
+                let ev = cam_event(spec, side);
+                let at = |d: f32| event_lift(ev.centre + d, ev);
+                assert!((at(spec.duration_deg / 2.0) - 1.0).abs() < 0.01, "{side:?} {high}");
+                assert!((at(0.0) - spec.lift_mm).abs() < 0.01);
+            }
+        }
     }
 
     #[test]
