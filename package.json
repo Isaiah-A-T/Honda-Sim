@@ -1,12 +1,48 @@
 {
   "name": "honda-sim",
-  "version": "0.1.0",
+  "version": "0.9.0",
   "description": "Drive-it-yourself simulator for testing Honda (8th gen Civic Si, K20Z3) tunes with a wheel and pedals",
   "type": "module",
   "private": true,
   "scripts": {
     "start": "node server.js",
+    "desktop": "electron .",
+    "dist:win": "electron-builder --win portable zip",
     "test": "node --test test/*.test.js"
   },
-  "license": "MIT"
+  "license": "MIT",
+  "main": "desktop/main.mjs",
+  "author": "Isaiah-A-T",
+  "devDependencies": {
+    "electron": "33.2.1",
+    "electron-builder": "25.1.8"
+  },
+  "build": {
+    "appId": "com.isaiahat.hondasim",
+    "productName": "Honda Sim",
+    "files": [
+      "index.html",
+      "style.css",
+      "server.js",
+      "src/**",
+      "vendor/**",
+      "desktop/**",
+      "package.json",
+      "LICENSE"
+    ],
+    "directories": {
+      "output": "dist"
+    },
+    "win": {
+      "target": [
+        "portable",
+        "zip"
+      ],
+      "signAndEditExecutable": false,
+      "artifactName": "HondaSim-${version}-win-x64.${ext}"
+    },
+    "portable": {
+      "artifactName": "HondaSim-${version}-portable.${ext}"
+    }
+  }
 }

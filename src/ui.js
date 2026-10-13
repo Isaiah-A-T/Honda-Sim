@@ -3,7 +3,11 @@
 import { parseTable, activeCell, guessFuelUnits } from './tables.js';
 import { CAR, placeholderTune, turboSetup } from './k20z3.js';
 import { createSim, step, shift, shiftUp, shiftDown, startEngine, rebuildEngine, snapshot, logToCsv, setTune } from './sim.js';
-import { PARTS, MATERIALS, partStatus } from './internals.js';
+import { PARTS, MATERIALS, partStatus, materialsFor, partMaterial } from './internals.js';
+import { FLOW } from './gasflow.js';
+import { bottomEnd, CRANKS, PISTONS, RODS, pistonProblem, rodProblem } from './parts.js';
+import { createBridge } from './bridge.js';
+import { createViewerLink } from './viewer-link.js';
 import { createInput, attachKeyboard, readInput, startLearn, AXES, BUTTONS } from './input.js';
 
 const TUNE_KEY = 'honda-sim.tune.v1';
@@ -17,6 +21,8 @@ const TABLES = [
   ['fuelHigh', 'Fuel (high cam)'],
   ['boostTarget', 'Boost target'],
   ['wgDuty', 'Wastegate duty'],
+  ['vtcLow', 'Cam angle (low cam)'],
+  ['vtcHigh', 'Cam angle (high cam)'],
 ];
 // Paste/CSV targets: "both cams" writes the same table into low and high cam.
 const TARGETS = [
@@ -29,6 +35,7 @@ function targetForFile(name) {
   const n = name.toLowerCase();
   if (/wg|wastegate|duty/.test(n)) return 'wgDuty';
   if (/boost/.test(n)) return 'boostTarget';
+  if (/cam|vtc/.test(n)) return /high/.test(n) ? 'vtcHigh' : 'vtcLow';
   if (/ign|timing/.test(n)) return /high/.test(n) ? 'ignHigh' : /low/.test(n) ? 'ignLow' : 'ignBoth';
   if (/afr|fuel|lambda/.test(n)) return /high/.test(n) ? 'fuelHigh' : /low/.test(n) ? 'fuelLow' : 'fuelBoth';
   return null;
@@ -98,8 +105,11 @@ function renderSettings() {
   $('setFuelUnits').value = tune.fuelUnits || guessFuelUnits(tune.fuelLow);
   const T = tune.turbo || {};
   $('setTurbo').checked = !!T.enabled;
+  $('setIc').checked = T.intercooler !== false;
   for (const [id, v] of [['setInjCc', tune.injectorCc], ['setDead', tune.injectorDeadMs], ['setOverboost', tune.overboostKpa], ['setTorqueLim', tune.torqueLimitNm],
-    ['setClutch', tune.clutchNm], ['setSpring', T.springKpa], ['setMaxBoost', T.maxBoostKpa], ['setSpool', T.spoolStartGs], ['setFullBoost', T.fullBoostGs], ['setWgGain', T.wgGain ?? 1]]) $(id).value = v ?? '';
+    ['setClutch', tune.clutchNm], ['setSpring', T.springKpa], ['setMaxBoost', T.maxBoostKpa], ['setTurbArea', T.turbineAreaCm2], ['setWgArea', T.wastegateAreaCm2], ['setCompTip', T.compressorTipMm], ['setWgGain', T.wgGain ?? 1]]) $(id).value = v ?? '';
+  const F = { ...FLOW, ...(tune.flow || {}) };
+  $('setTb').value = Math.round(F.throttleDiaM * 1000); $('setRunner').value = Math.round(F.runnerM * 1000); $('setExhaust').value = Math.round(F.exhaustDiaM * 1000);
 }
 
 function applyTune(t) {
@@ -108,6 +118,8 @@ function applyTune(t) {
   saveTune(tune);
   renderSettings();
   renderTable();
+  renderMaterials();
+  renderBottomEnd();
 }
 
 for (const [id, key] of [['setVtec', 'vtecRpm'], ['setVtecMap', 'vtecMinMap'], ['setRev', 'revLimit'], ['setOct', 'octane']]) {
@@ -122,12 +134,19 @@ for (const [id, key] of [['setInjCc', 'injectorCc'], ['setDead', 'injectorDeadMs
     if (v === undefined || Number.isFinite(v)) { tune[key] = v; saveTune(tune); }
   });
 }
-for (const [id, key] of [['setSpring', 'springKpa'], ['setMaxBoost', 'maxBoostKpa'], ['setSpool', 'spoolStartGs'], ['setFullBoost', 'fullBoostGs'], ['setWgGain', 'wgGain']]) {
+for (const [id, key] of [['setTb', 'throttleDiaM'], ['setRunner', 'runnerM'], ['setExhaust', 'exhaustDiaM']]) {
+  $(id).addEventListener('change', ev => {
+    const v = Number(ev.target.value) / 1000;
+    if (Number.isFinite(v) && v > 0) { tune.flow = { ...(tune.flow || {}), [key]: v }; saveTune(tune); }
+  });
+}
+for (const [id, key] of [['setSpring', 'springKpa'], ['setMaxBoost', 'maxBoostKpa'], ['setTurbArea', 'turbineAreaCm2'], ['setWgArea', 'wastegateAreaCm2'], ['setCompTip', 'compressorTipMm'], ['setWgGain', 'wgGain']]) {
   $(id).addEventListener('change', ev => {
     const v = Number(ev.target.value);
     if (Number.isFinite(v)) { tune.turbo = { ...tune.turbo, [key]: v }; saveTune(tune); }
   });
 }
+$('setIc').addEventListener('change', ev => { tune.turbo = { ...tune.turbo, intercooler: ev.target.checked }; saveTune(tune); });
 $('setTurbo').addEventListener('change', ev => { tune.turbo = { ...tune.turbo, enabled: ev.target.checked }; saveTune(tune); });
 $('btnTurbo').onclick = () => { applyTune(turboSetup(tune)); renderTabs(); };
 $('fileCsv').addEventListener('change', async ev => {
@@ -255,12 +274,66 @@ function drawDyno() {
 }
 
 // ------------------------------------------------------------------ internals
+const esc = t => String(t).replace(/[&<>"]/g, c => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;' }[c]));
+function matCell(m, f, digits = 0) {
+  const v = m[f];
+  if (v === undefined || v === null) return '<td class="num muted">–</td>';
+  const est = m.estimated?.[f];
+  return `<td class="num"${est ? ` title="Estimated: ${esc(est)}"` : ''}>${typeof v === 'number' ? v.toFixed(digits) : esc(v)}${est ? ' <span class="muted">est.</span>' : ''}</td>`;
+}
 function renderMaterials() {
-  $('matTable').innerHTML = '<thead><tr><th>Part</th><th>Material</th><th>Yield MPa</th><th>Tensile MPa</th><th>Modulus GPa</th><th>Density kg/m³</th><th>Capacity used</th></tr></thead><tbody>' +
-    PARTS.map(p => { const m = MATERIALS[p.material]; return `<tr><td>${p.name}</td><td>${m.name}</td><td class="num">${m.yieldMPa}</td><td class="num">${m.utsMPa}</td><td class="num">${m.modulusGPa}</td><td class="num">${m.densityKgM3}</td><td>${m.strengthMPa} (${m.note})</td></tr>`; }).join('') + '</tbody>';
+  const cols = [['densityKgM3', 'Density kg/m³'], ['modulusGPa', 'Modulus GPa'], ['yieldMPa', 'Yield MPa'], ['utsMPa', 'Tensile MPa'], ['fatigueMPa', 'Fatigue MPa'],
+    ['elongationPct', 'Elong. %', 1], ['thermalExpansionUmMK', 'Expansion µm/m·K', 1], ['conductivityWmK', 'Conductivity W/m·K'], ['maxServiceTempC', 'Max °C']];
+  $('matTable').innerHTML = `<thead><tr><th>Part</th><th>Alloy</th>${cols.map(c => `<th>${c[1]}</th>`).join('')}<th>Hot strength</th><th>Sources</th></tr></thead><tbody>` +
+    PARTS.map(p => {
+      const m = partMaterial(tune, p), id = Object.keys(MATERIALS).find(k => MATERIALS[k] === m);
+      const opts = materialsFor(p.category).map(k => `<option value="${k}"${k === id ? ' selected' : ''}>${esc(MATERIALS[k].name)}</option>`).join('');
+      const hot = m.strengthVsTempC ? m.strengthVsTempC.filter(([t]) => t >= 150).slice(0, 3).map(([t, f]) => `${(f * 100).toFixed(0)}% @ ${t}°`).join(', ') : '–';
+      const src = (m.sources || []).map((u, i) => `<a href="${esc(u)}" target="_blank" rel="noopener">${i + 1}</a>`).join(' ');
+      return `<tr><td>${p.name}</td><td><select data-part="${p.key}">${opts}</select></td>${cols.map(([f, , d]) => matCell(m, f, d)).join('')}<td${m.estimated?.strengthVsTempC ? ` title="Estimated: ${esc(m.estimated.strengthVsTempC)}"` : ''}>${hot}</td><td>${src || '–'}</td></tr>`;
+    }).join('') + '</tbody>';
+  $('matTable').querySelectorAll('select[data-part]').forEach(sel => sel.addEventListener('change', ev => {
+    tune.materials = { ...(tune.materials || {}), [ev.target.dataset.part]: ev.target.value };
+    saveTune(tune); renderMaterials();
+  }));
   $('partsTable').innerHTML = '<thead><tr><th>Part</th><th>Load now</th><th></th><th>Life used</th><th>Status</th></tr></thead><tbody>' +
     PARTS.map(p => `<tr><td>${p.name}</td><td><span class="loadbar"><div id="lb-${p.key}"></div></span></td><td class="num" id="lv-${p.key}"></td><td class="num" id="dm-${p.key}"></td><td id="st-${p.key}"></td></tr>`).join('') + '</tbody>';
 }
+// Bottom end picker. Parts that can't go in with the chosen crank are greyed out with the reason.
+function renderBottomEnd() {
+  const sel = tune.parts || {}, b = bottomEnd(tune), c = b.crank;
+  const opt = (list, cur, why) => list.map(p => {
+    const no = why(p);
+    return `<option value="${p.id}"${p.id === cur ? ' selected' : ''}${no ? ` disabled title="${esc(no)}"` : ''}>${esc(p.name)}${no ? ` (${esc(no)})` : ''}</option>`;
+  }).join('');
+  $('selCrank').innerHTML = opt(CRANKS, c.id, () => null);
+  $('selPiston').innerHTML = c.kitPiston ? `<option>${esc(c.kitPiston.name)} (comes with the kit)</option>` : opt(PISTONS, b.piston.id, p => pistonProblem(c, p));
+  $('selPiston').disabled = !!c.kitPiston;
+  $('selRod').innerHTML = c.kitRod ? `<option>${esc(c.kitRod.name)} (comes with the kit)</option>` : opt(RODS, b.rod.id, r => rodProblem(c, r, b.piston));
+  $('selRod').disabled = !!c.kitRod;
+  $('bottomSummary').innerHTML = `<b>${b.boreMm} × ${b.strokeMm} mm</b>, ${b.rodMm} mm rods, <b>${(b.displacementL * 1000).toFixed(0)} cc</b>, <b>${b.compression.toFixed(1)}:1</b>, ` +
+    `rod/stroke ${(b.rodMm / b.strokeMm).toFixed(2)}, deck clearance ${b.deckClearanceMm.toFixed(2)} mm, block ${c.block ?? 'K20Z3'} (${b.deckMm} mm deck), ` +
+    `piston ${(b.pistonKg * 1000).toFixed(0)} g${b.piston.pistonWeight_g || c.kitPiston ? '' : ' est.'}`;
+  const parts = [c, c.kitPiston ? null : b.piston, c.kitRod ? null : b.rod].filter(p => p && p.id !== 'stock');
+  const src = parts.flatMap(p => (p.sources || []).slice(0, 2).map((u, i) => `<a href="${esc(u)}" target="_blank" rel="noopener">${esc(p.brand)} ${i + 1}</a>`)).join(' ');
+  const est = Object.values(b.estimated).map(esc);
+  $('bottomNotes').innerHTML = [...b.issues.map(esc), ...est.map(x => `Estimated: ${x}`), src && `Sources: ${src}`].filter(Boolean).join('<br>');
+}
+const pickPart = (key, value) => {
+  tune.parts = { ...(tune.parts || {}), [key]: value };
+  // Fitting a part brings its own alloy, so clear any alloy picked for it by hand; oversize pistons need new sleeves.
+  const m = { ...(tune.materials || {}) };
+  if (key === 'piston') delete m.piston;
+  if (key === 'rod') delete m.rod;
+  if (key === 'crank') { delete m.crank; delete m.piston; delete m.rod; }
+  if (bottomEnd(tune).requiresSleeves && (m.sleeve ?? 'sleeve') === 'sleeve') m.sleeve = 'sleeveDuctile';
+  tune.materials = m;
+  saveTune(tune); renderBottomEnd(); renderMaterials();
+};
+$('selCrank').addEventListener('change', ev => pickPart('crank', ev.target.value));
+$('selPiston').addEventListener('change', ev => pickPart('piston', ev.target.value));
+$('selRod').addEventListener('change', ev => pickPart('rod', ev.target.value));
+
 $('btnRebuild').onclick = () => { rebuildEngine(sim); startEngine(sim); };
 
 function updateInternals() {
@@ -298,6 +371,12 @@ $('r3dSpeed').addEventListener('change', ev => r3d?.setTimeScale(Number(ev.targe
 $('r3dStress').addEventListener('change', ev => r3d?.setStress(ev.target.checked));
 $('r3dCut').addEventListener('change', ev => r3d?.setCutaway(ev.target.checked));
 new IntersectionObserver(([en]) => { r3dVisible = en.isIntersecting; }).observe($('r3d'));
+
+// ------------------------------------------------------------------ native 3D viewer (viewer/, optional)
+const viewerLink = createViewerLink(on => {
+  $('viewerLink').textContent = on ? 'Viewer app connected' : 'Viewer app not running';
+  $('viewerLink').className = on ? 'pill' : 'pill off';
+});
 
 // ------------------------------------------------------------------ main loop
 function handleEvents(events) {
@@ -343,6 +422,16 @@ function updateDash(input) {
   $('kl').textContent = s.knock_limit.toFixed(1);
   $('knockCount').textContent = s.knock_count;
   $('retard').textContent = s.knock_retard.toFixed(1);
+  $('vtc').textContent = s.vtc_deg.toFixed(0);
+  $('ve').textContent = (s.ve * 100).toFixed(0);
+  $('ca50').textContent = cut || s.ca50_deg === '' ? '–' : s.ca50_deg.toFixed(0);
+  $('knockIdx').textContent = s.knock_index.toFixed(2);
+  $('egt').textContent = s.egt_c;
+  $('exh').textContent = s.exh_kpa.toFixed(0);
+  $('pmep').textContent = s.pmep_kpa;
+  $('resid').textContent = s.residual_pct.toFixed(0);
+  $('turboK').textContent = s.turbo_krpm;
+  $('wgOpen').textContent = s.wg_open_pct;
   $('ipw').textContent = s.inj_ms.toFixed(2);
   $('duty').textContent = s.inj_duty.toFixed(0);
   $('tq').textContent = (s.torque_nm * NM_TO_LBFT).toFixed(0);
@@ -355,8 +444,11 @@ function updateDash(input) {
   $('padName').textContent = inp.padName ? `Detected: ${inp.padName}` : 'No wheel or pedals detected yet. Press any pedal or button.';
 }
 
+const bridge = createBridge(sim);
 let last = performance.now(), frame = 0, wasFull = false;
-function loop(now) {
+// fromTimer: the window is hidden (minimized, or behind the 3D view), so animation frames have stopped
+// but the sim and the state stream must keep running.
+function loop(now, fromTimer = false) {
   const dt = Math.min(0.05, (now - last) / 1000);
   last = now;
   const input = readInput(inp, dt);
@@ -371,9 +463,12 @@ function loop(now) {
   highlightCell();
   if (frame++ % 6 === 0) { drawDyno(); updateInternals(); }
   if (r3d && r3dVisible) r3d.update(sim, dt);
+  bridge.tick(now);
+  viewerLink.send(sim);
   $('btnCsv').disabled = sim.logging || !sim.log.length;
-  requestAnimationFrame(loop);
+  if (!fromTimer) requestAnimationFrame(loop);
 }
+setInterval(() => { if (document.hidden) loop(performance.now(), true); }, 16);
 
 $('carName').textContent = CAR.name;
 renderTabs();
@@ -381,4 +476,5 @@ renderSettings();
 renderTable();
 renderLearnRows();
 renderMaterials();
+renderBottomEnd();
 requestAnimationFrame(loop);

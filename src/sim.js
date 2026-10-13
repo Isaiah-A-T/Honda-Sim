@@ -5,6 +5,7 @@ import { CAR, ENGINE, placeholderTune } from './k20z3.js';
 import { createEngine, stepEngine, hp } from './engine.js';
 import { createVehicle, stepDrivetrain, overallRatio } from './vehicle.js';
 import { createInternals, stepInternals } from './internals.js';
+import { createThermal, stepThermal, COOLING } from './thermal.js';
 
 const SUBSTEP = 0.001;
 const SHIFT_TIME = 0.2;                 // seconds the auto-clutch stays open for a shift
@@ -47,6 +48,20 @@ export function startEngine(sim) {
   sim.running = true;
   sim.eng.rpm = ENGINE.idleRpm + 300;
   sim.eng.knockRetard = 0;
+}
+
+// Turbo builds: what the turbo's oil and coolant lines see (null with no turbo or a supercharger).
+export function turboLines(e, on) {
+  const tb = e.tune.turbo;
+  if (!tb?.enabled || tb.fixed) return null;
+  return { gasGs: on ? e.airGs + e.fuelGs : 0, egtC: e.egtC ?? 600, oilKpa: on ? e.oilKpa ?? 0 : 0, waterCooled: tb.waterCooled ?? true };
+}
+
+// Engine cold (coolant and oil at the outside air temperature), as after sitting overnight.
+export function coldEngine(sim) {
+  const e = sim.eng;
+  e.thermal = createThermal(e.tune.ambientC ?? 25, false, e.tune.cooling);
+  e.ect = e.thermal.coolantC; e.oilC = e.thermal.oilC;
 }
 
 // Fresh internals after a failure (or to reset wear).
@@ -98,6 +113,13 @@ export function step(sim, input, dt) {
       tq = sim.eng.rpm > 1 ? -12 : 0;              // a stopped engine just drags
     }
     stepDrivetrain(sim.eng, sim.car, tq, { clutch, brake, capacityNm: sim.eng.tune.clutchNm }, h);
+    // Coolant and oil: heat from combustion and friction while running, then the engine cools down.
+    const e = sim.eng, th = e.thermal;
+    th.g = e.tune.cooling ? { ...COOLING, ...e.tune.cooling } : COOLING;
+    const on = sim.running;
+    stepThermal(th, { rpm: e.rpm, fuelGs: on ? e.fuelGs : 0, frictionW: on ? e.frictionNm * e.rpm * Math.PI / 30 : 0,
+      heatLoss: 0.30, speedMs: sim.car.speedMs, mapKpa: e.map, ambientC: e.tune.ambientC ?? 25, turbo: turboLines(e, on) }, h);
+    e.ect = th.coolantC; e.oilC = th.oilC;
     if (!sim.running && sim.eng.rpm < 1) sim.eng.rpm = 0;
     sim.t += h;
   }
@@ -142,6 +164,23 @@ export function snapshot(sim, throttle = 0) {
     rod_load: +sim.internals.load.rod.toFixed(2),
     piston_load: +sim.internals.load.piston.toFixed(2),
     bearing_load: +sim.internals.load.bearing.toFixed(2),
+    sleeve_load: +sim.internals.load.sleeve.toFixed(2),
+    vtc_deg: +(e.vtc ?? 0).toFixed(1),
+    ve: +(e.ve ?? 0).toFixed(3),
+    ca50_deg: Number.isFinite(e.ca50) ? +e.ca50.toFixed(1) : '',
+    knock_index: +(e.knockIndex ?? 0).toFixed(2),
+    egt_c: +(e.egtC ?? 0).toFixed(0),
+    exh_kpa: +(e.exhKpa ?? 0).toFixed(1),
+    pmep_kpa: +(e.pmepKpa ?? 0).toFixed(0),
+    residual_pct: +((e.residual ?? 0) * 100).toFixed(1),
+    turbo_krpm: +((e.turboRadS ?? 0) * 30 / Math.PI / 1000).toFixed(0),
+    wg_open_pct: +((e.wgOpen ?? 0) * 100).toFixed(0),
+    ect_c: +e.ect.toFixed(1),
+    oil_c: +e.oilC.toFixed(1),
+    oil_kpa: +(e.oilKpa ?? 0).toFixed(0),
+    thermostat_pct: +(e.thermal.thermostat * 100).toFixed(0),
+    fan: e.thermal.fanOn ? 1 : 0,
+    radiator_kw: +e.thermal.radiatorKw.toFixed(1),
   };
 }
 

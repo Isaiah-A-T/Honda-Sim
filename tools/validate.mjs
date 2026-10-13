@@ -2,7 +2,7 @@
 //   node tools/validate.mjs
 // Sim numbers are crank figures turned into wheel figures with the car's driveline efficiency.
 // Sources and whether each tune is confirmed or guessed are in docs/VALIDATION.md.
-import { placeholderTune, turboSetup, mbt, knockLimit, CAR } from '../src/k20z3.js';
+import { placeholderTune, turboSetup, mbt, knockLimit, CAR, TURBO_6262 } from '../src/k20z3.js';
 import { createEngine, stepEngine, hp } from '../src/engine.js';
 
 const NM_LBFT = 0.737562, eff = CAR.drivelineEff;
@@ -29,7 +29,9 @@ const boostedTune = (octane, injCc) => {
   return { ...turboSetup(), octane, injectorCc: injCc, fuelUnits: 'lambda', fuelLow: lam, fuelHigh: lam, ignLow: ign, ignHigh: ign, revLimit: 9000, overboostKpa: 400, torqueLimitNm: Infinity };
 };
 // Fixed boost from a given rpm up: wastegate spring = target boost, turbo big enough to hold it.
-const fixedBoost = (tune, psi) => ({ ...tune, turbo: { enabled: true, maxBoostKpa: psi / 0.145, springKpa: psi / 0.145, spoolStartGs: 0, fullBoostGs: 1, responsePerS: 20 } });
+const fixedBoost = (tune, psi) => ({ ...tune, turbo: { enabled: true, fixed: true, maxBoostKpa: psi / 0.145, springKpa: psi / 0.145 } });
+// Real turbo: the turbine is driven by the gas model's exhaust, so back pressure costs power. Wastegate spring = target.
+const turbine = (tune, psi, spec) => ({ ...tune, turbo: { ...spec, enabled: true, springKpa: psi / 0.145, maxBoostKpa: Math.max(spec.maxBoostKpa, psi / 0.145 + 20) } });
 
 const fmt = (x, d = 0) => x.toFixed(d);
 const rows = [];
@@ -47,7 +49,9 @@ rows.push(['Hondata reflash VTEC 4,500 on stock hardware', 'Hondata: loses power
 // 3. PRL kit with Precision 6262, stock internals, 93 octane, 1200 cc: 335 whp @ 5.6 psi, 357 whp @ 7 psi.
 for (const [psi, pub] of [[5.6, 335], [7, 357]]) {
   const r = sweep(fixedBoost(boostedTune(93, 1200), psi), 3000, 8000);
-  rows.push([`Precision 6262 @ ${psi} psi, 93 octane`, `JD Tuning: ${pub} whp`, `${fmt(r.pHp.whp)} whp @ ${r.pHp.rpm}, ${fmt(r.pTq.wtq)} lb-ft @ ${r.pTq.rpm}`]);
+  const t = sweep(turbine(boostedTune(93, 1200), psi, TURBO_6262), 3000, 8000);
+  rows.push([`Precision 6262 @ ${psi} psi, 93 octane`, `JD Tuning: ${pub} whp`,
+    `${fmt(t.pHp.whp)} whp @ ${t.pHp.rpm}, ${fmt(t.pTq.wtq)} lb-ft @ ${t.pTq.rpm} with the turbine and its back pressure modelled; ${fmt(r.pHp.whp)} whp with boost held and no turbine`]);
 }
 
 // 4. Kraftwerks supercharger, 12.8 psi at 8,400, 93 octane, 1000 cc: 390 whp and 258 lb-ft @ 8,400.

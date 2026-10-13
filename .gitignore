@@ -3,3 +3,6 @@ node_modules/
 *.log
 *.png
 !docs/*.png
+dist/
+native/target/
+viewer/target/

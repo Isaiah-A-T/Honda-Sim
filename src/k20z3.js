@@ -42,29 +42,37 @@ export const TORQUE_TARGETS = {
   high: [[1000, 80], [3000, 120], [4000, 140], [5000, 152], [5500, 161], [5800, 172], [6200, 188], [6800, 187], [7400, 184], [7800, 180], [8200, 170], [8600, 158], [9000, 145]],
 };
 
-// Volumetric efficiency at wide-open throttle, solved from TORQUE_TARGETS (run tools/calibrate.mjs).
+// Breathing comes from the gas exchange model in gasflow.js (valves, cams, runners, exhaust). These
+// are the small per-rpm corrections tools/calibrate.mjs fits on top of it so the stock engine lands on
+// TORQUE_TARGETS; they stand for what the simple model leaves out (true wave dynamics, port shape,
+// wall heat). Edit TORQUE_TARGETS or the geometry in gasflow.js and rerun the tool, not these.
 export const VE_RPM = TORQUE_TARGETS.low.map(([r]) => r);
-export const VE_LOW = [0.5811, 0.6877, 0.7699, 0.8068, 0.8455, 0.877, 0.892, 0.8952, 0.8899, 0.8663, 0.7657, 0.6901, 0.6528];
-export const VE_HIGH = [0.3812, 0.5927, 0.7079, 0.7949, 0.8558, 0.9192, 1.0125, 1.0216, 1.0108, 0.9986, 0.9658, 0.9287, 0.8874];
-
-export function trueVE(rpm, highCam) {
-  return highCam ? lookup1(VE_HIGH_RPM, VE_HIGH, rpm) : lookup1(VE_RPM, VE_LOW, rpm);
-}
 export const VE_HIGH_RPM = TORQUE_TARGETS.high.map(([r]) => r);
+export const VE_CORR_LOW = [0.7385, 0.7563, 0.7949, 0.8228, 0.8598, 0.8923, 0.8825, 0.865, 0.8535, 0.8336, 0.8328, 0.7903, 0.834];
+export const VE_CORR_HIGH = [0.4896, 0.6341, 0.7635, 0.8364, 0.8624, 0.9419, 1.0363, 1.0194, 1.0664, 1.0444, 1.0092, 0.9799, 0.9905];
+
+export function veCorrection(rpm, highCam) {
+  return highCam ? lookup1(VE_HIGH_RPM, VE_CORR_HIGH, rpm) : lookup1(VE_RPM, VE_CORR_LOW, rpm);
+}
+
+// The engine itself finds best timing and knock in the gas exchange model (combustion phasing and an
+// end-gas autoignition model). These two are quick fits to what that model does, used to build the
+// placeholder tune and as the reference shown on the dash.
 
 // Spark advance for best torque (degrees BTDC).
 export function mbt(rpm, mapKpa) {
   return clamp(17 + 3.0 * Math.min(rpm, 6500) / 1000 + (100 - mapKpa) * 0.13, 8, 45);
 }
 
-// Highest advance before knock on 91 octane (degrees BTDC). Higher octane adds margin.
+// Highest advance before knock (degrees BTDC). Higher octane adds margin; hot intake air takes it away.
 export function knockLimit(rpm, mapKpa, iatC = 25, octane = 91) {
-  return 21 + 2.4 * rpm / 1000 - (mapKpa - 60) * 0.15 - Math.max(0, iatC - 30) * 0.12 + (octane - 91) * 1.2;
+  return Math.min(4 + 5.5 * rpm / 1000, 28 + rpm / 1000) - (mapKpa - 100) * 0.15 - Math.max(0, iatC - 30) * 0.12 + (octane - 91) * 1.2;
 }
 
-// Friction + pumping torque (Nm) the engine loses at a given rpm and manifold pressure.
-export function frictionNm(rpm, mapKpa) {
-  return 6 + 0.002 * rpm + 0.0000004 * rpm * rpm + (100 - mapKpa) * 0.15;
+// Mechanical friction torque (Nm): rings, bearings, valvetrain, oil and water pumps. Pumping losses
+// come from the gas exchange model. About 200 kPa FMEP at 7,800 rpm, normal for a high-revving 2.0.
+export function frictionNm(rpm) {
+  return 5 + 0.0012 * rpm + 0.0000003 * rpm * rpm;
 }
 
 const RPM_AXIS = [500, 1000, 1500, 2000, 2500, 3000, 3500, 4000, 4500, 5000, 5500, 6000, 6500, 7000, 7500, 8000];
@@ -94,11 +102,30 @@ export function placeholderTune() {
   };
 }
 
-// A GT35-class ball-bearing turbo on a 2.0 L, described by airflow: it starts making boost at about
-// 50 g/s through the engine (≈3,000 rpm at full throttle) and can hold full boost from about 105 g/s.
-// maxBoostKpa is what the compressor can push at this engine's airflow. All estimates; adjust them to
-// match a boost log from the car.
-export const TURBO_GT35 = { name: 'GT35-class turbo (estimated)', spoolStartGs: 50, fullBoostGs: 105, maxBoostKpa: 160, springKpa: 48, responsePerS: 2.5 };
+// A GT35-class ball-bearing turbo, described by its hardware rather than by when it makes boost.
+// The turbine is driven by exhaust energy from the gas exchange model: exhaust flow, temperature and
+// the pressure drop across it. The compressor takes power to make boost; the shaft speeds up when the
+// turbine makes more than the compressor uses. Turbine and wastegate are effective flow areas (port
+// area × discharge coefficient). Sizes are estimates for a GT3582R with a 0.82 A/R hot side and a
+// 44 mm wastegate; efficiencies are typical map-centre values. maxBoostKpa is where this compressor
+// runs off its map on a 2.0 L.
+export const TURBO_GT35 = {
+  name: 'GT35-class turbo (estimated)',
+  turbineAreaCm2: 9.5, wastegateAreaCm2: 9.0, compressorTipMm: 41, inertiaKgM2: 3.0e-5,
+  turbineEff: 0.68, compressorEff: 0.72, maxBoostKpa: 160, springKpa: 48,
+  // Front-mount intercooler: effectiveness and pressure drop at 250 g/s are typical bar-and-plate values (estimates).
+  intercooler: true, icEffectiveness: 0.75, icDropKpaAt250Gs: 8,
+  // Ball-bearing centre section with water ports (GT3582R-style; the Precision 6262 is water-cooled too).
+  waterCooled: true,
+};
+
+// Precision 6262 Gen2 (62 mm compressor inducer, 62 mm turbine) on a 0.82 A/R housing, as on the PRL kit.
+// Areas, efficiencies and inertia are estimates in the same way as the GT35.
+export const TURBO_6262 = {
+  name: 'Precision 6262 (estimated)',
+  turbineAreaCm2: 10.5, wastegateAreaCm2: 9.0, compressorTipMm: 44, inertiaKgM2: 3.5e-5,
+  turbineEff: 0.70, compressorEff: 0.75, maxBoostKpa: 200, springKpa: 48,
+};
 
 // Turbo build on stock internals: GT35-class turbo, 1000 cc injectors, 4-bar MAP, overboost cut and a torque
 // warning for the stock rods. Tables still come from the user's tune.

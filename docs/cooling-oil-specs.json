@@ -1,0 +1,341 @@
+{
+  "_meta": {
+    "compiled": "2026-10-13",
+    "engine": "Honda K20Z3 (2006-2011 Civic Si). K20A-family values are used only where labelled.",
+    "rule": "Every number below was read on a fetched page (URL in the item's sources list). null = not found on any reachable page. Nothing is estimated. Where a value was given in one unit only, the other-unit value in the same item is a straight unit conversion and is marked 'converted'.",
+    "accessNotes": "Blocked or unreachable from this environment: k20a.org, 8thcivic.com, honda-tech.com, 9thgencivic.com, ozhonda.com, club-honda.eu (it has a '2008 civic cooling system k20z3 engine.pdf' manual excerpt, id=1658, which could not be downloaded), workshop-manuals.com, hondapartsconnection.com, web.archive.org, and scribd (rendered only a JS error page). ManualsLib could only be read through a summariser, and its table text was scrambled, so treat its capacity mapping with some caution. The hondabook.ru pages are a translated Russian manual for the 2000-2005 European Civic (K20A, D15B, D17A), not the US K20Z3 manual.",
+    "sourceQuality": {
+      "high": ["Honda owner's manual (manualslib)", "hondanews.com press releases", "Honda parts catalogues (hondapartsnow)", "hondata.com help pages and Hondata staff forum posts"],
+      "medium": ["hondabook.ru (translated Euro Civic 7 K20A manual)", "Hybrid Racing / Mishimoto / Koyo / CSF product pages"],
+      "low": ["fatboysoffroad.com, getjerry.com, ahgautoservice.com (generic blog content, listed only to document conflicts)"]
+    }
+  },
+
+  "coolant": {
+    "capacity": {
+      "changeIncludingReserveTankL": 4.5,
+      "changeIncludingReserveTankUsGal": 1.19,
+      "totalL": 6.8,
+      "totalUsGal": 1.80,
+      "reserveTankL": 0.4,
+      "reserveTankUsGal": 0.11,
+      "radiatorOnlyL": null,
+      "pressReleaseCoolantSystemCapacityUsQt": 6.7,
+      "pressReleaseCoolantSystemCapacityL_converted": 6.34,
+      "note": "Owner's manual (2006 Civic, Si = footnote 4): change 1.19 US gal (4.5 L), total 1.80 US gal (6.8 L); footnote says totals include the reserve tank (0.11 US gal / 0.4 L) and coolant remaining in the engine. The ManualsLib text was scrambled and the Si column was matched by footnote/column order. The Honda 2006 Civic Si press release gives 'Coolant system capacity: 6.7 qt' (about 6.3 L), which does not match the 6.8 L manual total. For a radiator-only figure, the nearest number is the Mishimoto aftermarket aluminium radiator's 2.03 gal 'coolant capacity' (radiator.aftermarketReference), which is not the OEM radiator.",
+      "sources": [
+        "https://www.manualslib.com/manual/832361/Honda-2006-Civic.html?page=282",
+        "https://hondanews.com/en-US/releases/release-e9dd7ff209cc71cc83947a004c34c1b2-2006-honda-civic-coupe-and-civic-si-specifications"
+      ]
+    },
+    "type": {
+      "hondaCoolant": "Honda Long-life Anti-freeze/Coolant Type 2",
+      "mixAntifreezePercent": 50,
+      "mixWaterPercent": 50,
+      "premixed": true,
+      "note": "Owner's manual: 'This coolant is pre-mixed with 50 percent antifreeze and 50 percent water.' 'Never add straight antifreeze or plain water.'",
+      "sources": ["https://www.manualslib.com/manual/832361/Honda-2006-Civic.html?page=228"]
+    },
+    "thermostat": {
+      "oemPartNumber": "19301-RAF-004",
+      "thermostatCasePartNumber": "19320-RAA-A01",
+      "startToOpenC_k20aFamilyManual": [76, 80],
+      "fullyOpenC_k20aFamilyManual": 90,
+      "fullOpenLiftMm_k20aFamilyManual": 8,
+      "startToOpenC_hybridRacingOemListing": 87,
+      "startToOpenF_hybridRacingHousingPage": 172.4,
+      "startToOpenC_hybridRacingHousingPage_converted": 78.0,
+      "aftermarketLowTempFullyOpenC": 68,
+      "location": "Inlet-controlled vs outlet-controlled: not stated on any fetched page. Hybrid Racing says only that it sits 'between your engine and the radiator'. Honda lists a separate 'Case, Thermostat' (19320-RAA-A01) and a 'Water Passage (Water Manifold)' (19410-RBC-000) for the Si.",
+      "conflicts": "(1) The hondabook.ru Civic 7 manual gives an unlabelled thermostat test of 'temperature of opening start 76-80 C, full opening temperature 90 C, valve lift 8 mm'; the page covers D15B, D17A and K20A, so these are not confirmed for the K20Z3. (2) Hybrid Racing's OEM 19301-RAF-004 listing (K20Z3/K24A2/K24Z7) says it opens at about 87 C (183 F). (3) Hybrid Racing's adjustable-housing page calls the standard OEM K-series thermostat 172.4 F (78 C) 'factory spec', which agrees with the 76-80 C range. (4) A generic Honda blog (ahgautoservice) says ~85 C open and ~96 C full; low quality. Fully-open temperature and lift for the K20Z3 thermostat itself: not found.",
+      "sources": [
+        "https://www.hondabook.ru/en/Civic/7/power/cooling/termostat-snyatie-i-ustanovka",
+        "https://www.hybrid-racing.com/products/honda-k20z3-k24a2-k24z7-standard-thermostat-19301-raf-004",
+        "https://www.hybrid-racing.com/products/hybrid-racing-k-series-adjustable-thermostat-housing",
+        "https://www.hybrid-racing.com/products/hybridracing-low-temp-thermostat-k20a-prb",
+        "https://www.hondapartsnow.com/oem-2010-honda-civic-thermostat_housing.html",
+        "https://www.ahgautoservice.com/what-temperature-does-a-honda-thermostat-open/"
+      ]
+    },
+    "waterPump": {
+      "oemPartNumber": "19200-RBC-013",
+      "drive": "accessory drive belt (K20A manual: removal starts with '(K20A) Remove the accessory drive belt', then the crankshaft pulley; K-Tuned's electric-pump kit deletes the OEM water pump along with the belt auto-tensioner and accessory pulleys)",
+      "location": "front (timing-chain end) of the engine, behind the crankshaft pulley; Hybrid Racing's K20A2/K20Z1 pump page says replacement involves 'pulling the timing chain cover off'. Held by seven bolts (K20A manual).",
+      "flowLpm": null,
+      "oilCoolerCoolantPort": "Hybrid Racing: the water pump has an oil-cooler coolant port that the factory oil cooler uses; K20A2, K20Z1 and K20Z3 share this water pump design.",
+      "sources": [
+        "https://www.hondapartsnow.com/oem-2007-honda-civic-water_pump.html",
+        "https://www.hybrid-racing.com/products/honda-k20z3-water-pump-19200-rbc-013",
+        "https://www.hondabook.ru/en/Civic/7/power/cooling/nasos-ohlazhdayuschey-zhidkosti",
+        "https://www.hybrid-racing.com/products/honda-k20a2-water-pump-19200-prb-a01",
+        "https://www.a4h-tech.com/en/k-tuned-electric-water-pump-plate-kit-k20-k24-engines",
+        "https://www.hybrid-racing.com/products/hybrid-racing-k20a2-k20z-water-pump-port-block-off"
+      ]
+    },
+    "routing": {
+      "pumpFeedsBlockWhere": null,
+      "headGasketCrossover": null,
+      "headExit": "Water outlet on the head: the K20Z3 'EGR Passage / Water Neck' 18712-RRA-A00 combines the coolant neck with the EGR ports (Hybrid Racing). The water neck also has an idle-air-assist valve port (Hybrid Racing CTS adapter page). Which end of the head it sits on is not stated on any fetched page.",
+      "hosesAndPipesSi": [
+        {"name": "Water Hose (Upper) - upper radiator hose", "partNumber": "19501-RRA-A01"},
+        {"name": "Water Hose (Lower) - lower radiator hose", "partNumber": "19504-RRA-A01"},
+        {"name": "Pipe, Heater (Connector Pipe)", "partNumber": "19510-RTA-000"},
+        {"name": "Bypass Inlet Hose (Hybrid Racing: 'Installs Under Intake Manifold')", "partNumber": "19504-RAC-000"},
+        {"name": "Hose, Oil Cooler In (2007-2011)", "partNumber": "19422-RRB-A01"},
+        {"name": "Hose, Oil Cooler Outlet (2007-2011)", "partNumber": "19423-RRB-A01"},
+        {"name": "Hose, Oil Cooler In (2006)", "partNumber": "19422-RBC-000"},
+        {"name": "Water Passage (Water Manifold)", "partNumber": "19410-RBC-000"},
+        {"name": "Case, Thermostat", "partNumber": "19320-RAA-A01"},
+        {"name": "EGR Passage / Water Neck", "partNumber": "18712-RRA-A00"},
+        {"name": "Hose A, Water Inlet (heater, fits 06-11 Si)", "partNumber": "79721-SVB-A00"},
+        {"name": "Hose B, Water Inlet (heater, listed as related)", "partNumber": "79722-SNG-A00"},
+        {"name": "Water Outlet Hose (heater, listed as related)", "partNumber": "79725-SVB-A00"},
+        {"name": "Joint, Water (heater, listed as related)", "partNumber": "79711-SNB-A00"}
+      ],
+      "heaterCore": "Heater feed/return hoses exist (79721/79722 inlet, 79725 outlet), but their engine-side connection points are not stated on any fetched page.",
+      "throttleBodyCoolantLines": null,
+      "bypassCircuit": "A bypass inlet hose (19504-RAC-000) runs under the intake manifold (Hybrid Racing). Its endpoints are not stated.",
+      "oilCoolerCoolant": "Water-to-oil cooler at the oil filter. Coolant comes from an oil-cooler port on the water pump. Hybrid Racing describes the factory cooler as fed through 'a sandwich plate on the back of the engine'. The K20A manual removes the cooler after the oil filter: 'Disconnect the bypass hose (A), unscrew the fitting (B) and remove the oil cooler (C)', fitting torque 74 N·m. Hybrid Racing's hose pages say hoses 19422/19423 'carry oil to and from the cooler', but Honda's part names ('Hose, Oil Cooler In/Outlet') sit in the 19xxx cooling-system group. The water-pump block-off page and the K20A manual show the cooler is coolant-fed, so these are most likely the coolant hoses; the Hybrid Racing hose wording conflicts with that.",
+      "expansionTank": "Reserve tank, 0.4 L (0.11 US gal), with MAX/MIN marks; reserve tank cap 19102-RNA-A00.",
+      "sources": [
+        "https://www.hondapartsnow.com/oem-2008-honda-civic-cooling_hose.html",
+        "https://www.hondapartsnow.com/oem-2008-honda-civic-radiator_hose.html",
+        "https://www.hondapartsnow.com/oem-2010-honda-civic-thermostat_housing.html",
+        "https://www.hondapartsnow.com/genuine/honda~hose~water~inlet~79721-svb-a00.html",
+        "https://www.hondapartsnow.com/oem-2007-honda-civic-radiator_cap.html",
+        "https://www.hybrid-racing.com/products/honda-k20z3-egr-passage-18712-rra-a00",
+        "https://www.hybrid-racing.com/collections/under-50/products/honda-k20z3-bypass-inlet-hose-19504-rac-000",
+        "https://www.hybrid-racing.com/products/honda-k20z3-oil-cooler-hoses-19422-rrb-a01",
+        "https://www.hybrid-racing.com/products/hybrid-racing-k20a2-k20z-water-pump-port-block-off",
+        "https://www.hybrid-racing.com/collections/all/products/hybrid-racing-k-swap-coolant-temp-sensor-adapter",
+        "https://www.hondabook.ru/en/Civic/7/power/lubrication/maslooohladitel-k20a-modeli-bez-bloka-balansirnyh-valov",
+        "https://www.manualslib.com/manual/832361/Honda-2006-Civic.html?page=282"
+      ]
+    },
+    "radiator": {
+      "oemPartNumber": "19010-RNB-A51",
+      "oemMaker": "Denso",
+      "oemPackageDimensionsIn": [28.5, 20.4, 8.8],
+      "oemPackageWeightLb": 9.6,
+      "oemCoreDimensionsMm": null,
+      "oemRows": null,
+      "oeReplacementCsf3362": {
+        "coreLengthIn": 14.75,
+        "coreWidthIn": 26.6875,
+        "coreThicknessIn": 0.625,
+        "coreLengthMm_converted": 374.7,
+        "coreWidthMm_converted": 677.9,
+        "coreThicknessMm_converted": 15.9,
+        "rows": 1,
+        "material": "aluminium core, plastic tanks",
+        "flow": "down flow",
+        "inletIn": 1.25,
+        "outletIn": 1.25,
+        "capPsiSpecified": 16,
+        "note": "CSF 3362 is an OE-style replacement listed for all 2006-2011 Civic Si 2.0L; it reflects the OE layout, but it is not the Honda part."
+      },
+      "aftermarketReferenceMishimotoMMRAD_CIV_06SI": {
+        "coreLengthIn": 14.72,
+        "coreHeightIn": 26.32,
+        "coreThicknessIn": 1.57,
+        "rows": 2,
+        "coolantCapacityUsGal": 2.03,
+        "inletOutletIn": 1.25
+      },
+      "aftermarketReferenceKoyoV2926CoreThicknessMm": 36,
+      "oemTankMaterialPerHybridRacing": "plastic end tanks, crimped (Hybrid Racing Koyo page; its core-thickness remarks are the writer's guesses and are not used here)",
+      "capPartNumber": "19045-RAA-003",
+      "capPressurePsi": 16,
+      "capPressureKpa_converted": 110,
+      "capTestPressureRangeKpa_k20aFamilyManual": [93, 123],
+      "capNote": "16 psi comes from CSF's cap spec for the Civic Si application, not from Honda. The 93-123 kPa cap test range comes from the Euro Civic 7 manual (page covers D15B/D17A/K20A, engine not labelled). Honda's catalogue does not list a pressure for 19045-RAA-003.",
+      "sources": [
+        "https://www.hondapartsnow.com/oem-2007-honda-civic-radiator.html",
+        "https://www.hondapartsnow.com/oem-2007-honda-civic-radiator_cap.html",
+        "https://www.partcatalog.com/products/csf-3362-radiator",
+        "https://www.mishimoto.com/mishimoto-aluminum-radiator-honda-civic-06-si.html",
+        "https://www.kamispeed.com/products/koyo-06-11-honda-civic-si-2-0l-coupe-sedan-mt-radiator",
+        "https://www.hybrid-racing.com/products/koyo-radiator-racing-radiator-for-honda-civic-06-11",
+        "https://www.hondabook.ru/en/Civic/7/power/cooling/kryshka-radiatora"
+      ]
+    },
+    "fans": {
+      "count": 2,
+      "radiatorFan": {"bladePartNumber": "19020-RRA-A01", "position": "driver side", "shroudPartNumber": "19015-RRA-A01 (Main Shroud)", "packageDimensionsIn": [14.6, 14.6, 4.1]},
+      "condenserFan": {"bladePartNumber": "38611-RRA-A01", "position": "passenger side", "shroudPartNumber": "38615-RRA-A01 (Sub Shroud, Denso)", "packageDimensionsIn": [14.6, 14.7, 3.6]},
+      "diameterMm": null,
+      "motorWattageW": null,
+      "control": "ECU (PCM) controlled. Hondata (Site Admin, 2009, 'Civic Si 2006-2011 Americas' forum): 'there are two fan speeds, which activate both on coolant temperature and AC pressure'; 'The fan temperature control uses the second water temperature sensor ... in the bottom of the radiator, so gives the temperature of the coolant returning to the engine'; 'The fans switch off at about 30 mph as they reach their stall speed.'",
+      "switchOnC_stockK20Z3": null,
+      "switchOffC_stockK20Z3": null,
+      "fanSwitchOnC_k20aFamilyManual": [91, 95],
+      "fanSwitchOffBelowOnC_k20aFamilyManual": [3, 8],
+      "fanNote": "The 91-95 C on / 3-8 C lower off values belong to a separate fan switch in the Euro Civic 7 manual (D15B/D17A/K20A page, engine not labelled). The 06-11 Si uses ECU control from a radiator-outlet sensor, and its stock thresholds were not found. Hondata KManager notes that either the fan switch or the ECU can turn on the fans (where both exist).",
+      "sources": [
+        "https://www.hondapartsnow.com/oem-2007-honda-civic-cooling_fan_assembly.html",
+        "https://hondapartsnow.com/oem-2007-honda-civic-fan_shroud.html",
+        "https://hondata.mobi/forum/viewtopic.php?p=41993",
+        "https://www.hondata.mobi/forum/viewtopic.php?p=8106",
+        "https://www.hondabook.ru/en/Civic/7/power/cooling/vyklyuchatel-ventilyatora-sistemy-ohlazhdeniya"
+      ]
+    },
+    "sensors": {
+      "ect1Location": "cylinder head (Hondata: 'engine coolant temperature as measured in the cylinder head')",
+      "ect2Location": "bottom of the radiator, the returning coolant (Hondata staff post, 06-11 Si); used for fan control. Hondata FlashPro cannot datalog ECT2 on the 'Civic Si 06' ECU.",
+      "sources": [
+        "https://hondata.com/help/flashpro/ect.htm",
+        "https://hondata.com/help/flashpro/sensors.htm",
+        "https://hondata.mobi/forum/viewtopic.php?p=41993"
+      ]
+    },
+    "normalOperatingTempC": null,
+    "normalOperatingTempNote": "No Honda figure was found. The only figure is an anecdote on Hybrid Racing's Koyo page: on track with the stock radiator, coolant 'starts at 195-200 F and reaches 220-230 F by lap 5 or 6', after which the ECU pulls timing. Not used as a spec.",
+    "normalOperatingTempSources": ["https://www.hybrid-racing.com/products/koyo-radiator-racing-radiator-for-honda-civic-06-11"]
+  },
+
+  "oil": {
+    "capacity": {
+      "changeWithFilterL": 4.4,
+      "changeWithFilterUsQt": 4.6,
+      "changeWithoutFilterL": 4.2,
+      "changeWithoutFilterUsQt": 4.4,
+      "totalDryL": 5.5,
+      "totalDryUsQt": 5.8,
+      "pressReleaseCrankcaseUsQt": 5.8,
+      "note": "Owner's manual Si values (footnote 4); the ManualsLib table text was scrambled, so the without-filter and total rows were matched by column order. The press release's 'Crankcase oil capacity 5.8 qt' matches the manual total. Conflict: getjerry.com gives 3.9 qt for '2.0L' (that is the non-Si 1.8L figure), and should be ignored.",
+      "sources": [
+        "https://www.manualslib.com/manual/832361/Honda-2006-Civic.html?page=282",
+        "https://www.manualslib.com/manual/832361/Honda-2006-Civic.html",
+        "https://hondanews.com/en-US/releases/release-e9dd7ff209cc71cc83947a004c34c1b2-2006-honda-civic-coupe-and-civic-si-specifications",
+        "https://getjerry.com/car-repair/2007-honda-civic-oil-capacity"
+      ]
+    },
+    "viscosity": {
+      "recommended": "API Premium 5W-30 (2006 Si owner's manual; non-Si 1.8L uses 5W-20)",
+      "laterModelYearsNote": "Not checked against the 2007-2011 owner's manuals.",
+      "sources": ["https://www.manualslib.com/manual/832361/Honda-2006-Civic.html"]
+    },
+    "pump": {
+      "type": "rotor (trochoid) pump: 'driving and driven rotors' (K20A manual)",
+      "drive": "chain from the crankshaft (K20A manual: oil pump drive chain, tensioner and driven sprocket)",
+      "location": "In the oil pan, inside the balancer unit. The Honda press release says the Si has a 'chain-driven balancer unit mounted in oil pan'; the K20A manual says that on balance-shaft engines 'the pump is part of the balance mechanism'.",
+      "rotorTipClearanceMm_k20a": [0.02, 0.15],
+      "outerRotorToHousingClearanceMm_k20a": [0.15, 0.21],
+      "outerRotorToHousingClearanceMaxMm_k20a": 0.23,
+      "rotorEndClearanceMm": [0.03, 0.07],
+      "rotorEndClearanceMaxMm": 0.12,
+      "rotorTipClearanceMaxMm": 0.20,
+      "reliefValveOpeningKpa": null,
+      "sources": [
+        "https://www.hondabook.ru/en/Civic/7/power/lubrication/maslyanyy-nasos",
+        "https://hondanews.com/en-US/honda-automobiles/releases/release-56b0418fdb34027710fdde004c34c1ad-2006-honda-civic-powertrains"
+      ]
+    },
+    "pressure": {
+      "testOilTempC": 80,
+      "minAtIdleKpa_k20aFamilyManual": 70,
+      "minAt3000RpmKpa_k20a": 300,
+      "minAt3000RpmKpa_otherEnginesSameManual": 340,
+      "k20z3SpecificIdleKpa": null,
+      "k20z3SpecificAt3000RpmKpa": null,
+      "note": "From the Euro Civic 7 (2000-2005) manual, at 80 C oil: 70 kPa at minimum stable idle; at 3000 rpm 'K20A - 300 kPa', 'except K20A - 340 kPa'. The Civic 8 (R18A) page on the same site gives 70 kPa / 340 kPa with 'no more than' wording (a translation error). The US K20Z3 service-manual values were not reachable. Hondata adds that setting VTEC below about 2500 rpm on twin-cam engines can leave too little oil pressure for the rest of the engine.",
+      "sources": [
+        "https://www.hondabook.ru/en/Civic/7/power/lubrication/proverka-davleniya-masla",
+        "https://www.hondabook.ru/en/Civic/8/power/r18a/proverka-davleniya-motornogo-masla",
+        "https://www.hondata.com/help/flashpro/vtec_parameters.htm"
+      ]
+    },
+    "switches": {
+      "lowOilPressureSwitch": "Dash-light sender. Hybrid Racing says it 'mounts on the oil pump'. Honda test: continuity with engine off, none with engine running. Switch pressure not found.",
+      "lowOilPressureSwitchKpa": null,
+      "vtecOilPressureSwitch": "37250-PRB-A01 (Hybrid Racing also prints 37250-PR3-003), 'Mounts on VTEC spool valve assembly (cylinder head)'; tells the ECU that VTEC oil pressure is present (DTC P1259). Hondata logs it as 'VTS' on the Civic Si 06 ECU.",
+      "vtecOilPressureSwitchKpa": null,
+      "vtcOilControlValve": "15830-RBB-003, in the cylinder head; meters oil to the intake-cam VTC actuator (DTC P2646).",
+      "sources": [
+        "https://www.hybrid-racing.com/products/honda-k-series-vtc-oil-pressure-switch-37250-prb-a01",
+        "https://www.hybrid-racing.com/products/honda-k20z3-k24z7-k24a2-vtc-oil-control-sensor-15830-rbb-003",
+        "https://www.hondabook.ru/en/Civic/7/power/lubrication/datchik-avariynogo-davleniya-masla",
+        "https://hondata.com/help/flashpro/sensors.htm"
+      ]
+    },
+    "galleryRouting": {
+      "pumpToFilterToMainGallery": null,
+      "mainsAndRods": null,
+      "head": "VTEC spool valve with VTEC oil pressure switch on the head; VTC oil control valve in the head feeding the intake-cam actuator. Passage-level routing not found.",
+      "chainTensioner": "Oil-pump drive chain has its own tensioner, bolts 12 N·m (K20A manual). How the cam timing-chain tensioner is fed: not found.",
+      "pistonOilJets": {
+        "present": true,
+        "countPerEngine": 4,
+        "partNumber": "15280-PRB-A00",
+        "nozzleHoleMm_k20a": 1.2,
+        "checkBallOpeningKpa_k20a": 200,
+        "checkBallTravelMm_k20a": 4,
+        "note": "Hybrid Racing lists 15280-PRB-A00 for K20A2/K20Z1/K20Z3/K24A2, one per cylinder, bolted into the block. The K20A manual check: a 1.1 mm pin must pass through the 1.2 mm nozzle; the steel ball moves about 4 mm and starts to move at about 200 kPa air pressure.",
+        "sources": [
+          "https://www.hybrid-racing.com/products/honda-rbb-oil-jet-squirter-k20z3-k24a2-15280-prb-a00",
+          "https://www.hondabook.ru/en/Civic/7/power/lubrication/maslyanye-forsunki-k20a-modeli-bez-bloka-balansirnyh-valov"
+        ]
+      },
+      "return": null,
+      "sources": [
+        "https://www.hybrid-racing.com/products/honda-k-series-vtc-oil-pressure-switch-37250-prb-a01",
+        "https://www.hybrid-racing.com/products/honda-k20z3-k24z7-k24a2-vtc-oil-control-sensor-15830-rbb-003",
+        "https://www.hondabook.ru/en/Civic/7/power/lubrication/maslyanyy-nasos"
+      ]
+    },
+    "oilCooler": {
+      "present": true,
+      "type": "water-to-oil, at the oil filter",
+      "partName": "Cooler, Engine Oil",
+      "partNumber": "15500-RBC-004",
+      "fitment": "2007 Civic 2-door Si / 4-door Si, KA 6MT",
+      "fittingTorqueNm_k20a": 74,
+      "note": "Honda catalogue lists 15500-RBC-004 for the Si. Classic Motorsports forum users describe the K20A2 factory cooler as a water-to-oil 'donut' cooler with two 1/2 in barbs. Coolant comes from the water pump's oil-cooler port (Hybrid Racing).",
+      "sources": [
+        "https://www.hondapartsnow.com/oem-2007-honda-civic-oil_cooler.html",
+        "https://classicmotorsports.com/forum/grm/oem-style-water-to-oil-cooler-for-k20/266410/page1",
+        "https://www.hybrid-racing.com/products/hybrid-racing-k20a2-k20z-water-pump-port-block-off",
+        "https://www.hondabook.ru/en/Civic/7/power/lubrication/maslooohladitel-k20a-modeli-bez-bloka-balansirnyh-valov"
+      ]
+    },
+    "oilPan": "cast aluminium (Honda press release: 'a stiff, cast-aluminum oil pan')",
+    "oilPanSources": ["https://hondanews.com/en-US/honda-automobiles/releases/release-56b0418fdb34027710fdde004c34c1ad-2006-honda-civic-powertrains"],
+    "typicalOilTempC": null,
+    "typicalOilTempNote": "Honda gives no normal oil temperature. The pressure test uses 80 C oil, after the electric fan has cycled on at least twice (Civic 8 R18A page)."
+  },
+
+  "ecuTemperatureBehaviour": {
+    "vtecMinimumCoolantTempC": null,
+    "vtecNote": "Hondata FlashPro: 'VTEC minimum coolant temperature is the minimum water temperature before VTEC will activate'. The stock value is not published. VTEC also has a minimum vehicle speed, an rpm window and a MAP window. The K20Z3 VTEC switchover is 5800 rpm (Wikipedia).",
+    "ignitionVsCoolant": "Hondata: the stock ECU retards ignition below normal operating temperature (separate low/high-load tables, split near 40 kPa MAP), uses cold-start catalyst-heating retard, and has a 'High ECT' table that 'retards the ignition when the coolant temperature is higher than normal (overheating)'. KManager wording: low-ECT advance offsets the slower burn. Stock thresholds are not published.",
+    "ignitionVsIat": "Stock ECU retards ignition as intake air temperature rises, to prevent knock.",
+    "idleVsCoolant": "Target idle speed comes from two tables indexed by coolant temperature, with elevated idle for about 20-60 s after start.",
+    "fanOnTempC": null,
+    "overheatProtectionThresholdC": null,
+    "sources": [
+      "https://www.hondata.com/help/flashpro/vtec_parameters.htm",
+      "https://hondata.com/help/flashpro/ignition_parameters.htm",
+      "https://www.hondata.com/help/kmanager/ignition_compensation.htm",
+      "https://hondata.com/help/flashpro/idle_parameters.htm",
+      "https://en.wikipedia.org/wiki/Honda_K_engine"
+    ]
+  },
+
+  "otherEngineFacts": {
+    "timingDrive": "maintenance-free silent chain",
+    "block": "aluminium block with cast-in iron liners; one-piece crankshaft carrier with ferrous main bearing caps",
+    "boreMm": 86,
+    "strokeMm": 86,
+    "compressionRatio": 11.0,
+    "sources": [
+      "https://hondanews.com/en-US/honda-automobiles/releases/release-56b0418fdb34027710fdde004c34c1ad-2006-honda-civic-powertrains",
+      "https://hondanews.com/en-US/releases/release-e9dd7ff209cc71cc83947a004c34c1b2-2006-honda-civic-coupe-and-civic-si-specifications"
+    ]
+  },
+
+  "lowQualityConflictingSources": [
+    {"url": "https://fatboysoffroad.com/2006-honda-civic-specifications/", "claims": "Si oil ~4.6 qt with filter, 5W-30; coolant ~6.7 qt; Honda Type 2", "status": "matches Honda numbers; generic content, not used as primary"},
+    {"url": "https://getjerry.com/car-repair/2007-honda-civic-oil-capacity", "claims": "2.0L 3.9 qt 5W-20", "status": "conflicts with owner's manual Si 4.4 L / 5W-30; ignore"},
+    {"url": "https://www.ahgautoservice.com/what-temperature-does-a-honda-thermostat-open/", "claims": "Honda thermostats open ~85 C, fully open ~96 C", "status": "generic, not K20Z3-specific"}
+  ]
+}
