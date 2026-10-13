@@ -96,6 +96,7 @@ It uses [Three.js](https://threejs.org) r160, included in `vendor/` (MIT license
 | `src/tables.js` | Table lookups and the parser for tables pasted from FlashPro Manager |
 | `src/k20z3.js` | Car data (gear ratios, weight, tires), friction, the fitted airflow corrections, turbo specs |
 | `src/gasflow.js` | Crank-angle gas exchange and combustion: cams, VTC, valves, runners, exhaust, burn, knock |
+| `src/parts.js` | Bottom end: real aftermarket pistons, rods and stroker kits (from `docs/parts-catalog.json`), whether they fit together, and the bore, stroke, rod length, compression and displacement they make |
 | `src/materials.js` | Material library with published properties and sources (built from `docs/materials-sources.json`) |
 | `src/engine.js` | Runs the tune like the ECU (fuel, low/high cam ignition, VTEC, rev limit, decel cut, idle) and works out torque |
 | `src/vehicle.js` | Clutch, gearbox and road load |

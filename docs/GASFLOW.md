@@ -38,7 +38,11 @@ The engine uses these directly:
 Published: bore, stroke, rod length, compression ratio; 35 mm intake and 30 mm exhaust valves, two each, 5.5 mm
 stems; VTEC on both cams and VTC on the intake cam; the RBC intake manifold; stock VTEC point 5,800 rpm.
 
-Estimated (Honda doesn't publish them): cam lift, duration and lobe centres; the stock VTC schedule (shaped after the
+Estimated (Honda doesn't publish them): cam lift, duration and lobe centres. A search for the stock lobe numbers came up
+empty: Honda's own material gives none, and the forum threads that quote them could not be opened (see
+`docs/cam-specs.json` for what was checked). The estimates sit below the mildest published aftermarket grind
+(Skunk2 Ultra Stage 1: 264° at 1 mm, 13.7 / 13.5 mm valve lift). The VTC range (50 crank degrees, intake only) and
+the 5,800 rpm VTEC point are published and used as is; the stock VTC schedule (shaped after the
 cam angles Hondata describes); port, runner, manifold and exhaust volumes and lengths; valve flow coefficient; the
 exhaust system's effective diameter (52 mm gives about 20 kPa of back pressure at the power peak); burn duration;
 wall heat loss; turbine and wastegate flow areas and turbo efficiencies. The knock correlation is from the literature

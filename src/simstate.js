@@ -7,7 +7,8 @@
 // A display module plugs in as:   const view = createX(container); every frame: view.update(renderState(sim), dt)
 // See docs/MODULES.md.
 
-import { PARTS, GEOMETRY, partMaterial } from './internals.js';
+import { PARTS, partMaterial, engineGeometry } from './internals.js';
+import { bottomEnd } from './parts.js';
 import { FLOW, valveLiftM, camCard } from './gasflow.js';
 
 export const FIRING_ORDER = [1, 3, 4, 2];
@@ -17,7 +18,7 @@ export const FIRING_OFFSET_DEG = [0, 540, 180, 360];
 export function renderState(sim) {
   const e = sim.eng, s = sim.internals, t = e.tune;
   const firing = sim.running && !e.revCut && !e.dfco && !e.boostCut;
-  const geom = { ...FLOW, ...(t.flow || {}) };
+  const geom = { ...FLOW, ...(t.flow || {}) }, G = engineGeometry(t), b = bottomEnd(t);
   return {
     running: sim.running,
     rpm: e.rpm,
@@ -58,7 +59,9 @@ export function renderState(sim) {
     })),
     failed: s.failed,
     forces: { rodDownN: s.rodCompN, rodUpN: s.rodTensionN, sleeveMPa: s.sleeveMPa ?? 0 },
-    geometry: { boreM: GEOMETRY.boreM, strokeM: GEOMETRY.strokeM, rodM: GEOMETRY.rodM, inValveM: geom.inValveM, exValveM: geom.exValveM },
+    geometry: { boreM: G.boreM, strokeM: G.strokeM, rodM: G.rodM, compression: G.compression, displacementL: b.displacementL,
+      deckM: b.deckMm / 1000, deckClearanceM: b.deckClearanceMm / 1000, inValveM: geom.inValveM, exValveM: geom.exValveM },
+    bottomEnd: { stock: b.stock, crank: b.crank.name, pistons: b.pistonName, rods: b.rodName, block: b.crank.block ?? 'K20Z3', issues: b.issues },
   };
 }
 

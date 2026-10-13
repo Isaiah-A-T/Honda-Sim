@@ -9,6 +9,7 @@
 
 import { clamp, lookup2, guessFuelUnits } from './tables.js';
 import { ENGINE, TURBO_GT35, veCorrection, mbt, frictionNm } from './k20z3.js';
+import { bottomEnd, flowGeometry } from './parts.js';
 import { FLOW, createGasflow, runCycle, settle, vtcFor, valveLiftM } from './gasflow.js';
 
 const AIR_DENSITY_G_PER_L = 1.184;   // 25 °C, sea level
@@ -18,7 +19,8 @@ const FUEL_DENSITY_G_PER_CC = 0.745;
 const GAS_EVERY_S = 0.01;              // run one gas exchange cycle this often (results change slowly)
 const P_AMB = 101.3, DOWNPIPE_KPA = 4;
 
-const flowGeom = t => ({ ...FLOW, ...(t.flow || {}) });
+// Gas model geometry: defaults, then the bore/stroke/rod/compression the parts list adds up to, then flow settings.
+const flowGeom = t => ({ ...FLOW, ...flowGeometry(t), ...(t.flow || {}) });
 // Turbo settings, with the GT35 defaults filling anything a saved tune from an older version lacks.
 const turboOf = t => (t.turbo?.enabled ? { ...TURBO_GT35, ...t.turbo } : t.turbo);
 // Exhaust outlet the gas model empties into: the exhaust system, or the turbine plus the open part of the wastegate.
@@ -38,8 +40,9 @@ const blend = (a, b, f) => Object.fromEntries(Object.keys(a).map(k => [k, Number
 // One gas state per cam lobe set. While VTEC is switching, some cylinders are on each, so both run and
 // their results are mixed by the share of cylinders locked to the VTEC lobe.
 function updateGas(e, dt, force = false) {
-  if (!e.gas || e.gasFlowRef !== e.tune.flow) {
-    e.gas = createGasflow(flowGeom(e.tune)); e.gasHi = createGasflow(flowGeom(e.tune)); e.gasFlowRef = e.tune.flow; force = true;
+  if (!e.gas || e.gasFlowRef !== e.tune.flow || e.gasPartsRef !== e.tune.parts) {
+    e.gas = createGasflow(flowGeom(e.tune)); e.gasHi = createGasflow(flowGeom(e.tune));
+    e.gasFlowRef = e.tune.flow; e.gasPartsRef = e.tune.parts; e.dispL = bottomEnd(e.tune).displacementL; force = true;
   }
   e.gasT += dt;
   if (!force && e.gasT < GAS_EVERY_S) return;
@@ -175,7 +178,7 @@ export function stepEngine(e, pedal, dt) {
   // Manifold pressure: where airflow through the throttle balances what the engine pumps out.
   updateGas(e, dt);
   const corr = veCorrection(rpm, false) + (veCorrection(rpm, true) - veCorrection(rpm, false)) * e.camF, g = e.gasOut;
-  const mapTarget = manifoldPressure(e.tps, rpm, g.veDelivered * corr, 101.3 + e.boost - e.icDropKpa, e.iat, flowGeom(t).throttleDiaM);
+  const mapTarget = manifoldPressure(e.tps, rpm, g.veDelivered * corr, 101.3 + e.boost - e.icDropKpa, e.iat, flowGeom(t).throttleDiaM, e.dispL);
   e.map += (mapTarget - e.map) * Math.min(1, dt * 12);
 
   e.crankDeg = (e.crankDeg + rpm * 6 * dt) % 720;
@@ -192,7 +195,7 @@ export function stepEngine(e, pedal, dt) {
   // exchange model, plus what passes straight through during valve overlap.
   const ve = g.ve * corr;
   e.ve = ve;
-  const density = ENGINE.displacementL * AIR_DENSITY_G_PER_L * (e.map / 101.3) * (298 / (273 + e.iat));
+  const density = e.dispL * AIR_DENSITY_G_PER_L * (e.map / 101.3) * (298 / (273 + e.iat));
   const airPerCycle = ve * density;
   e.airGs = airPerCycle * rpm / 120;
   e.airDeliveredGs = Math.max(g.veDelivered * corr, ve) * density * rpm / 120;
@@ -241,8 +244,8 @@ export function stepEngine(e, pedal, dt) {
   // Torque: indicated work from the cylinder pressure trace, less pumping work and mechanical friction.
   e.ca50 = g.ca50Deg; e.burnDeg = g.burnDeg;
   e.cylPmaxBar = g.pmaxBar * corr;
-  const indicated = fired ? g.imepKpa * corr * ENGINE.displacementL / (4 * Math.PI) : g.imepKpa * ENGINE.displacementL / (4 * Math.PI);
-  e.pumpingNm = e.pmepKpa * ENGINE.displacementL / (4 * Math.PI);
+  const indicated = fired ? g.imepKpa * corr * e.dispL / (4 * Math.PI) : g.imepKpa * e.dispL / (4 * Math.PI);
+  e.pumpingNm = e.pmepKpa * e.dispL / (4 * Math.PI);
   e.torqueNm = indicated - frictionNm(rpm) - e.pumpingNm;
   e.sparkEff = clamp(1 - ((e.ign - e.mbt) / 28) ** 2, 0.2, 1);   // display only
   e.overTorque = e.torqueNm > (t.torqueLimitNm ?? Infinity);
@@ -266,9 +269,9 @@ function orificeFlow(areaM2, upKpa, downKpa, tempK) {
     : Math.sqrt(2 * GAMMA / (GAMMA - 1) * (pr ** (2 / GAMMA) - pr ** ((GAMMA + 1) / GAMMA)));
   return THROTTLE_CD * areaM2 * upKpa * 1000 / Math.sqrt(R_AIR * tempK) * psi;     // kg/s
 }
-export function manifoldPressure(tps, rpm, ve, upstreamKpa, iatC = 25, throttleDiaM = THROTTLE_D_M) {
+export function manifoldPressure(tps, rpm, ve, upstreamKpa, iatC = 25, throttleDiaM = THROTTLE_D_M, dispL = ENGINE.displacementL) {
   const T = 273 + iatC, area = throttleAreaM2(tps, throttleDiaM);
-  const pumped = p => ve * ENGINE.displacementL / 1000 * Math.max(rpm, 1) / 120 * p * 1000 / (R_AIR * T);
+  const pumped = p => ve * dispL / 1000 * Math.max(rpm, 1) / 120 * p * 1000 / (R_AIR * T);
   let lo = 0.5, hi = upstreamKpa;
   for (let i = 0; i < 40; i++) {
     const mid = (lo + hi) / 2;

@@ -40,7 +40,8 @@ view.update(renderState(sim), dtSeconds);
 | `parts` | Keyed by part (`piston`, `rod`, `rodBolt`, `bearing`, `crank`, `gasket`, `headBolt`, `sleeve`, `block`, `valvetrain`): `load` (0.8 = endurance limit, 1.5 = breaks), `damage` (life used 0–1), `failed`, and the selected `material` |
 | `failed` | Name of the failed part, or `null` |
 | `forces` | Rod force down on the firing stroke and up at TDC (N), sleeve hoop stress (MPa) |
-| `geometry` | Bore, stroke, rod length, valve sizes (m) |
+| `geometry` | Bore, stroke, rod length, deck height and deck clearance, valve sizes (m); compression ratio; displacement (L). Changes with the fitted crank, rods and pistons |
+| `bottomEnd` | Names of the fitted crank (or stroker kit), rods and pistons, the block (K20Z3 or K24A), whether it's all stock, and any fitment notes |
 
 Helpers:
 - `valveLift(state, cyl, intake, crankDeg?)` gives valve lift in metres for cylinder 1–4 from the same cam lobes and VTC
