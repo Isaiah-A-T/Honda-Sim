@@ -83,7 +83,8 @@
         <label>Overboost cut kPa <input type="number" id="setOverboost" step="1"></label>
         <label>Torque warning Nm <input type="number" id="setTorqueLim" step="10"></label>
         <label>Clutch capacity Nm <input type="number" id="setClutch" step="10"></label>
-        <label class="inline"><input type="checkbox" id="setTurbo"> Turbo</label>
+        <label class="inline"><input type="checkbox" id="setTurbo"> Turbo (off = N/A)</label>
+        <label class="inline"><input type="checkbox" id="setIc"> Intercooler</label>
         <label>Wastegate spring kPa <input type="number" id="setSpring" step="1"></label>
         <label>Turbo max boost kPa <input type="number" id="setMaxBoost" step="5"></label>
         <label>Turbine area cm² <input type="number" id="setTurbArea" step="0.5" title="Effective flow area of the turbine housing. Smaller spools sooner but makes more back pressure."></label>
@@ -127,6 +128,16 @@
       </div>
       <div id="failBanner" class="fail" hidden></div>
       <div class="tablewrap"><table id="partsTable"></table></div>
+      <details open>
+        <summary>Bottom end: crank, rods and pistons (real aftermarket parts)</summary>
+        <div class="row">
+          <label>Crank / kit <select id="selCrank"></select></label>
+          <label>Rods <select id="selRod"></select></label>
+          <label>Pistons <select id="selPiston"></select></label>
+        </div>
+        <p id="bottomSummary" class="small"></p>
+        <p id="bottomNotes" class="small muted"></p>
+      </details>
       <details>
         <summary>Materials: pick an alloy per part, see its published properties</summary>
         <div class="tablewrap"><table id="matTable"></table></div>

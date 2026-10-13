@@ -5,6 +5,7 @@ import { CAR, placeholderTune, turboSetup } from './k20z3.js';
 import { createSim, step, shift, shiftUp, shiftDown, startEngine, rebuildEngine, snapshot, logToCsv, setTune } from './sim.js';
 import { PARTS, MATERIALS, partStatus, materialsFor, partMaterial } from './internals.js';
 import { FLOW } from './gasflow.js';
+import { bottomEnd, CRANKS, PISTONS, RODS, pistonProblem, rodProblem } from './parts.js';
 import { createBridge } from './bridge.js';
 import { createViewerLink } from './viewer-link.js';
 import { createInput, attachKeyboard, readInput, startLearn, AXES, BUTTONS } from './input.js';
@@ -104,6 +105,7 @@ function renderSettings() {
   $('setFuelUnits').value = tune.fuelUnits || guessFuelUnits(tune.fuelLow);
   const T = tune.turbo || {};
   $('setTurbo').checked = !!T.enabled;
+  $('setIc').checked = T.intercooler !== false;
   for (const [id, v] of [['setInjCc', tune.injectorCc], ['setDead', tune.injectorDeadMs], ['setOverboost', tune.overboostKpa], ['setTorqueLim', tune.torqueLimitNm],
     ['setClutch', tune.clutchNm], ['setSpring', T.springKpa], ['setMaxBoost', T.maxBoostKpa], ['setTurbArea', T.turbineAreaCm2], ['setWgArea', T.wastegateAreaCm2], ['setCompTip', T.compressorTipMm], ['setWgGain', T.wgGain ?? 1]]) $(id).value = v ?? '';
   const F = { ...FLOW, ...(tune.flow || {}) };
@@ -117,6 +119,7 @@ function applyTune(t) {
   renderSettings();
   renderTable();
   renderMaterials();
+  renderBottomEnd();
 }
 
 for (const [id, key] of [['setVtec', 'vtecRpm'], ['setVtecMap', 'vtecMinMap'], ['setRev', 'revLimit'], ['setOct', 'octane']]) {
@@ -143,6 +146,7 @@ for (const [id, key] of [['setSpring', 'springKpa'], ['setMaxBoost', 'maxBoostKp
     if (Number.isFinite(v)) { tune.turbo = { ...tune.turbo, [key]: v }; saveTune(tune); }
   });
 }
+$('setIc').addEventListener('change', ev => { tune.turbo = { ...tune.turbo, intercooler: ev.target.checked }; saveTune(tune); });
 $('setTurbo').addEventListener('change', ev => { tune.turbo = { ...tune.turbo, enabled: ev.target.checked }; saveTune(tune); });
 $('btnTurbo').onclick = () => { applyTune(turboSetup(tune)); renderTabs(); };
 $('fileCsv').addEventListener('change', async ev => {
@@ -295,6 +299,41 @@ function renderMaterials() {
   $('partsTable').innerHTML = '<thead><tr><th>Part</th><th>Load now</th><th></th><th>Life used</th><th>Status</th></tr></thead><tbody>' +
     PARTS.map(p => `<tr><td>${p.name}</td><td><span class="loadbar"><div id="lb-${p.key}"></div></span></td><td class="num" id="lv-${p.key}"></td><td class="num" id="dm-${p.key}"></td><td id="st-${p.key}"></td></tr>`).join('') + '</tbody>';
 }
+// Bottom end picker. Parts that can't go in with the chosen crank are greyed out with the reason.
+function renderBottomEnd() {
+  const sel = tune.parts || {}, b = bottomEnd(tune), c = b.crank;
+  const opt = (list, cur, why) => list.map(p => {
+    const no = why(p);
+    return `<option value="${p.id}"${p.id === cur ? ' selected' : ''}${no ? ` disabled title="${esc(no)}"` : ''}>${esc(p.name)}${no ? ` (${esc(no)})` : ''}</option>`;
+  }).join('');
+  $('selCrank').innerHTML = opt(CRANKS, c.id, () => null);
+  $('selPiston').innerHTML = c.kitPiston ? `<option>${esc(c.kitPiston.name)} (comes with the kit)</option>` : opt(PISTONS, b.piston.id, p => pistonProblem(c, p));
+  $('selPiston').disabled = !!c.kitPiston;
+  $('selRod').innerHTML = c.kitRod ? `<option>${esc(c.kitRod.name)} (comes with the kit)</option>` : opt(RODS, b.rod.id, r => rodProblem(c, r, b.piston));
+  $('selRod').disabled = !!c.kitRod;
+  $('bottomSummary').innerHTML = `<b>${b.boreMm} × ${b.strokeMm} mm</b>, ${b.rodMm} mm rods, <b>${(b.displacementL * 1000).toFixed(0)} cc</b>, <b>${b.compression.toFixed(1)}:1</b>, ` +
+    `rod/stroke ${(b.rodMm / b.strokeMm).toFixed(2)}, deck clearance ${b.deckClearanceMm.toFixed(2)} mm, block ${c.block ?? 'K20Z3'} (${b.deckMm} mm deck), ` +
+    `piston ${(b.pistonKg * 1000).toFixed(0)} g${b.piston.pistonWeight_g || c.kitPiston ? '' : ' est.'}`;
+  const parts = [c, c.kitPiston ? null : b.piston, c.kitRod ? null : b.rod].filter(p => p && p.id !== 'stock');
+  const src = parts.flatMap(p => (p.sources || []).slice(0, 2).map((u, i) => `<a href="${esc(u)}" target="_blank" rel="noopener">${esc(p.brand)} ${i + 1}</a>`)).join(' ');
+  const est = Object.values(b.estimated).map(esc);
+  $('bottomNotes').innerHTML = [...b.issues.map(esc), ...est.map(x => `Estimated: ${x}`), src && `Sources: ${src}`].filter(Boolean).join('<br>');
+}
+const pickPart = (key, value) => {
+  tune.parts = { ...(tune.parts || {}), [key]: value };
+  // Fitting a part brings its own alloy, so clear any alloy picked for it by hand; oversize pistons need new sleeves.
+  const m = { ...(tune.materials || {}) };
+  if (key === 'piston') delete m.piston;
+  if (key === 'rod') delete m.rod;
+  if (key === 'crank') { delete m.crank; delete m.piston; delete m.rod; }
+  if (bottomEnd(tune).requiresSleeves && (m.sleeve ?? 'sleeve') === 'sleeve') m.sleeve = 'sleeveDuctile';
+  tune.materials = m;
+  saveTune(tune); renderBottomEnd(); renderMaterials();
+};
+$('selCrank').addEventListener('change', ev => pickPart('crank', ev.target.value));
+$('selPiston').addEventListener('change', ev => pickPart('piston', ev.target.value));
+$('selRod').addEventListener('change', ev => pickPart('rod', ev.target.value));
+
 $('btnRebuild').onclick = () => { rebuildEngine(sim); startEngine(sim); };
 
 function updateInternals() {
@@ -437,4 +476,5 @@ renderSettings();
 renderTable();
 renderLearnRows();
 renderMaterials();
+renderBottomEnd();
 requestAnimationFrame(loop);

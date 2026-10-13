@@ -112,6 +112,20 @@ export function valveLiftM(thetaDeg, intake, highCam, vtc = 0, geom = FLOW) {
     : liftAt(th, 360 - geom.exhaustCentre, cam.exDur, cam.exLift);
 }
 
+// The cam card in the usual form: lift, duration at 1 mm of valve lift, and lobe centreline (intake:
+// degrees after TDC with VTC at 0; exhaust: degrees before TDC).
+export function camCard(geom = FLOW) {
+  const lobe = (lift, dur, centre) => {
+    const x = 2 * Math.asin((0.001 / lift) ** (1 / 1.6)) / Math.PI;   // where the sine^1.6 profile crosses 1 mm
+    return { liftMm: +(lift * 1000).toFixed(2), durationDeg: +(dur * (1 - x)).toFixed(1), durationSeatDeg: dur, centerlineDeg: centre };
+  };
+  const { low, high } = geom.cams;
+  return {
+    intakeLow: lobe(low.inLift, low.inDur, geom.intakeCentre0), intakeHigh: lobe(high.inLift, high.inDur, geom.intakeCentre0),
+    exhaustLow: lobe(low.exLift, low.exDur, geom.exhaustCentre), exhaustHigh: lobe(high.exLift, high.exDur, geom.exhaustCentre),
+  };
+}
+
 export function createGasflow(geom = FLOW) {
   const G = geom;
   const ap = Math.PI / 4 * G.boreM ** 2, vd = ap * G.strokeM;

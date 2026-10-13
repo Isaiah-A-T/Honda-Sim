@@ -1,0 +1,608 @@
+{
+ "pistonAl": {
+  "name": "Cast hypereutectic aluminium A390 (stock-type cast piston)",
+  "category": "piston",
+  "densityKgM3": 2700,
+  "modulusGPa": 75,
+  "poisson": 0.33,
+  "yieldMPa": 290,
+  "utsMPa": 290,
+  "fatigueMPa": 100,
+  "elongationPct": 0.87,
+  "hardness": "140 HB",
+  "thermalExpansionUmMK": 20,
+  "conductivityWmK": 130,
+  "specificHeatJkgK": 880,
+  "meltingOrSolidusC": 480,
+  "maxServiceTempC": 170,
+  "strengthVsTempC": [
+   [
+    25,
+    1
+   ],
+   [
+    150,
+    0.9
+   ],
+   [
+    205,
+    0.8
+   ],
+   [
+    260,
+    0.675
+   ],
+   [
+    315,
+    0.55
+   ],
+   [
+    370,
+    0.4
+   ]
+  ],
+  "fatigueNote": "makeitfrom summary value; cycle count not stated",
+  "estimated": {},
+  "sources": [
+   "https://makeitfrom.com/material-properties/A390.0-T6-Cast-Aluminum",
+   "https://corpora.tika.apache.org/base/docs/govdocs1/719/719097.pdf"
+  ]
+ },
+ "piston4032": {
+  "name": "Forged aluminium 4032-T6 (low-expansion forged piston)",
+  "category": "piston",
+  "densityKgM3": 2600,
+  "modulusGPa": 73,
+  "poisson": 0.33,
+  "yieldMPa": 320,
+  "utsMPa": 390,
+  "fatigueMPa": 110,
+  "elongationPct": 6.7,
+  "hardness": "120 HB",
+  "thermalExpansionUmMK": 19,
+  "conductivityWmK": 140,
+  "specificHeatJkgK": 900,
+  "meltingOrSolidusC": 530,
+  "maxServiceTempC": 180,
+  "strengthVsTempC": [
+   [
+    25,
+    1
+   ],
+   [
+    150,
+    0.88
+   ],
+   [
+    205,
+    0.75
+   ],
+   [
+    260,
+    0.6
+   ],
+   [
+    315,
+    0.45
+   ],
+   [
+    370,
+    0.33
+   ]
+  ],
+  "fatigueNote": "makeitfrom summary; cycles not stated",
+  "estimated": {
+   "strengthVsTempC": "not found; a 12% Si forging falls off like A390 but a little faster"
+  },
+  "sources": [
+   "https://makeitfrom.com/material-properties/4032-4032-T6-AlSi12.5MgCuNi-Aluminum"
+  ]
+ },
+ "piston2618": {
+  "name": "Forged aluminium 2618-T61 (high-strength forged piston)",
+  "category": "piston",
+  "densityKgM3": 2900,
+  "modulusGPa": 71,
+  "poisson": 0.33,
+  "yieldMPa": 350,
+  "utsMPa": 420,
+  "fatigueMPa": 110,
+  "elongationPct": 5.8,
+  "hardness": "120 HB",
+  "thermalExpansionUmMK": 22,
+  "conductivityWmK": 160,
+  "specificHeatJkgK": 880,
+  "meltingOrSolidusC": 550,
+  "maxServiceTempC": 210,
+  "strengthVsTempC": [
+   [
+    20,
+    1
+   ],
+   [
+    204,
+    0.8
+   ]
+  ],
+  "fatigueNote": "makeitfrom summary; cycles not stated",
+  "estimated": {},
+  "sources": [
+   "https://makeitfrom.com/material-properties/2618-2618-T61-3.1924-Aluminum",
+   "https://apps.dtic.mil/sti/html/tr/AD0801499/index.html"
+  ]
+ },
+ "rodPM": {
+  "name": "Powder-forged steel Fe-Cu-C (stock rods)",
+  "category": "rod",
+  "yieldMPa": 723,
+  "hardness": "361 HV1 / 37 HRC (core of forged slugs)",
+  "densityKgM3": 7780,
+  "modulusGPa": 200,
+  "utsMPa": 900,
+  "fatigueMPa": 340,
+  "thermalExpansionUmMK": 12,
+  "estimated": {
+   "densityKgM3": "steel; machinability blanks 7.74–7.80 g/cm³",
+   "modulusGPa": "typical steel",
+   "utsMPa": "not published for this grade; about 1.25 × yield",
+   "fatigueMPa": "not published; about 0.38 × tensile, typical for powder-forged steel",
+   "thermalExpansionUmMK": "typical steel"
+  },
+  "sources": [
+   "https://www.hoganas.com/globalassets/downloads/technical-papers/pm/newmaterialsforpowderforgedconnectingrods.pdf",
+   "https://www.metal-powder.tech/?p=2128",
+   "https://www.hoganas.com/globalassets/downloads/technical-papers/pm/materialsforhighlyloadedpartssuchasconnectingrods.pdf"
+  ]
+ },
+ "rod4340": {
+  "name": "AISI 4340 forged steel, quenched and tempered",
+  "category": "rod",
+  "densityKgM3": 7800,
+  "modulusGPa": 190,
+  "poisson": 0.29,
+  "yieldMPa": 1150,
+  "utsMPa": 1210,
+  "fatigueMPa": 740,
+  "elongationPct": 14,
+  "hardness": "350 HB",
+  "thermalExpansionUmMK": 13,
+  "conductivityWmK": 44,
+  "specificHeatJkgK": 470,
+  "meltingOrSolidusC": 1420,
+  "maxServiceTempC": 430,
+  "fatigueNote": "makeitfrom summary; cycles not stated",
+  "estimated": {},
+  "sources": [
+   "https://makeitfrom.com/material-properties/Quenched-and-Tempered-4340-Ni-Cr-Mo-Steel"
+  ]
+ },
+ "rod300M": {
+  "name": "300M steel",
+  "category": "rod",
+  "densityKgM3": 7870,
+  "modulusGPa": 205,
+  "poisson": 0.28,
+  "yieldMPa": 1586,
+  "utsMPa": 1931,
+  "meltingOrSolidusC": 1422,
+  "fatigueMPa": 770,
+  "thermalExpansionUmMK": 12,
+  "estimated": {
+   "fatigueMPa": "not found; about 0.4 × tensile",
+   "thermalExpansionUmMK": "typical steel"
+  },
+  "sources": [
+   "https://alloysintl.com/inventory/alloy-steel/alloy-steel-300m/"
+  ]
+ },
+ "rodTitanium": {
+  "name": "Titanium Ti-6Al-4V",
+  "category": "rod",
+  "densityKgM3": 4400,
+  "modulusGPa": 110,
+  "poisson": 0.32,
+  "yieldMPa": 910,
+  "utsMPa": 1000,
+  "fatigueMPa": 530,
+  "elongationPct": 8.6,
+  "hardness": "33 HRC",
+  "thermalExpansionUmMK": 8.9,
+  "conductivityWmK": 6.8,
+  "specificHeatJkgK": 560,
+  "meltingOrSolidusC": 1650,
+  "maxServiceTempC": 330,
+  "fatigueNote": "makeitfrom range 530-630 MPa (annealed to STA); cycles not stated",
+  "estimated": {},
+  "sources": [
+   "https://www.makeitfrom.com/material-properties/Grade-5-Ti-6Al-4V-3.7165-R56400-Titanium"
+  ]
+ },
+ "rodBolt": {
+  "name": "Alloy steel bolt, property class 10.9 (stock)",
+  "category": "rodBolt",
+  "densityKgM3": 7800,
+  "modulusGPa": 190,
+  "poisson": 0.29,
+  "yieldMPa": 940,
+  "utsMPa": 1040,
+  "fatigueMPa": 650,
+  "elongationPct": 9,
+  "hardness": "32-39 HRC / 310-382 HV / 295-363 HB (ISO 898-1 10.9)",
+  "thermalExpansionUmMK": 13,
+  "conductivityWmK": 43,
+  "specificHeatJkgK": 470,
+  "meltingOrSolidusC": 1420,
+  "maxServiceTempC": 420,
+  "threadFatigueMPa": 70,
+  "fatigueNote": "makeitfrom Q&T 4140 summary value (bulk material, not a threaded fastener); cycles not stated",
+  "estimated": {
+   "threadFatigueMPa": "rolled thread, rolled before heat treatment; stress amplitude, estimate"
+  },
+  "sources": [
+   "https://www.trfastenings.com/knowledge-base/metric-screws/screws-and-bolts-mechanical-properties",
+   "https://www.makeitfrom.com/material-properties/Quenched-and-Tempered-4140-Cr-Mo-Steel"
+  ]
+ },
+ "boltARP2000": {
+  "name": "ARP2000",
+  "category": "rodBolt",
+  "densityKgM3": 7800,
+  "modulusGPa": 190,
+  "poisson": 0.29,
+  "utsMPa": 1517,
+  "thermalExpansionUmMK": 13,
+  "conductivityWmK": 39,
+  "specificHeatJkgK": 470,
+  "meltingOrSolidusC": 1420,
+  "yieldMPa": 1330,
+  "threadFatigueMPa": 130,
+  "estimated": {
+   "yieldMPa": "ARP gives clamp/tensile only; about 0.88 × tensile",
+   "threadFatigueMPa": "threads rolled after heat treatment; ARP says this gives several times the fatigue life; estimate"
+  },
+  "sources": [
+   "https://arp-bolts.com/tech/materials",
+   "https://www.makeitfrom.com/material-properties/SAE-AISI-8740-G87400-Ni-Cr-Mo-Steel"
+  ]
+ },
+ "boltARPL19": {
+  "name": "ARP L19",
+  "category": "rodBolt",
+  "utsMPa": 1793,
+  "yieldMPa": 1610,
+  "densityKgM3": 7800,
+  "modulusGPa": 200,
+  "thermalExpansionUmMK": 12,
+  "threadFatigueMPa": 150,
+  "estimated": {
+   "yieldMPa": "ARP gives tensile only; about 0.9 × tensile",
+   "densityKgM3": "steel",
+   "modulusGPa": "steel",
+   "thermalExpansionUmMK": "steel",
+   "threadFatigueMPa": "estimate, as above"
+  },
+  "sources": [
+   "https://arp-bolts.com/tech/materials"
+  ]
+ },
+ "bearing": {
+  "name": "Aluminium-tin bimetal shell (stock)",
+  "category": "bearing",
+  "utsMPa": 200,
+  "hardness": "30-40 HB (alloy layer)",
+  "thermalExpansionUmMK": 18,
+  "conductivityWmK": 47,
+  "maxServiceTempC": 150,
+  "densityKgM3": 2900,
+  "modulusGPa": 70,
+  "loadRatingMPa": 85,
+  "estimated": {
+   "densityKgM3": "Al-Sn range 2.6–2.9 g/cm³",
+   "modulusGPa": "Al-Sn range 69–79 GPa",
+   "loadRatingMPa": "peak load on the projected area; bearing makers rate Al-Sn below tri-metal, value is an estimate"
+  },
+  "sources": [
+   "https://www.viiplus.com/product/jf-20-high-tin-aluminum-bushing/",
+   "https://www.totalmateria.com/en-us/material/3211817"
+  ]
+ },
+ "bearingTriMetal": {
+  "name": "Copper-lead tri-metal race shell",
+  "category": "bearing",
+  "hardness": "45-70 HB (alloy layer)",
+  "thermalExpansionUmMK": 19,
+  "conductivityWmK": 60,
+  "maxServiceTempC": 170,
+  "densityKgM3": 8900,
+  "modulusGPa": 120,
+  "loadRatingMPa": 110,
+  "estimated": {
+   "densityKgM3": "Cu-Pb range 7.5–9.3 g/cm³",
+   "modulusGPa": "Cu-Pb range 100–150 GPa",
+   "loadRatingMPa": "peak load on the projected area; estimate"
+  },
+  "sources": [
+   "https://www.bronzegleitlager.com/sale-13377330-bimetal-bushing-steel-backed-cupb24sn4-alloy.html",
+   "https://www.totalmateria.com/en-us/material/3256135"
+  ]
+ },
+ "crank": {
+  "name": "38MnVS6 micro-alloyed forged steel (stock-type)",
+  "category": "crank",
+  "densityKgM3": 7670,
+  "modulusGPa": 210,
+  "poisson": 0.3,
+  "yieldMPa": 520,
+  "utsMPa": 800,
+  "elongationPct": 12,
+  "hardness": "250-300 HB (Ovako variants 7221/SB9857, +AR)",
+  "thermalExpansionUmMK": 11.1,
+  "conductivityWmK": 42.6,
+  "specificHeatJkgK": 470,
+  "fatigueMPa": 400,
+  "estimated": {
+   "fatigueMPa": "not published; about 0.5 × tensile at a rolled pin fillet"
+  },
+  "sources": [
+   "https://steelnavigator.ovako.com/steel-grades/38mnvs6/",
+   "https://swisssteel-group.com/content-media/documents/Data-Sheets/Engineering-Steel/1.5231_de.pdf",
+   "https://www.saarstahl.com/app/uploads/2024/03/20160318122935-1303_38MnVS6.pdf"
+  ]
+ },
+ "crank4340": {
+  "name": "4340 billet steel",
+  "category": "crank",
+  "densityKgM3": 7800,
+  "modulusGPa": 190,
+  "poisson": 0.29,
+  "yieldMPa": 1150,
+  "utsMPa": 1210,
+  "fatigueMPa": 740,
+  "elongationPct": 14,
+  "hardness": "350 HB",
+  "thermalExpansionUmMK": 13,
+  "conductivityWmK": 44,
+  "specificHeatJkgK": 470,
+  "meltingOrSolidusC": 1420,
+  "maxServiceTempC": 430,
+  "fatigueNote": "makeitfrom summary; cycles not stated",
+  "estimated": {},
+  "sources": [
+   "https://makeitfrom.com/material-properties/Quenched-and-Tempered-4340-Ni-Cr-Mo-Steel"
+  ]
+ },
+ "crankEN40B": {
+  "name": "EN40B nitriding steel",
+  "category": "crank",
+  "yieldMPa": 680,
+  "utsMPa": 850,
+  "elongationPct": 13,
+  "hardness": "248-302 HB core (T); nitrided case 61-65 HRC",
+  "fatigueMPa": 550,
+  "densityKgM3": 7850,
+  "modulusGPa": 210,
+  "thermalExpansionUmMK": 12,
+  "estimated": {
+   "fatigueMPa": "not found; nitrided surface, about 0.65 × tensile",
+   "densityKgM3": "steel",
+   "modulusGPa": "steel",
+   "thermalExpansionUmMK": "steel"
+  },
+  "sources": [
+   "https://westyorkssteel.com/alloy-steel/nitriding-steel/en40b"
+  ]
+ },
+ "gasket": {
+  "name": "Multi-layer steel, AISI 301 spring temper (stock)",
+  "category": "gasket",
+  "densityKgM3": 7800,
+  "modulusGPa": 200,
+  "poisson": 0.28,
+  "yieldMPa": 1080,
+  "utsMPa": 1460,
+  "fatigueMPa": 540,
+  "elongationPct": 7.4,
+  "hardness": "440 HB",
+  "thermalExpansionUmMK": 17,
+  "conductivityWmK": 16,
+  "specificHeatJkgK": 480,
+  "meltingOrSolidusC": 1400,
+  "maxServiceTempC": 840,
+  "sealFactor": 0.73,
+  "fatigueNote": "makeitfrom summary; cycles not stated",
+  "estimated": {
+   "sealFactor": "share of head-bolt clamp the gasket needs to keep sealing (MLS); estimate"
+  },
+  "sources": [
+   "https://makeitfrom.com/material-properties/Full-Hard-301-Stainless-Steel"
+  ]
+ },
+ "gasketCopper": {
+  "name": "Solid copper C11000, annealed",
+  "category": "gasket",
+  "densityKgM3": 9000,
+  "modulusGPa": 120,
+  "poisson": 0.34,
+  "yieldMPa": 69,
+  "utsMPa": 220,
+  "fatigueMPa": 75,
+  "elongationPct": 50,
+  "hardness": "40 HRF",
+  "thermalExpansionUmMK": 17,
+  "conductivityWmK": 390,
+  "specificHeatJkgK": 390,
+  "meltingOrSolidusC": 1070,
+  "maxServiceTempC": 200,
+  "sealFactor": 0.8,
+  "fatigueNote": "makeitfrom summary; cycles not stated",
+  "estimated": {
+   "sealFactor": "estimate; copper is usually run with O-ringed bores"
+  },
+  "sources": [
+   "https://www.makeitfrom.com/material-properties/Annealed-OS050-C11000-Copper"
+  ]
+ },
+ "valveSpring": {
+  "name": "Chrome-silicon spring wire SAE 9254",
+  "category": "valveSpring",
+  "densityKgM3": 7700,
+  "modulusGPa": 206,
+  "poisson": 0.29,
+  "yieldMPa": 1674,
+  "utsMPa": 1860,
+  "thermalExpansionUmMK": 13,
+  "conductivityWmK": 46,
+  "specificHeatJkgK": 480,
+  "meltingOrSolidusC": 1400,
+  "maxServiceTempC": 250,
+  "fatigueMPa": 650,
+  "estimated": {
+   "fatigueMPa": "not found; typical shot-peened Cr-Si valve spring torsional endurance"
+  },
+  "sources": [
+   "https://makeitfrom.com/material-properties/SAE-AISI-9254-G92540-Silicon-Chromium-Steel",
+   "https://www.wire-pengg.com/images/data/downloads/en/datenblaetter/pengg_austria/844_e.pdf",
+   "https://www.gibbswire.com/pdf/chrome-silicon-comm-wire.pdf"
+  ]
+ },
+ "blockAl": {
+  "name": "Die-cast aluminium 383 / ADC12 (assumed stock grade)",
+  "category": "block",
+  "densityKgM3": 2800,
+  "modulusGPa": 73,
+  "poisson": 0.33,
+  "yieldMPa": 150,
+  "utsMPa": 280,
+  "fatigueMPa": 150,
+  "elongationPct": 3.5,
+  "hardness": "75 HB",
+  "thermalExpansionUmMK": 21,
+  "conductivityWmK": 96,
+  "specificHeatJkgK": 880,
+  "meltingOrSolidusC": 540,
+  "maxServiceTempC": 170,
+  "strengthVsTempC": [
+   [
+    20,
+    1
+   ],
+   [
+    100,
+    0.95
+   ],
+   [
+    150,
+    0.86
+   ],
+   [
+    200,
+    0.72
+   ],
+   [
+    250,
+    0.55
+   ]
+  ],
+  "fatigueNote": "makeitfrom summary; cycles not stated",
+  "estimated": {
+   "strengthVsTempC": "not found for 383; typical Al-Si-Cu die-cast curve"
+  },
+  "sources": [
+   "https://www.makeitfrom.com/material-properties/383.0-383.0-F-SC102A-A03830-Cast-Aluminum"
+  ]
+ },
+ "sleeve": {
+  "name": "Grey cast iron, ASTM A48 class 30 (stock-type)",
+  "category": "sleeve",
+  "densityKgM3": 7500,
+  "modulusGPa": 180,
+  "poisson": 0.29,
+  "yieldMPa": 130,
+  "utsMPa": 240,
+  "fatigueMPa": 97,
+  "elongationPct": 9.6,
+  "hardness": "210 HB",
+  "thermalExpansionUmMK": 11,
+  "conductivityWmK": 46,
+  "specificHeatJkgK": 490,
+  "meltingOrSolidusC": 1180,
+  "fatigueNote": "makeitfrom summary; cycles not stated",
+  "estimated": {},
+  "sources": [
+   "https://www.makeitfrom.com/material-properties/ASTM-Grade-30-or-200-ISO-200-EN-JL-1030-F12101-Grey-Cast-Iron"
+  ]
+ },
+ "sleeveDuctile": {
+  "name": "Ductile iron (aftermarket sleeves)",
+  "category": "sleeve",
+  "densityKgM3": 7500,
+  "modulusGPa": 170,
+  "poisson": 0.31,
+  "yieldMPa": 410,
+  "utsMPa": 600,
+  "elongationPct": 8.2,
+  "hardness": "190 HB",
+  "thermalExpansionUmMK": 11,
+  "conductivityWmK": 36,
+  "specificHeatJkgK": 490,
+  "meltingOrSolidusC": 1120,
+  "maxServiceTempC": 290,
+  "fatigueMPa": 270,
+  "estimated": {
+   "fatigueMPa": "not found; about 0.45 × tensile, typical for ductile iron"
+  },
+  "sources": [
+   "https://www.makeitfrom.com/material-properties/ASTM-Grade-80-55-06-SAE-D5506-Ductile-Cast-Iron",
+   "https://www.myalro.com/gradeinfo/Metals_Gridpt.aspx?gp=0139",
+   "https://dragcartel.com/products/k-series-sleeve-kit"
+  ]
+ },
+ "headBolt": {
+  "name": "Alloy steel bolt, property class 10.9 (stock)",
+  "category": "headBolt",
+  "densityKgM3": 7800,
+  "modulusGPa": 190,
+  "poisson": 0.29,
+  "yieldMPa": 940,
+  "utsMPa": 1040,
+  "fatigueMPa": 650,
+  "elongationPct": 9,
+  "hardness": "31-39 HRC (10.9)",
+  "thermalExpansionUmMK": 13,
+  "conductivityWmK": 43,
+  "specificHeatJkgK": 470,
+  "meltingOrSolidusC": 1420,
+  "maxServiceTempC": 420,
+  "threadFatigueMPa": 70,
+  "fatigueNote": "makeitfrom Q&T 4140 bulk value",
+  "estimated": {
+   "threadFatigueMPa": "as above"
+  },
+  "sources": [
+   "https://www.trfastenings.com/knowledge-base/metric-screws/screws-and-bolts-mechanical-properties",
+   "https://www.makeitfrom.com/material-properties/Quenched-and-Tempered-4140-Cr-Mo-Steel"
+  ]
+ },
+ "headStudARP2000": {
+  "name": "ARP2000 head studs",
+  "category": "headBolt",
+  "densityKgM3": 7800,
+  "modulusGPa": 190,
+  "poisson": 0.29,
+  "utsMPa": 1517,
+  "thermalExpansionUmMK": 13,
+  "conductivityWmK": 39,
+  "specificHeatJkgK": 470,
+  "meltingOrSolidusC": 1420,
+  "yieldMPa": 1330,
+  "threadFatigueMPa": 130,
+  "estimated": {
+   "yieldMPa": "ARP gives clamp/tensile only; about 0.88 × tensile",
+   "threadFatigueMPa": "as above"
+  },
+  "sources": [
+   "https://arp-bolts.com/tech/materials",
+   "https://www.makeitfrom.com/material-properties/SAE-AISI-8740-G87400-Ni-Cr-Mo-Steel"
+  ]
+ }
+}

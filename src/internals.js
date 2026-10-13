@@ -16,6 +16,7 @@
 
 import { clamp, lookup1 } from './tables.js';
 import { MATERIALS } from './materials.js';
+import { bottomEnd } from './parts.js';
 export { MATERIALS };
 
 export const GEOMETRY = {
@@ -49,17 +50,31 @@ export const PARTS = [
 ];
 
 export const materialsFor = category => Object.entries(MATERIALS).filter(([, m]) => m.category === category).map(([id]) => id);
+// The alloy picked for a part wins; otherwise the alloy of the aftermarket part fitted (src/parts.js);
+// otherwise stock.
 export function partMaterial(tune, part) {
   const id = tune?.materials?.[part.key];
-  return MATERIALS[id]?.category === part.category ? MATERIALS[id] : MATERIALS[part.default];
+  if (MATERIALS[id]?.category === part.category) return MATERIALS[id];
+  const fitted = tune?.parts ? bottomEnd(tune).materials[part.key] : null;
+  return MATERIALS[fitted]?.category === part.category ? MATERIALS[fitted] : MATERIALS[part.default];
+}
+
+// Geometry with the fitted crank, rods and pistons. Stock sleeves get thinner as the bore grows; a
+// re-sleeved block (any aftermarket sleeve material) is back to full wall thickness.
+export function engineGeometry(tune) {
+  const b = bottomEnd(tune);
+  if (b.stock) return GEOMETRY;
+  const resleeved = (tune?.materials?.sleeve ?? 'sleeve') !== 'sleeve';
+  return {
+    ...GEOMETRY, boreM: b.boreMm / 1000, strokeM: b.strokeMm / 1000, rodM: b.rodMm / 1000, compression: b.compression,
+    pinM: b.pinMm / 1000, bigEndM: b.bigEndBearingMm / 1000, pistonKg: b.pistonKg, rodSmallEndKg: b.rodRecipKg,
+    sleeveWallM: resleeved ? GEOMETRY.sleeveWallM : Math.max(0.0015, GEOMETRY.sleeveWallM - (b.boreMm - 86) / 2000),
+  };
 }
 const derate = (m, tempC) => (m.strengthVsTempC ? lookup1(m.strengthVsTempC.map(d => d[0]), m.strengthVsTempC.map(d => d[1]), tempC) : 1);
 // Goodman: a steady (mean) stress uses up some of the alternating stress the metal can take forever.
 const goodman = (ampMPa, meanMPa, m, k = 1) => ampMPa / Math.max(1, m.fatigueMPa * k * (1 - clamp(meanMPa / (m.utsMPa * k), 0, 0.95)));
 
-const G = GEOMETRY;
-const PISTON_AREA = Math.PI / 4 * G.boreM ** 2;
-const LAMBDA = G.strokeM / 2 / G.rodM;
 
 export function createInternals() {
   return {
@@ -80,7 +95,7 @@ export function cyclesToFailure(load) {
 // Peak cylinder pressure (bar): compression pressure × combustion rise, shifted by spark timing.
 export function peakPressureBar(e) {
   const charge = (e.map / 101.3) * (e.ve ?? 0.9) * (298 / (273 + e.iat));
-  const compressionBar = 1.013 * charge * G.compression ** 1.3;
+  const compressionBar = 1.013 * charge * engineGeometry(e.tune).compression ** 1.3;
   if (e.revCut || e.dfco || e.boostCut || e.torqueNm === undefined) return compressionBar;
   const spark = clamp(1 + 0.025 * (e.ign - e.mbt), 0.35, 1.3);       // advance raises it, retard lowers it
   const mixture = e.lambda < 1 ? 1 - (1 - e.lambda) * 0.3 : 1 / e.lambda;
@@ -93,6 +108,8 @@ export function stepInternals(s, e, dt) {
   if (s.failed) return;
   const rpm = Math.max(e.rpm, 0), w = rpm * Math.PI / 30;
   const M = Object.fromEntries(PARTS.map(p => [p.key, partMaterial(e.tune, p)]));
+  const G = engineGeometry(e.tune);
+  const PISTON_AREA = Math.PI / 4 * G.boreM ** 2, LAMBDA = G.strokeM / 2 / G.rodM;
 
   // Peak pressure from the cycle model, plus knock: pressure oscillations on top of the peak, getting
   // worse the further past the knock limit.

@@ -31,15 +31,17 @@ view.update(renderState(sim), dtSeconds);
 |---|---|
 | `running`, `firing`, `rpm`, `crankDeg` | Engine running, burning fuel this cycle (false on rev cut, decel cut, overboost cut), speed, crank angle 0–720 with cylinder 1 firing TDC at 0 |
 | `gear`, `speedMs`, `throttlePct`, `mapKpa` | Drivetrain and load |
-| `cams` | `highCam` (VTEC engaged), `vtcDeg` (intake cam advance), `vtecRpm` |
+| `cams` | `highCam` (ECU on high-cam tables), `vtecCommanded`, `oilKpa`, `vtecPins` (lock pin travel per cylinder 1–4, 0–1), `vtecEngagedShare`, `vtcDeg` (intake cam advance, crank degrees 0–50), `vtecRpm`, `card` (each lobe's `liftMm`, `durationDeg` at 1 mm, `durationSeatDeg`, `centerlineDeg`) |
 | `combustion` | Spark, best-torque spark, knock limit, crank angle where half the charge has burned (`ca50Deg`), burn duration, `knocking`, knock index (1 = edge), λ |
 | `flow` | VE, airflow g/s, residual exhaust share, pumping loss, exhaust manifold pressure, EGT, peak cylinder pressure |
-| `turbo` | `null` without a turbo, else boost, shaft rpm, wastegate opening 0–1, turbine and compressor power |
+| `induction`, `intercooler` | `'na'`, `'turbo'` or `'supercharger'`; whether a boosted build has an intercooler |
+| `turbo` | `null` without a turbo, else charge temperature after the intercooler (or compressor), intercooler pressure drop, boost, shaft rpm, wastegate opening 0–1, turbine and compressor power |
 | `temps` | Piston crown, intake air, coolant |
 | `parts` | Keyed by part (`piston`, `rod`, `rodBolt`, `bearing`, `crank`, `gasket`, `headBolt`, `sleeve`, `block`, `valvetrain`): `load` (0.8 = endurance limit, 1.5 = breaks), `damage` (life used 0–1), `failed`, and the selected `material` |
 | `failed` | Name of the failed part, or `null` |
 | `forces` | Rod force down on the firing stroke and up at TDC (N), sleeve hoop stress (MPa) |
-| `geometry` | Bore, stroke, rod length, valve sizes (m) |
+| `geometry` | Bore, stroke, rod length, deck height and deck clearance, valve sizes (m); compression ratio; displacement (L). Changes with the fitted crank, rods and pistons |
+| `bottomEnd` | Names of the fitted crank (or stroker kit), rods and pistons, the block (K20Z3 or K24A), whether it's all stock, and any fitment notes |
 
 Helpers:
 - `valveLift(state, cyl, intake, crankDeg?)` gives valve lift in metres for cylinder 1–4 from the same cam lobes and VTC

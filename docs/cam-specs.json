@@ -1,0 +1,149 @@
+{
+  "_meta": {
+    "compiled": "2026-10-13",
+    "engine": "Honda K20Z3 (2006-2011 Civic Si, 2007-2010 Acura CSX Type-S)",
+    "rule": "Every value below was read on a fetched page. null = not found on any reachable page. Nothing is estimated.",
+    "accessNotes": "The main community sources for stock K-series lobe specs (k20a.org 'stock cam specs' t=76662 and 'CAMS: z1 vs z3 vs a2 vs itr vs 06 tsx', 8thcivic.com 'Mother of all camshafts thread' and 'Does anyone know the K20Z3's cylinder head/cam specs', clubrsx.com, honda-tech.com, hondata.com forum 'What are K20Z4 stock camshaft specs?') and web.archive.org were all blocked or unreachable from this environment (proxy CONNECT 403 / fetch error / robots). The Scribd service-manual copy only rendered a JavaScript error page. So stock lobe lift/duration/centreline numbers could NOT be confirmed.",
+    "camCodesNote": "The caller's suggested codes (RRB intake for K20Z3; PRB/PRC for K20Z1) could not be verified on any fetched page; the codes appear only in titles of unreachable forum threads (e.g. clubrsx 'RRB/TSX intake cam and PRC exhaust cam?'). Treat as unconfirmed."
+  },
+  "camCodes": {
+    "intake": null,
+    "exhaust": null,
+    "k20z1SameAsK20z3": null,
+    "note": "Unconfirmed. Not found on any fetched page.",
+    "sources": []
+  },
+  "intakeLow": {
+    "liftMm": null,
+    "durationDeg": null,
+    "durationAt": null,
+    "centerlineDeg": null,
+    "centerlineNote": "Intake centreline is variable via VTC (50 deg range per Honda). No stock base-position value found.",
+    "sources": []
+  },
+  "intakeHigh": {
+    "liftMm": null,
+    "durationDeg": null,
+    "durationAt": null,
+    "centerlineDeg": null,
+    "centerlineNote": "Variable via VTC. Honda press kit: 'At high engine speeds, valve lift phase on the intake side is increased by five degrees and on the exhaust side by 10 degrees' -- Honda does not say relative to what (likely vs the previous-gen engine) and gives no absolute values.",
+    "sources": [
+      "https://hondanews.com/en-US/honda-automobiles/releases/release-56b0418fdb34027710fdde004c34c1ad-2006-honda-civic-powertrains"
+    ]
+  },
+  "exhaustLow": {
+    "liftMm": null,
+    "durationDeg": null,
+    "durationAt": null,
+    "centerlineDeg": null,
+    "centerlineNote": "Exhaust cam has no VTC on the K20Z3 (fixed phase). No stock centreline value found.",
+    "sources": [
+      "https://en.wikipedia.org/wiki/Honda_K_engine"
+    ]
+  },
+  "exhaustHigh": {
+    "liftMm": null,
+    "durationDeg": null,
+    "durationAt": null,
+    "centerlineDeg": null,
+    "centerlineNote": "See intakeHigh note on Honda's '10 degrees' exhaust phase statement.",
+    "sources": [
+      "https://hondanews.com/en-US/honda-automobiles/releases/release-56b0418fdb34027710fdde004c34c1ad-2006-honda-civic-powertrains"
+    ]
+  },
+  "vtc": {
+    "rangeCrankDeg": 50,
+    "camOnly": "intake",
+    "notes": [
+      "Honda 2006 Civic powertrains release (Si engine): the VTC actuator advances or retards the intake cam across a '50 degree range' (Honda does not say crank or cam degrees in that sentence).",
+      "Hondata FlashPro 'VTC tuning' help: VTC moves the intake cam 'over a range of 50 crank degrees'; 'The allowable cam angle range is from 0 to 45 or 0 to 50 degrees, depending on the calibration type.' Hondata N/A guidance: max advance just after VTEC engagement until ~6500-7000 rpm, then retard 'back around 25 degrees' to redline.",
+      "Wikipedia VTEC: K-series intake cam 'capable of advancing between 25 and 50 degrees, depending upon engine configuration'; phasing by 'a computer-controlled, oil-driven adjustable cam sprocket'.",
+      "Tegiwa (Genuine Honda 25 deg VTC gear): the 25 deg actuator 'is found on the K24A3'; '50 degrees is the maximum amount of movement from any stock actuator'.",
+      "Wikipedia K engine: K20Z3 has VTC on the intake cam only, not the exhaust."
+    ],
+    "sources": [
+      "https://hondanews.com/en-US/honda-automobiles/releases/release-56b0418fdb34027710fdde004c34c1ad-2006-honda-civic-powertrains",
+      "https://hondata.com/help/flashpro/tuning_for_vtc.htm",
+      "https://en.wikipedia.org/wiki/VTEC",
+      "https://www.tegiwa.com/products/genuine-honda-25deg-vtc-actuator-intake-cam-gear-k-series",
+      "https://en.wikipedia.org/wiki/Honda_K_engine"
+    ]
+  },
+  "vtecActuation": {
+    "switchRpm": 5800,
+    "switchRpmNote": "Honda: above 5,800 rpm the intake and exhaust valves use high-lift, long-duration cam profiles (K20Z3). Wikipedia K engine also lists VTEC engagement 5800 rpm for K20Z3/K20Z1/K20A2. Both intake and exhaust cams have three lobes per cylinder (Wikipedia VTEC).",
+    "oilPressureKpa": null,
+    "oilPressureNote": "No authoritative figure found. Only a Link ECU forum post: 'A quick google says something about being a 50PSI switch, but yeah, grain of salt.' -- unverified, not used.",
+    "ecuConditions": {
+      "rpm": "Stock K20Z3 switch point 5800 rpm (Honda). Hondata: VTEC point is a 'VTEC window' varying with engine speed and load ('allows the VTEC point to move higher with lighter engine load'); KManager example 3800 rpm at 96 kPa MAP rising linearly to 5500 rpm at 30 kPa MAP (tuning example, not the stock calibration); guide limits: not below 2500 rpm on twin-cam engines, not above 6500 rpm.",
+      "loadMap": "Hondata 'VTEC pressure window' = minimum MAP for VTEC activation vs rpm (no stock values published).",
+      "vehicleSpeed": "Hondata: 'VTEC engage and disengage minimum speed is the minimum vehicle speed before VTEC will activate'; disengage speed lower than engage speed. No stock value.",
+      "coolantTemp": "Hondata: 'VTEC minimum coolant temperature is the minimum water temperature before VTEC will activate.' No stock value.",
+      "oilPressureSwitch": "Hondata KManager: 'For JDM engines and JDM ECUs disable the VTEC oil pressure sensor' (i.e. USDM ECUs monitor a VTEC oil pressure switch). Wikipedia VTEC: ECU 'takes account of engine oil pressure, engine temperature, vehicle speed, engine speed, and throttle position'.",
+      "hysteresis": "Wikipedia VTEC: 'The switch back from high- to low-rpm cams is set to occur at a lower engine speed than the switch up.'"
+    },
+    "switchTimeMs": null,
+    "switchTimeNote": "No published ms figure found. Honda patent US4901685 notes a delay from energising the solenoid valve to piston movement that depends on engine speed, oil temperature, oil pressure and battery voltage, but gives no number.",
+    "pinEngagement": "Pin can only slide when the rocker arms are aligned, i.e. while the cam is on its base circle (valve closed). Honda patent US4901685 (Honda Giken Kogyo): 'During an interval Ac when the valve is closed, the first rocker arm 8 is held at rest' with guide holes 'kept in axial registry'; second embodiment adds 'a timing plate 39 for controlling the timing of movement of the piston 36'. So each cylinder switches on its own next base-circle window, not all at once. (Generic Honda VTEC patent, not K20Z3-specific.)",
+    "mechanism": "ECU energises the VTEC solenoid; a spool valve directs oil pressure through the rocker shaft to a locking pin that locks the outer (low-lobe) rockers to the centre high-lift rocker; spring returns the pin when pressure is released (Honda VTEC release; Counterman).",
+    "sources": [
+      "https://hondanews.com/en-US/honda-automobiles/releases/release-56b0418fdb34027710fdde004c34c1ad-2006-honda-civic-powertrains",
+      "https://en.wikipedia.org/wiki/Honda_K_engine",
+      "https://en.wikipedia.org/wiki/VTEC",
+      "https://www.hondata.com/help/flashpro/vtec_parameters.htm",
+      "https://www.hondata.com/help/kmanager/vtec.htm",
+      "https://hondanews.com/en-US/releases/release-b50efa689496a1943cdccc46490f00df-vtec",
+      "https://www.counterman.com/counter-view-understanding-honda-variable-valve-timing/",
+      "https://patents.justia.com/patent/4901685",
+      "https://forums.linkecu.com/topic/21627-k20-vtec-oil-pressure-switch-wiring-help/"
+    ],
+    "notes": "Oil pressure threshold and switch time remain unconfirmed."
+  },
+  "otherSources": {
+    "note": "Aftermarket K20/K24 cams that list K20Z3 fitment. None of these pages publish stock comparison numbers; listed only as context for what 'upgraded' looks like.",
+    "hondaPressKitEngine": {
+      "power": "197 hp @ 7800 rpm",
+      "torque": "139 lb-ft @ 6200 rpm",
+      "compression": "11.0:1",
+      "intakeDuctMm": 70,
+      "tailpipeMm": 60.5,
+      "source": "https://hondanews.com/en-US/honda-automobiles/releases/release-56b0418fdb34027710fdde004c34c1ad-2006-honda-civic-powertrains"
+    },
+    "skunk2TunerStage3": {
+      "intake": {"valveLiftMm": 14.0, "advDurationDeg": 278},
+      "exhaust": {"valveLiftMm": 13.0, "advDurationDeg": 282, "centerline": "107 BTDC"},
+      "notes": "1.7 rocker ratio; i-VTEC settings: small lobe 35 deg advance, big lobe 40 deg tapering to 30 deg; VTEC crossover 5500-6500 rpm; claimed +30-33 hp over factory",
+      "source": "https://www.realstreetperformance.com/skunk2-tuner-cams-stage-3-rsx-civic-k20a2-k20z1-k20z3-k24a2.html"
+    },
+    "skunk2UltraStage1": {
+      "intake": {"valveLiftMm": 13.72, "durationDeg": 264, "durationAt": "1mm"},
+      "exhaust": {"valveLiftMm": 13.46, "durationDeg": 264, "durationAt": "1mm", "centerline": "111 BTDC"},
+      "source": "https://www.realstreetperformance.com/skunk2-ultra-camshafts-stage-1-k20a-a2-z1-z3-k24a2-2-0l-dohc-i-vtec.html"
+    },
+    "kelford179A": {
+      "intake": {"valveLiftMm": 12.50, "advDurationDeg": 310, "advAt": "0.10mm", "durationAt1mmDeg": 262},
+      "exhaust": {"valveLiftMm": 12.20, "advDurationDeg": 304, "advAt": "0.10mm", "durationAt1mmDeg": 256, "centerline": 105},
+      "source": "https://kelfordcams.com/product/honda-k-series-camshaft"
+    },
+    "dragCartelDropIn": {
+      "intakeLow": {"liftMm": 9.6, "durationDeg": 250},
+      "intakeHigh": {"liftMm": 12.7, "durationDeg": 295},
+      "exhaustLow": {"liftMm": 8.4, "durationDeg": 243},
+      "exhaustHigh": {"liftMm": 12.0, "durationDeg": 288},
+      "durationAt": null,
+      "source": "https://www.hybrid-racing.com/products/pro-cams-drop-in"
+    },
+    "junK20A": {
+      "note": "JUN Type0 (bolt-on, works with VTC), K20A: IN primary 244 deg/8.2 mm, mid 304/12.2, secondary 240/7.5; EX 248/8.5, 304/11.8, 244/7.8",
+      "source": "https://junauto.co.jp/products/camshaft/k20.en.html"
+    },
+    "todaH1K20A": {
+      "note": "IN: 267(11.5) / 297(13.0) / 267(11.5); EX: 267(11.5) / 292(12.0) / 267(11.5) (primary/mid/secondary, deg (valve lift mm))",
+      "source": "https://www.tdi-plc.com/?p=43337"
+    },
+    "brianCrowerStage2FI": {
+      "note": "Adv 296/300, @0.050in 222/224, valve lift 13.21/12.62 mm (1.75 ratio; intake/exhaust order not labelled)",
+      "source": "https://www.inductionperformance.com/products/brian-crower-honda-acura-k20a2-k20a-k24a2-k20z3-camshafts-stage-2-forced-induction-spec-bc0041-2"
+    }
+  }
+}
