@@ -1,0 +1,648 @@
+//! The K20Z3 model: builds every part from the dimensions in kinematics.rs and moves them each frame.
+//! Built in millimetres; SCALE turns that into scene units (1 unit = 100 mm).
+
+use crate::kinematics::*;
+use crate::materials;
+use crate::meshes::*;
+use crate::state::SimState;
+use three_d::*;
+
+pub const SCALE: f32 = 0.01;
+const DECK: f32 = DECK_HEIGHT;
+const ROOF: f32 = DECK + 10.0;
+const CAM_Y: f32 = DECK + 128.0;
+const CAM_Z: f32 = 38.0;
+const VALVE_SEAT_Z: f32 = 20.0;
+const VALVE_TIP_Y: f32 = CAM_Y - 19.0;
+const LEN: f32 = 4.0 * BORE_SPACING + 40.0;
+
+#[derive(Clone, Copy, PartialEq, Eq, Debug)]
+pub enum Sys {
+    Casting,
+    Internals,
+    Intake,
+    Exhaust,
+    Turbo,
+    NaIntake,
+}
+
+#[derive(Clone, Copy, PartialEq, Eq, Debug)]
+pub enum Mode {
+    Full,
+    Internals,
+    Block,
+    Airflow,
+    Stress,
+    Materials,
+}
+
+impl Mode {
+    pub const ALL: [Mode; 6] = [Mode::Full, Mode::Internals, Mode::Block, Mode::Airflow, Mode::Stress, Mode::Materials];
+    pub fn label(self) -> &'static str {
+        match self {
+            Mode::Full => "Full engine",
+            Mode::Internals => "Internals",
+            Mode::Block => "Block",
+            Mode::Airflow => "Airflow",
+            Mode::Stress => "Stress",
+            Mode::Materials => "Materials",
+        }
+    }
+    fn shows(self, sys: Sys) -> bool {
+        match self {
+            Mode::Internals => sys == Sys::Internals,
+            Mode::Block => sys == Sys::Casting,
+            _ => true,
+        }
+    }
+}
+
+#[derive(Clone, Copy, PartialEq, Eq)]
+pub enum Castings {
+    SeeThrough,
+    Solid,
+    Hidden,
+}
+
+#[derive(Clone, Copy)]
+enum Mover {
+    Fixed,
+    Crank,
+    Piston(usize),
+    Rod(usize),
+    Valve(usize),
+    Cam(Side),
+    Butterfly,
+    TurbineWheel,
+    CompWheel,
+}
+
+pub struct Part {
+    pub gm: Gm<Mesh, PhysicalMaterial>,
+    local: Mat4,
+    mover: Mover,
+    pub key: Option<&'static str>,
+    pub index: Option<usize>,
+    pub label: String,
+    pub sys: Sys,
+    base: Srgba,
+    base_emissive: Srgba,
+    base_alpha: u8,
+    opaque: bool,
+    vtec_lobe: bool,
+    pub visible: bool,
+}
+
+struct ValveInfo {
+    cyl: usize,
+    side: Side,
+    seat: Vec3,
+    axis: Vec3,
+}
+
+enum GlowKind {
+    Flame(usize),
+    Plug(usize),
+}
+
+struct Glow {
+    gm: Gm<Mesh, ColorMaterial>,
+    kind: GlowKind,
+}
+
+struct Flow {
+    curve: Curve,
+    intake: bool,
+    cyl: Option<usize>,
+    only_turbo: Option<bool>,
+    u: Vec<f32>,
+}
+
+pub struct Engine {
+    pub parts: Vec<Part>,
+    valves: Vec<ValveInfo>,
+    glows: Vec<Glow>,
+    flows: Vec<Flow>,
+    particles: Gm<InstancedMesh, ColorMaterial>,
+    show_particles: bool,
+    transparent_states: RenderStates,
+    pub crank: f32,
+    turbo_angle: f32,
+    pub shake: f32,
+    turbo_offset: Vec3,
+    tb_pos: Vec3,
+}
+
+fn srgba(hex: u32, a: u8) -> Srgba {
+    Srgba::new((hex >> 16) as u8, (hex >> 8) as u8, hex as u8, a)
+}
+
+fn lerp_color(a: Srgba, b: [f32; 3], t: f32) -> Srgba {
+    let f = |x: u8, y: f32| ((x as f32 / 255.0) * (1.0 - t) + y * t).clamp(0.0, 1.0) * 255.0;
+    Srgba::new(f(a.r, b[0]) as u8, f(a.g, b[1]) as u8, f(a.b, b[2]) as u8, a.a)
+}
+
+struct Builder<'a> {
+    ctx: &'a Context,
+    parts: Vec<Part>,
+}
+
+struct Spec {
+    color: u32,
+    alpha: u8,
+    metal: f32,
+    rough: f32,
+    emissive: u32,
+}
+
+const fn metal(color: u32, metal: f32, rough: f32) -> Spec {
+    Spec { color, alpha: 255, metal, rough, emissive: 0 }
+}
+const fn glass(color: u32, alpha: u8) -> Spec {
+    Spec { color, alpha, metal: 0.1, rough: 0.6, emissive: 0 }
+}
+
+impl<'a> Builder<'a> {
+    #[allow(clippy::too_many_arguments)]
+    fn add(&mut self, mesh: &CpuMesh, s: Spec, key: Option<&'static str>, label: &str, index: Option<usize>, sys: Sys, mover: Mover, local: Mat4) -> usize {
+        let cpu = CpuMaterial {
+            albedo: srgba(s.color, s.alpha),
+            metallic: s.metal,
+            roughness: s.rough,
+            emissive: srgba(s.emissive, 255),
+            ..Default::default()
+        };
+        let material = if s.alpha < 255 { PhysicalMaterial::new_transparent(self.ctx, &cpu) } else { PhysicalMaterial::new_opaque(self.ctx, &cpu) };
+        let gm = Gm::new(Mesh::new(self.ctx, mesh), material);
+        self.parts.push(Part {
+            gm,
+            local,
+            mover,
+            key,
+            index,
+            label: label.to_string(),
+            sys,
+            base: srgba(s.color, s.alpha),
+            base_emissive: srgba(s.emissive, 255),
+            base_alpha: s.alpha,
+            opaque: s.alpha == 255,
+            vtec_lobe: false,
+            visible: true,
+        });
+        self.parts.len() - 1
+    }
+}
+
+fn t(x: f32, y: f32, z: f32) -> Mat4 {
+    Mat4::from_translation(vec3(x, y, z))
+}
+
+/// Cam lobe outline (z, y) with the nose pointing +Y.
+fn lobe_outline(base: f32, lift: f32) -> Vec<(f32, f32)> {
+    (0..48)
+        .map(|i| {
+            let a = i as f32 / 48.0 * std::f32::consts::TAU;
+            let r = base + a.cos().max(0.0).powi(3) * lift;
+            (-r * a.sin(), r * a.cos())
+        })
+        .collect()
+}
+
+pub struct FlowPath {
+    pts: Vec<[f32; 3]>,
+    intake: bool,
+    cyl: Option<usize>,
+    only_turbo: Option<bool>,
+}
+
+impl Engine {
+    pub fn new(ctx: &Context) -> Self {
+        let mut b = Builder { ctx, parts: Vec::new() };
+        let mut valves = Vec::new();
+        let mut glows = Vec::new();
+        let mut paths: Vec<FlowPath> = Vec::new();
+        let id = Mat4::identity();
+        let r = STROKE / 2.0;
+
+        // ---------- Castings ----------
+        b.add(&boxed(LEN, DECK + 60.0, 190.0), glass(0x8fa3b8, 34), Some("block"), "Engine block", None, Sys::Casting, Mover::Fixed, t(0.0, (DECK - 60.0) / 2.0, 0.0));
+        for c in 1..=4 {
+            b.add(&open_cylinder_y(BORE / 2.0 + 2.0, 130.0, 40), glass(0xa9b8c8, 46), Some("block"), "Cylinder liner", None, Sys::Casting, Mover::Fixed, t(cyl_x(c), DECK - 65.0, 0.0));
+        }
+        b.add(&boxed(LEN - 30.0, 90.0, 170.0), glass(0x6f7782, 34), None, "Oil pan", None, Sys::Casting, Mover::Fixed, t(0.0, -105.0, 0.0));
+        b.add(&boxed(LEN, 120.0, 160.0), glass(0x9fb0c2, 30), Some("head"), "Cylinder head", None, Sys::Casting, Mover::Fixed, t(0.0, DECK + 60.0, 0.0));
+        b.add(&boxed(LEN - 20.0, 45.0, 150.0), glass(0xb3262b, 40), None, "Cam cover", None, Sys::Casting, Mover::Fixed, t(0.0, DECK + 142.0, 0.0));
+
+        // ---------- Crankshaft ----------
+        let steel = || metal(0x9aa0a6, 0.8, 0.3);
+        for i in 0..5 {
+            b.add(&along_x(cylinder_y(27.0, 27.0, 22.0, 32)), steel(), Some("crank"), "Crankshaft main journal", None, Sys::Internals, Mover::Crank, t((i as f32 - 2.0) * BORE_SPACING, 0.0, 0.0));
+        }
+        let mut cw_outline: Vec<(f32, f32)> = (0..=16)
+            .map(|i| {
+                let a = std::f32::consts::PI * (1.18 + 0.64 * i as f32 / 16.0);
+                (-70.0 * a.cos(), 70.0 * a.sin())
+            })
+            .collect();
+        cw_outline.push((0.0, 0.0));
+        let counterweight = extrude_x(&cw_outline, 14.0);
+        for c in 1..=4 {
+            let up = if c == 1 || c == 4 { 1.0 } else { -1.0 };
+            b.add(&along_x(cylinder_y(24.0, 24.0, 26.0, 28)), steel(), Some("crank"), &format!("Crank pin {c}"), None, Sys::Internals, Mover::Crank, t(cyl_x(c), up * r, 0.0));
+            for side in [-1.0, 1.0] {
+                let x = cyl_x(c) + side * 24.0;
+                b.add(&boxed(14.0, r + 30.0, 48.0), steel(), Some("crank"), "Crank web", None, Sys::Internals, Mover::Crank, t(x, up * r / 2.0, 0.0));
+                let flip = if up < 0.0 { Mat4::from_angle_x(degrees(180.0)) } else { id };
+                b.add(&counterweight, steel(), Some("crank"), "Counterweight", None, Sys::Internals, Mover::Crank, t(x, 0.0, 0.0) * flip);
+            }
+        }
+        b.add(&along_x(cylinder_y(18.0, 18.0, 70.0, 20)), steel(), Some("crank"), "Crank snout", None, Sys::Internals, Mover::Crank, t(cyl_x(1) - 85.0, 0.0, 0.0));
+        b.add(&along_x(cylinder_y(70.0, 70.0, 22.0, 48)), metal(0x2c3138, 0.5, 0.5), None, "Crank pulley", None, Sys::Internals, Mover::Crank, t(cyl_x(1) - 120.0, 0.0, 0.0));
+        b.add(&boxed(24.0, 40.0, 8.0), Spec { emissive: 0x666666, ..metal(0xf4f4f4, 0.2, 0.5) }, None, "Timing mark", None, Sys::Internals, Mover::Crank, t(cyl_x(1) - 120.0, 48.0, 0.0));
+        b.add(&along_x(cylinder_y(22.0, 22.0, 14.0, 18)), steel(), None, "Crank timing sprocket", None, Sys::Internals, Mover::Crank, t(cyl_x(1) - 72.0, 0.0, 0.0));
+        b.add(&along_x(cylinder_y(140.0, 140.0, 26.0, 64)), metal(0x6f757c, 0.85, 0.4), Some("flywheel"), "Flywheel", None, Sys::Internals, Mover::Crank, t(cyl_x(4) + 110.0, 0.0, 0.0));
+        b.add(&boxed(28.0, 90.0, 14.0), Spec { emissive: 0x553300, ..metal(0xffc400, 0.3, 0.5) }, None, "Flywheel mark", None, Sys::Internals, Mover::Crank, t(cyl_x(4) + 96.0, 80.0, 0.0));
+        b.add(&along_x(cylinder_y(118.0, 118.0, 30.0, 48)), metal(0x4a4f57, 0.55, 0.45), Some("clutch"), "Clutch pressure plate", None, Sys::Internals, Mover::Crank, t(cyl_x(4) + 138.0, 0.0, 0.0));
+
+        // ---------- Pistons and rods ----------
+        let piston_mesh = merge(&[
+            transformed(cylinder_y(BORE / 2.0 - 0.5, BORE / 2.0 - 0.5, 48.0, 40), t(0.0, 6.0, 0.0)),
+        ]);
+        let rings = merge(&[24.0, 18.0, 12.0].map(|y| transformed(cylinder_y(BORE / 2.0, BORE / 2.0, 1.6, 40), t(0.0, y, 0.0))));
+        for c in 1..=4 {
+            let i = Some(c - 1);
+            b.add(&piston_mesh, metal(0xd5d8dc, 0.4, 0.35), Some("pistons"), &format!("Piston {c}"), i, Sys::Internals, Mover::Piston(c), id);
+            b.add(&rings, metal(0x30343a, 0.5, 0.5), None, &format!("Piston rings {c}"), i, Sys::Internals, Mover::Piston(c), id);
+            b.add(&along_x(cylinder_y(10.0, 10.0, 60.0, 16)), metal(0x8c939b, 0.9, 0.3), Some("pistons"), &format!("Wrist pin {c}"), i, Sys::Internals, Mover::Piston(c), id);
+            let rod = metal(0xb8bcc2, 0.75, 0.3);
+            b.add(&boxed(20.0, ROD_LENGTH - 30.0, 16.0), rod, Some("rods"), &format!("Connecting rod {c}"), i, Sys::Internals, Mover::Rod(c), t(0.0, -ROD_LENGTH / 2.0, 0.0));
+            b.add(&along_x(cylinder_y(15.0, 15.0, 22.0, 20)), metal(0xb8bcc2, 0.75, 0.3), Some("rods"), &format!("Rod small end {c}"), i, Sys::Internals, Mover::Rod(c), id);
+            b.add(&along_x(cylinder_y(32.0, 32.0, 24.0, 28)), metal(0xb8bcc2, 0.75, 0.3), Some("rods"), &format!("Rod big end {c}"), i, Sys::Internals, Mover::Rod(c), t(0.0, -ROD_LENGTH, 0.0));
+
+            for (kind, color) in [(GlowKind::Flame(c), Srgba::new(255, 140, 30, 0)), (GlowKind::Plug(c), Srgba::new(160, 212, 255, 0))] {
+                let mesh = match kind {
+                    GlowKind::Flame(_) => cylinder_y(BORE / 2.0 - 4.0, BORE / 2.0 - 4.0, 1.0, 32),
+                    GlowKind::Plug(_) => {
+                        let mut s = CpuMesh::sphere(12);
+                        s.transform(Mat4::from_scale(7.0)).unwrap();
+                        s
+                    }
+                };
+                let mut mat = ColorMaterial::new_transparent(ctx, &CpuMaterial { albedo: color, ..Default::default() });
+                mat.render_states.blend = Blend::ADD;
+                mat.render_states.write_mask = WriteMask::COLOR;
+                glows.push(Glow { gm: Gm::new(Mesh::new(ctx, &mesh), mat), kind });
+            }
+        }
+
+        // ---------- Cams, valves, plugs ----------
+        for side in [Side::Intake, Side::Exhaust] {
+            let z = if side == Side::Intake { CAM_Z } else { -CAM_Z };
+            let name = if side == Side::Intake { "Intake" } else { "Exhaust" };
+            let cam = metal(0x7d8590, 0.8, 0.35);
+            b.add(&along_x(cylinder_y(12.0, 12.0, LEN - 10.0, 20)), cam, Some("cams"), &format!("{name} camshaft"), None, Sys::Internals, Mover::Cam(side), id);
+            b.add(&along_x(cylinder_y(34.0, 34.0, 14.0, 36)), metal(0x5e656e, 0.6, 0.4), None, &format!("{name} cam sprocket"), None, Sys::Internals, Mover::Cam(side), t(cyl_x(1) - 72.0, 0.0, 0.0));
+            b.add(&boxed(16.0, 14.0, 6.0), Spec { emissive: 0x555555, ..metal(0xf4f4f4, 0.2, 0.5) }, None, "Cam timing mark", None, Sys::Internals, Mover::Cam(side), t(cyl_x(1) - 72.0, 28.0, 0.0));
+            let ev_low = cam_event(side, false);
+            let ev_high = cam_event(side, true);
+            let low_mesh = extrude_x(&lobe_outline(17.0, ev_low.lift), 12.0);
+            let high_mesh = extrude_x(&lobe_outline(17.0, ev_high.lift), 10.0);
+            for c in 1..=4 {
+                let slot = FIRING_ORDER.iter().position(|&x| x == c).unwrap() as f32;
+                let centre = ev_low.centre + slot * 180.0;
+                let alpha = Mat4::from_angle_x(radians(std::f32::consts::PI - (centre / 2.0).to_radians()));
+                for dx in [-17.0, 17.0] {
+                    b.add(&low_mesh, metal(0x7d8590, 0.8, 0.35), Some("cams"), &format!("Cyl {c} {} lobe (low cam)", name.to_lowercase()), None, Sys::Internals, Mover::Cam(side), t(cyl_x(c) + dx, 0.0, 0.0) * alpha);
+                }
+                let hi = b.add(&high_mesh, metal(0x8a929c, 0.8, 0.35), Some("cams"), &format!("Cyl {c} {} VTEC lobe (high cam)", name.to_lowercase()), None, Sys::Internals, Mover::Cam(side), t(cyl_x(c), 0.0, 0.0) * alpha);
+                b.parts[hi].vtec_lobe = true;
+
+                for dx in [-17.0, 17.0] {
+                    let seat = vec3(cyl_x(c) + dx, ROOF, if side == Side::Intake { VALVE_SEAT_Z } else { -VALVE_SEAT_Z });
+                    let tip = vec3(cyl_x(c) + dx, VALVE_TIP_Y, z);
+                    let stem_len = (tip - seat).magnitude();
+                    let axis = (tip - seat).normalize();
+                    let head_r = if side == Side::Intake { 17.5 } else { 15.0 };
+                    let color = if side == Side::Intake { 0xc8b88a } else { 0x9a8a7a };
+                    let vi = valves.len();
+                    valves.push(ValveInfo { cyl: c, side, seat, axis });
+                    let label = format!("Cyl {c} {} valve", name.to_lowercase());
+                    b.add(&cylinder_y(head_r, head_r * 0.55, 4.0, 28), metal(color, 0.7, 0.4), Some("valves"), &label, Some(c - 1), Sys::Internals, Mover::Valve(vi), id);
+                    b.add(&cylinder_y(2.8, 2.8, stem_len, 10), metal(color, 0.7, 0.4), Some("valves"), &label, Some(c - 1), Sys::Internals, Mover::Valve(vi), t(0.0, stem_len / 2.0, 0.0));
+                    b.add(&torus_y(9.0, 1.6, 18, 6), metal(0x50565e, 0.6, 0.45), None, "Valve spring", Some(c - 1), Sys::Internals, Mover::Valve(vi), t(0.0, stem_len - 30.0, 0.0));
+                }
+            }
+        }
+        let chain_x = cyl_x(1) - 72.0;
+        let chain = Curve::new(
+            &[[-25.0, 0.0], [-12.0, -22.0], [12.0, -22.0], [25.0, 0.0], [CAM_Z + 36.0, CAM_Y - 10.0], [CAM_Z + 22.0, CAM_Y + 28.0],
+              [0.0, CAM_Y + 30.0], [-CAM_Z - 22.0, CAM_Y + 28.0], [-CAM_Z - 36.0, CAM_Y - 10.0]]
+                .map(|[zz, y]| [chain_x, y, zz]),
+            true,
+        );
+        b.add(&tube(&chain, 3.0, 160, 6), metal(0x3b4048, 0.9, 0.4), None, "Timing chain", None, Sys::Internals, Mover::Fixed, id);
+        for c in 1..=4 {
+            b.add(&cylinder_y(6.0, 6.0, 90.0, 12), metal(0xeeeeee, 0.1, 0.4), None, &format!("Spark plug {c}"), None, Sys::Internals, Mover::Fixed, t(cyl_x(c), ROOF + 56.0, 0.0));
+            b.add(&boxed(26.0, 40.0, 26.0), metal(0x1e2226, 0.3, 0.6), None, &format!("Ignition coil {c}"), None, Sys::Internals, Mover::Fixed, t(cyl_x(c), ROOF + 126.0, 0.0));
+        }
+
+        // ---------- Intake ----------
+        let intake = || metal(0x3a3f46, 0.4, 0.6);
+        for c in 1..=4 {
+            let x = cyl_x(c);
+            let runner = Curve::new(&[[x, DECK + 70.0, 80.0], [x, DECK + 110.0, 150.0], [x, DECK + 70.0, 220.0], [x, DECK - 10.0, 235.0]], false);
+            b.add(&tube(&runner, 19.0, 48, 16), intake(), Some("intake"), &format!("Intake runner {c}"), None, Sys::Intake, Mover::Fixed, id);
+            b.add(&transformed(cylinder_y(6.0, 4.0, 55.0, 10), Mat4::from_angle_x(radians(-0.6))), metal(0x24282e, 0.3, 0.6), None, &format!("Fuel injector {c}"), None, Sys::Intake, Mover::Fixed, t(x + 20.0, DECK + 100.0, 105.0));
+            paths.push(FlowPath { pts: vec![[x, DECK - 30.0, 250.0], [x, DECK - 10.0, 235.0], [x, DECK + 70.0, 220.0], [x, DECK + 110.0, 150.0], [x, DECK + 70.0, 80.0], [x, ROOF + 22.0, VALVE_SEAT_Z + 6.0], [x, ROOF - 10.0, 0.0]], intake: true, cyl: Some(c), only_turbo: None });
+        }
+        paths.push(FlowPath { pts: vec![[-LEN / 2.0 - 70.0, DECK - 30.0, 250.0], [-LEN / 2.0 + 30.0, DECK - 30.0, 250.0], [LEN / 2.0 - 30.0, DECK - 30.0, 250.0]], intake: true, cyl: None, only_turbo: None });
+        b.add(&along_x(cylinder_y(55.0, 55.0, LEN - 20.0, 32)), intake(), Some("intake"), "Intake plenum", None, Sys::Intake, Mover::Fixed, t(0.0, DECK - 30.0, 250.0));
+        let tb_pos = vec3(-LEN / 2.0 - 40.0, DECK - 30.0, 250.0);
+        b.add(&along_x(open_cylinder_y(36.0, 60.0, 32)), metal(0x9aa3ad, 0.6, 0.4), None, "Throttle body", None, Sys::Intake, Mover::Fixed, t(tb_pos.x, tb_pos.y, tb_pos.z));
+        b.add(&along_x(cylinder_y(33.0, 33.0, 2.0, 32)), metal(0xc7ccd2, 0.6, 0.35), None, "Throttle plate", None, Sys::Intake, Mover::Butterfly, id);
+        let na = Curve::new(&[[-LEN / 2.0 - 70.0, DECK - 30.0, 250.0], [-LEN / 2.0 - 160.0, DECK - 30.0, 260.0], [-LEN / 2.0 - 220.0, DECK - 80.0, 150.0]], false);
+        b.add(&tube(&na, 36.0, 40, 18), metal(0x2b2f35, 0.3, 0.8), Some("intake"), "Intake pipe", None, Sys::NaIntake, Mover::Fixed, id);
+        paths.push(FlowPath { pts: vec![[-LEN / 2.0 - 220.0, DECK - 80.0, 150.0], [-LEN / 2.0 - 160.0, DECK - 30.0, 260.0], [-LEN / 2.0 - 70.0, DECK - 30.0, 250.0]], intake: true, cyl: None, only_turbo: Some(false) });
+
+        // ---------- Exhaust ----------
+        let exh = || metal(0x4f4945, 0.45, 0.8);
+        for c in 1..=4 {
+            let x = cyl_x(c);
+            let runner = Curve::new(&[[x, DECK + 70.0, -80.0], [x, DECK + 60.0, -150.0], [x * 0.6, DECK - 10.0, -210.0], [x * 0.15, DECK - 80.0, -235.0]], false);
+            b.add(&tube(&runner, 18.0, 48, 16), exh(), Some("exhaust"), &format!("Exhaust runner {c}"), None, Sys::Exhaust, Mover::Fixed, id);
+            paths.push(FlowPath { pts: vec![[x, ROOF - 10.0, 0.0], [x, ROOF + 22.0, -VALVE_SEAT_Z - 6.0], [x, DECK + 70.0, -80.0], [x, DECK + 60.0, -150.0], [x * 0.6, DECK - 10.0, -210.0], [x * 0.15, DECK - 80.0, -235.0], [0.0, DECK - 140.0, -240.0]], intake: false, cyl: Some(c), only_turbo: None });
+        }
+        b.add(&cylinder_y(32.0, 40.0, 70.0, 24), exh(), Some("exhaust"), "Exhaust collector", None, Sys::Exhaust, Mover::Fixed, t(0.0, DECK - 110.0, -240.0));
+        paths.push(FlowPath { pts: vec![[0.0, DECK - 140.0, -240.0], [0.0, DECK - 260.0, -240.0]], intake: false, cyl: None, only_turbo: Some(false) });
+
+        // ---------- Turbo ----------
+        let to = vec3(0.0, DECK - 180.0, -260.0);
+        let tt = |x: f32, y: f32, z: f32| t(to.x + x, to.y + y, to.z + z);
+        let shift = |pts: &[[f32; 3]]| -> Vec<[f32; 3]> { pts.iter().map(|p| [p[0] + to.x, p[1] + to.y, p[2] + to.z]).collect() };
+        b.add(&along_x(torus_y(55.0, 30.0, 40, 16)), metal(0x8a8f96, 0.6, 0.5), Some("turbo"), "Turbine housing", None, Sys::Turbo, Mover::Fixed, tt(-50.0, 0.0, 0.0));
+        b.add(&along_x(torus_y(65.0, 32.0, 40, 16)), metal(0xb3b8be, 0.5, 0.45), Some("turbo"), "Compressor housing", None, Sys::Turbo, Mover::Fixed, tt(70.0, 0.0, 0.0));
+        b.add(&along_x(cylinder_y(38.0, 38.0, 90.0, 24)), metal(0x52575e, 0.55, 0.45), Some("turbo"), "Centre section (bearings)", None, Sys::Turbo, Mover::Fixed, tt(0.0, 0.0, 0.0));
+        let wheel = |radius: f32, blades: u32| {
+            let mut parts = vec![along_x(cylinder_y(12.0, 12.0, 30.0, 12))];
+            for i in 0..blades {
+                let rot = Mat4::from_angle_x(radians(i as f32 / blades as f32 * std::f32::consts::TAU));
+                parts.push(transformed(boxed(26.0, radius, 2.5), rot * t(0.0, radius / 2.0, 0.0) * Mat4::from_angle_y(radians(0.5))));
+            }
+            merge(&parts)
+        };
+        b.add(&wheel(36.0, 11), metal(0x8d7f70, 0.85, 0.35), None, "Turbine wheel", None, Sys::Turbo, Mover::TurbineWheel, id);
+        b.add(&wheel(44.0, 12), metal(0xd8dde2, 0.85, 0.35), None, "Compressor wheel", None, Sys::Turbo, Mover::CompWheel, id);
+        let downpipe = Curve::new(&shift(&[[-50.0, 0.0, -60.0], [-60.0, -60.0, -80.0], [-60.0, -160.0, -60.0]]), false);
+        b.add(&tube(&downpipe, 30.0, 30, 16), metal(0x8a8f96, 0.6, 0.5), Some("exhaust"), "Downpipe", None, Sys::Turbo, Mover::Fixed, id);
+        let charge = Curve::new(&shift(&[[110.0, 0.0, 0.0], [180.0, 60.0, 80.0], [-LEN / 2.0 - 120.0, 150.0, 510.0], [-LEN / 2.0 - 70.0, 150.0, 510.0]]), false);
+        b.add(&tube(&charge, 26.0, 80, 16), metal(0x2f6fb5, 0.5, 0.45), Some("intake"), "Charge pipe", None, Sys::Turbo, Mover::Fixed, id);
+        let up = Curve::new(&[[0.0, DECK - 140.0, -240.0], [-30.0, DECK - 160.0, -250.0], [-50.0, DECK - 180.0, -262.0]], false);
+        b.add(&tube(&up, 28.0, 20, 16), exh(), Some("exhaust"), "Turbo up-pipe", None, Sys::Turbo, Mover::Fixed, id);
+        let mut ex_turbo = vec![[0.0, DECK - 140.0, -240.0], [-30.0, DECK - 160.0, -250.0], [-50.0, DECK - 180.0, -262.0]];
+        ex_turbo.extend(shift(&[[-50.0, 0.0, -60.0], [-60.0, -60.0, -80.0], [-60.0, -160.0, -60.0]]));
+        paths.push(FlowPath { pts: ex_turbo, intake: false, cyl: None, only_turbo: Some(true) });
+        paths.push(FlowPath { pts: shift(&[[70.0, 0.0, 0.0], [110.0, 0.0, 0.0], [180.0, 60.0, 80.0], [-LEN / 2.0 - 120.0, 150.0, 510.0], [-LEN / 2.0 - 70.0, 150.0, 510.0]]), intake: true, cyl: None, only_turbo: Some(true) });
+
+        let flows = paths
+            .into_iter()
+            .map(|p| {
+                let curve = Curve::new(&p.pts, false);
+                let n = ((curve.length() / 16.0).round() as usize).max(6);
+                let u = (0..n).map(|i| (i as f32 + 0.3 * ((i * 7919) % 10) as f32 / 10.0) / n as f32).collect();
+                Flow { curve, intake: p.intake, cyl: p.cyl, only_turbo: p.only_turbo, u }
+            })
+            .collect();
+        let mut dot = CpuMesh::sphere(6);
+        dot.transform(Mat4::from_scale(4.5)).unwrap();
+        let particles = Gm::new(InstancedMesh::new(ctx, &Instances::default(), &dot), ColorMaterial::new_opaque(ctx, &CpuMaterial { albedo: Srgba::WHITE, ..Default::default() }));
+        let transparent_states = PhysicalMaterial::new_transparent(ctx, &CpuMaterial { albedo: Srgba::new(255, 255, 255, 100), ..Default::default() }).render_states;
+
+        Engine {
+            parts: b.parts,
+            valves,
+            glows,
+            flows,
+            particles,
+            show_particles: false,
+            transparent_states,
+            crank: 0.0,
+            turbo_angle: 0.0,
+            shake: 0.0,
+            turbo_offset: to,
+            tb_pos,
+        }
+    }
+
+    /// Advance the animation and apply the mode's visibility and colours.
+    #[allow(clippy::too_many_arguments)]
+    pub fn update(&mut self, s: &SimState, dt: f32, slow_mo: f32, mode: Mode, castings: Castings, materials: &dyn Fn(&str) -> Option<(String, [u8; 3])>, selected: Option<&str>, time: f32) {
+        self.crank = advance_crank(self.crank, s.rpm, dt, slow_mo);
+        let crank = self.crank;
+        let vtc = s.vtc_deg.clamp(0.0, VTC_MAX_DEG);
+        let burning = s.running && !s.fuel_cut && s.rpm > 300.0;
+        if s.turbo {
+            let spin = (s.boost_kpa.max(0.0) / 100.0 * 9.0 + s.rpm / 8000.0 * 2.0) * if s.running { 1.0 } else { 0.2 };
+            self.turbo_angle = (self.turbo_angle + spin * dt * std::f32::consts::TAU) % std::f32::consts::TAU;
+        }
+        self.shake = if s.knock && burning { (self.shake + dt * 8.0).min(1.0) } else { (self.shake - dt * 4.0).max(0.0) };
+        let jitter = if self.shake > 0.0 {
+            let n = (time * 97.0).sin() * 43758.547;
+            let m = (time * 61.0).cos() * 12543.13;
+            vec3((n.fract() - 0.5) * 2.0 * self.shake, (m.fract() - 0.5) * 2.0 * self.shake, 0.0)
+        } else {
+            vec3(0.0, 0.0, 0.0)
+        };
+        let world = Mat4::from_scale(SCALE) * Mat4::from_translation(jitter);
+
+        let lifts: Vec<[f32; 2]> = (1..=4)
+            .map(|c| [valve_lift(c, crank, Side::Intake, s.vtec, vtc), valve_lift(c, crank, Side::Exhaust, s.vtec, 0.0)])
+            .collect();
+
+        for p in self.parts.iter_mut() {
+            let m = match p.mover {
+                Mover::Fixed => Mat4::identity(),
+                Mover::Crank => Mat4::from_angle_x(degrees(crank)),
+                Mover::Piston(c) => {
+                    let pin = piston_pin_height(crank + throw_angle(c));
+                    t(cyl_x(c), pin, 0.0)
+                }
+                Mover::Rod(c) => {
+                    let theta = crank + throw_angle(c);
+                    t(cyl_x(c), piston_pin_height(theta), 0.0) * Mat4::from_angle_x(radians(-rod_angle(theta)))
+                }
+                Mover::Valve(i) => {
+                    let v = &self.valves[i];
+                    let lift = lifts[v.cyl - 1][if v.side == Side::Intake { 0 } else { 1 }];
+                    let pos = v.seat - v.axis * lift;
+                    let rot = Quat::from_arc(vec3(0.0, 1.0, 0.0), v.axis, None);
+                    Mat4::from_translation(pos) * Mat4::from(rot)
+                }
+                Mover::Cam(side) => {
+                    let a = if side == Side::Intake { (crank + vtc) / 2.0 } else { crank / 2.0 };
+                    t(0.0, CAM_Y, if side == Side::Intake { CAM_Z } else { -CAM_Z }) * Mat4::from_angle_x(degrees(a))
+                }
+                Mover::Butterfly => Mat4::from_translation(self.tb_pos) * Mat4::from_angle_y(radians(0.12 + s.throttle.clamp(0.0, 1.0) * 1.38)),
+                Mover::TurbineWheel => Mat4::from_translation(self.turbo_offset + vec3(-50.0, 0.0, 0.0)) * Mat4::from_angle_x(radians(self.turbo_angle)),
+                Mover::CompWheel => Mat4::from_translation(self.turbo_offset + vec3(70.0, 0.0, 0.0)) * Mat4::from_angle_x(radians(self.turbo_angle)),
+            };
+            p.gm.geometry.set_transformation(world * m * p.local);
+
+            // Visibility for this mode.
+            let mut vis = mode.shows(p.sys);
+            if p.sys == Sys::Turbo { vis &= s.turbo; }
+            if p.sys == Sys::NaIntake { vis &= !s.turbo; }
+            let cast_mode = match mode {
+                Mode::Block => Castings::Solid,
+                Mode::Airflow => Castings::SeeThrough,
+                _ => castings,
+            };
+            if p.sys == Sys::Casting { vis &= cast_mode != Castings::Hidden; }
+            p.visible = vis;
+
+            // Transparency: castings follow the setting; airflow mode ghosts the plumbing.
+            let ghost = mode == Mode::Airflow && matches!(p.sys, Sys::Intake | Sys::Exhaust | Sys::Turbo | Sys::NaIntake);
+            let (alpha, transparent) = if p.sys == Sys::Casting {
+                match (mode, cast_mode) {
+                    (Mode::Airflow, _) => ((p.base_alpha as f32 * 0.45) as u8, true),
+                    (_, Castings::Solid) => (235, true),
+                    _ => (p.base_alpha, true),
+                }
+            } else if ghost {
+                (56, true)
+            } else {
+                (p.base_alpha, !p.opaque)
+            };
+            let mat = &mut p.gm.material;
+            if transparent != mat.is_transparent {
+                mat.is_transparent = transparent;
+                mat.render_states = if transparent { self.transparent_states } else { RenderStates::default() };
+            }
+
+            // Colour for this mode.
+            let mut albedo = p.base;
+            let mut emissive = p.base_emissive;
+            match mode {
+                Mode::Stress => {
+                    if let Some(k) = p.key {
+                        let (rgb, amount) = stress_tint(s.stress_of(k, p.index));
+                        albedo = lerp_color(p.base, rgb, amount);
+                        let e = amount * amount * if k == "exhaust" { 0.8 } else { 0.3 };
+                        emissive = lerp_color(p.base_emissive, rgb, e);
+                    }
+                }
+                Mode::Materials => {
+                    if let Some(k) = p.key {
+                        match materials(k) {
+                            Some((_, c)) => albedo = Srgba::new(c[0], c[1], c[2], p.base.a),
+                            None => albedo = Srgba::new((p.base.r as f32 * 0.55) as u8, (p.base.g as f32 * 0.55) as u8, (p.base.b as f32 * 0.55) as u8, p.base.a),
+                        }
+                        let pulse = if selected == Some(k) { (0.18 + 0.12 * (time * 6.0).sin()) * 255.0 } else { 0.0 };
+                        emissive = Srgba::new(pulse as u8, pulse as u8, pulse as u8, 255);
+                    }
+                }
+                _ => {}
+            }
+            if p.vtec_lobe && s.vtec && mode != Mode::Materials {
+                emissive = Srgba::new(28, 140, 76, 255);
+            }
+            albedo.a = alpha;
+            mat.albedo = albedo;
+            mat.emissive = emissive;
+        }
+
+        // Plug flashes and combustion.
+        let load = (s.map_kpa / 100.0).clamp(0.15, 2.2);
+        let lean = ((s.lambda - 0.85) / 0.35).clamp(0.0, 1.0);
+        let internals_shown = mode.shows(Sys::Internals);
+        for g in self.glows.iter_mut() {
+            let c = match g.kind { GlowKind::Flame(c) | GlowKind::Plug(c) => c };
+            let cyc = cycle_angle(c, crank);
+            let since = modulo(cyc + s.ign_deg, 720.0);
+            let pin = piston_pin_height(crank + throw_angle(c));
+            match g.kind {
+                GlowKind::Plug(_) => {
+                    let a = if burning && since < 30.0 { 1.0 - since / 30.0 } else { 0.0 };
+                    let a = a * if internals_shown { 1.0 } else { 0.0 };     // additive: scale the colour itself
+                    g.gm.material.color = Srgba::new((160.0 * a) as u8, (212.0 * a) as u8, (255.0 * a) as u8, 255);
+                    g.gm.geometry.set_transformation(world * t(cyl_x(c), ROOF - 4.0, 0.0));
+                }
+                GlowKind::Flame(_) => {
+                    let burn = if burning && since < 110.0 { (std::f32::consts::PI * since / 110.0).sin() } else { 0.0 };
+                    let a = burn * (0.35 + 0.35 * load.min(1.5)) * if internals_shown { 1.0 } else { 0.0 };
+                    let color = if s.knock { [255, 40, 25] } else { [255, (115.0 + 100.0 * lean) as u8, (30.0 + 190.0 * lean) as u8] };
+                    g.gm.material.color = Srgba::new((color[0] as f32 * a) as u8, (color[1] as f32 * a) as u8, (color[2] as f32 * a) as u8, 255);
+                    let crown = pin + 30.0;
+                    let h = (ROOF - crown).max(1.0);
+                    g.gm.geometry.set_transformation(world * t(cyl_x(c), (crown + ROOF) / 2.0, 0.0) * Mat4::from_nonuniform_scale(1.0, h, 1.0));
+                }
+            }
+        }
+
+        // Airflow particles.
+        self.show_particles = mode == Mode::Airflow;
+        if self.show_particles {
+            let base = if s.running && s.rpm > 300.0 { 220.0 + 900.0 * (s.air_gs / 150.0).clamp(0.0, 2.2) } else { 0.0 };
+            let boost = (s.boost_kpa / 150.0).clamp(0.0, 1.0);
+            let heat = s.stress_of("exhaust", None).clamp(0.0, 1.2);
+            let mut tf = Vec::new();
+            let mut colors = Vec::new();
+            for f in self.flows.iter_mut() {
+                if let Some(turbo) = f.only_turbo {
+                    if turbo != s.turbo { continue; }
+                }
+                let gate = match f.cyl {
+                    Some(c) => {
+                        let lift = lifts[c - 1][if f.intake { 0 } else { 1 }];
+                        let max = cam_event(if f.intake { Side::Intake } else { Side::Exhaust }, true).lift;
+                        (lift / max * 1.6).min(1.0)
+                    }
+                    None => 1.0,
+                };
+                let cut = if !f.intake && s.fuel_cut { 0.5 } else { 1.0 };
+                let du = base * gate * cut * dt / f.curve.length();
+                let col = if f.intake {
+                    [(0.43 + 0.5 * boost) * 255.0, (0.78 + 0.2 * boost) * 255.0, 255.0]
+                } else {
+                    [255.0, (0.42 + 0.45 * heat) * 255.0, (0.1 + 0.35 * (heat - 0.6).max(0.0)) * 255.0]
+                };
+                let dim = if f.cyl.is_some() { 0.45 + 0.55 * gate } else { 1.0 };
+                for u in f.u.iter_mut() {
+                    *u = (*u + du) % 1.0;
+                    let p = f.curve.point_at(*u);
+                    tf.push(world * Mat4::from_translation(p));
+                    colors.push(Srgba::new((col[0] * dim) as u8, (col[1] * dim) as u8, (col[2] * dim) as u8, 255));
+                }
+            }
+            self.particles.geometry.set_instances(&Instances { transformations: tf, colors: Some(colors), ..Default::default() });
+        }
+    }
+
+    pub fn objects(&self) -> Vec<&dyn Object> {
+        let mut v: Vec<&dyn Object> = self.parts.iter().filter(|p| p.visible).map(|p| &p.gm as &dyn Object).collect();
+        if self.show_particles {
+            v.push(&self.particles);
+        }
+        v.extend(self.glows.iter().map(|g| &g.gm as &dyn Object));
+        v
+    }
+
+    /// Indices of the parts that can be hovered, in the order they're passed to `pick`.
+    pub fn pickable(&self) -> Vec<usize> {
+        self.parts.iter().enumerate().filter(|(_, p)| p.visible && p.gm.material.albedo.a > 100).map(|(i, _)| i).collect()
+    }
+}
+
+/// Material colour for a part key: the sim's own materials when it sent them, else the placeholder catalog.
+pub fn material_lookup<'a>(s: &'a SimState, choices: &'a std::collections::HashMap<String, String>) -> impl Fn(&str) -> Option<(String, [u8; 3])> + 'a {
+    move |key: &str| {
+        if let Some(pm) = &s.part_materials {
+            let m = pm.get(key)?;
+            let fam = materials::family(&m.family)?;
+            return Some((m.label.clone(), fam.color));
+        }
+        let cat = materials::catalog(key)?;
+        let id = choices.get(key).map(|s| s.as_str()).unwrap_or(cat.options[0].id);
+        let opt = cat.options.iter().find(|o| o.id == id).unwrap_or(&cat.options[0]);
+        Some((opt.label.to_string(), materials::family(opt.family)?.color))
+    }
+}

@@ -99,6 +99,8 @@ It uses [Three.js](https://threejs.org) r160, included in `vendor/` (MIT license
 | `src/vehicle.js` | Clutch, gearbox and road load |
 | `src/internals.js` | Part loads (including sleeves, block and head bolts), per-part alloys and fatigue |
 | `src/render3d.js` | Three.js engine model, animated from the sim and colored by stress |
+| `src/viewer-link.js` | Sends the sim's state to the native 3D viewer app over a localhost WebSocket |
+| `viewer/` | Native 3D viewer (Windows .exe, Rust): engine internals, block, airflow, stress and materials views. See `viewer/README.md` |
 | `src/sim.js` | Ties it together: shifting, auto-clutch, stalling, datalog |
 | `src/simstate.js` | The read-only state add-on modules (3D view, gauges) use; see [docs/MODULES.md](docs/MODULES.md) |
 | `src/input.js` | Gamepad API wheel/pedal mapping and keyboard |

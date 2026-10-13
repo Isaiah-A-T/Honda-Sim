@@ -6,6 +6,7 @@ import { createSim, step, shift, shiftUp, shiftDown, startEngine, rebuildEngine,
 import { PARTS, MATERIALS, partStatus, materialsFor, partMaterial } from './internals.js';
 import { FLOW } from './gasflow.js';
 import { createBridge } from './bridge.js';
+import { createViewerLink } from './viewer-link.js';
 import { createInput, attachKeyboard, readInput, startLearn, AXES, BUTTONS } from './input.js';
 
 const TUNE_KEY = 'honda-sim.tune.v1';
@@ -332,6 +333,12 @@ $('r3dStress').addEventListener('change', ev => r3d?.setStress(ev.target.checked
 $('r3dCut').addEventListener('change', ev => r3d?.setCutaway(ev.target.checked));
 new IntersectionObserver(([en]) => { r3dVisible = en.isIntersecting; }).observe($('r3d'));
 
+// ------------------------------------------------------------------ native 3D viewer (viewer/, optional)
+const viewerLink = createViewerLink(on => {
+  $('viewerLink').textContent = on ? 'Viewer app connected' : 'Viewer app not running';
+  $('viewerLink').className = on ? 'pill' : 'pill off';
+});
+
 // ------------------------------------------------------------------ main loop
 function handleEvents(events) {
   for (const ev of events) {
@@ -418,6 +425,7 @@ function loop(now, fromTimer = false) {
   if (frame++ % 6 === 0) { drawDyno(); updateInternals(); }
   if (r3d && r3dVisible) r3d.update(sim, dt);
   bridge.tick(now);
+  viewerLink.send(sim);
   $('btnCsv').disabled = sim.logging || !sim.log.length;
   if (!fromTimer) requestAnimationFrame(loop);
 }
