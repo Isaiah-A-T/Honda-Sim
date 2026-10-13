@@ -1,0 +1,95 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>Honda Sim</title>
+  <link rel="stylesheet" href="style.css">
+</head>
+<body>
+  <header>
+    <h1>Honda Sim <small id="carName"></small></h1>
+    <div id="tuneName" class="muted"></div>
+    <div id="engineState" class="pill"></div>
+  </header>
+
+  <main>
+    <section class="panel dash">
+      <div class="rpm">
+        <div class="rpmbar"><div id="rpmFill"></div><div id="rpmLimit"></div></div>
+        <div class="rpmrow"><span id="rpm" class="big">0</span> rpm
+          <span id="vtec" class="lamp">VTEC</span><span id="shiftLamp" class="lamp warn">SHIFT</span>
+          <span id="revcut" class="lamp bad">CUT</span><span id="knockLamp" class="lamp bad">KNOCK</span></div>
+      </div>
+      <div class="grid">
+        <div><label>Gear</label><span id="gear" class="big">N</span></div>
+        <div><label>Speed</label><span id="speed" class="big">0</span> <span id="speedUnit">mph</span></div>
+        <div><label>Throttle</label><span id="tps">0</span>%</div>
+        <div><label>MAP</label><span id="map">0</span> kPa</div>
+        <div><label>AFR / λ</label><span id="afr">14.7</span> / <span id="lambda">1.00</span></div>
+        <div><label>λ target</label><span id="lamTarget">–</span></div>
+        <div><label>Ignition</label><span id="ign">0</span>° <span class="muted">(table <span id="ignTable">0</span>°)</span></div>
+        <div><label>MBT / knock limit</label><span id="mbt">0</span>° / <span id="kl">0</span>°</div>
+        <div><label>Knock</label><span id="knockCount">0</span> <span class="muted">events, retard <span id="retard">0</span>°</span></div>
+        <div><label>Injector</label><span id="ipw">0</span> ms <span class="muted"><span id="duty">0</span>%</span></div>
+        <div><label>Torque</label><span id="tq">0</span> lb-ft</div>
+        <div><label>Power</label><span id="hp">0</span> hp</div>
+      </div>
+      <div class="pedals">
+        <div><label>Throttle</label><div class="bar"><div id="barThrottle"></div></div></div>
+        <div><label>Brake</label><div class="bar"><div id="barBrake" class="b"></div></div></div>
+        <div><label>Clutch</label><div class="bar"><div id="barClutch" class="c"></div></div></div>
+      </div>
+      <div class="row">
+        <button id="btnStart">Start engine (R)</button>
+        <button id="btnLog">Start datalog</button>
+        <button id="btnCsv" disabled>Download log CSV</button>
+        <button id="btnDynoClear">Clear dyno</button>
+        <label class="inline"><input type="checkbox" id="kmh"> km/h</label>
+      </div>
+      <canvas id="dyno" width="640" height="220" aria-label="Dyno chart of power and torque at full throttle"></canvas>
+      <p class="muted small">Dyno chart fills in whenever you hold full throttle. Solid: hp, dashed: lb-ft. Faded lines are the previous run.</p>
+    </section>
+
+    <section class="panel tables">
+      <div class="tabs" id="tableTabs"></div>
+      <div class="tablewrap"><table id="tableView"></table></div>
+      <details>
+        <summary>Paste a table from FlashPro Manager</summary>
+        <p class="small">In FlashPro Manager, click inside the table, press Ctrl+A then Ctrl+C, and paste here. The first row should be the column axis (MAP) and the first column the row axis (RPM).</p>
+        <textarea id="pasteBox" rows="8" placeholder="Paste table here"></textarea>
+        <div class="row">
+          <select id="pasteTarget"></select>
+          <button id="btnPaste">Load into tune</button>
+        </div>
+        <div id="pasteMsg" class="small"></div>
+      </details>
+      <div class="settings">
+        <label>VTEC rpm <input type="number" id="setVtec" step="50"></label>
+        <label>VTEC min MAP <input type="number" id="setVtecMap" step="1"></label>
+        <label>Rev limit <input type="number" id="setRev" step="50"></label>
+        <label>Octane <input type="number" id="setOct" step="1"></label>
+        <label>Fuel table units
+          <select id="setFuelUnits"><option value="lambda">Lambda target</option><option value="afr">AFR target</option><option value="ms">Injector ms</option></select></label>
+      </div>
+      <div class="row">
+        <button id="btnSaveTune">Save tune (.json)</button>
+        <label class="filebtn">Open tune (.json)<input type="file" id="fileTune" accept=".json,application/json"></label>
+        <button id="btnResetTune">Reset to placeholder</button>
+      </div>
+    </section>
+
+    <section class="panel controls">
+      <h2>Wheel and pedals</h2>
+      <div id="padName" class="muted small">No wheel or pedals detected yet. Press any pedal or button.</div>
+      <div id="learnRows"></div>
+      <div id="learnMsg" class="small"></div>
+      <h2>Keyboard</h2>
+      <p class="small">W / ↑ throttle (hold Shift for faster), S / ↓ brake, C or Space clutch, E shift up, Q shift down, 1–6 pick a gear, 0 reverse, N neutral, R start.
+        With no clutch pedal mapped, the clutch is automatic for launches and shifts.</p>
+    </section>
+  </main>
+
+  <script type="module" src="src/ui.js"></script>
+</body>
+</html>
