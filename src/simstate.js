@@ -70,7 +70,7 @@ export function renderState(sim) {
 // Coolant and oil: temperatures, flows, the thermostat and fans, and the circuits as from/to segments
 // between named components (see COMPONENTS in thermal.js for where each one sits on the car).
 function coolingState(e) {
-  const th = e.thermal, g = th.g, c = circuits(th);
+  const th = e.thermal, g = th.g, c = circuits(th, e.oilKpa ?? 0);
   return {
     coolantC: th.coolantC, radiatorInC: th.coolantC, radiatorOutC: th.radiatorOutC, pumpInletC: th.inletC,
     boilingC: boilingC(g), boiling: th.boiling, overheatS: th.overheatS,

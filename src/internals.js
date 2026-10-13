@@ -123,7 +123,9 @@ export function stepInternals(s, e, dt) {
   // conducts heat better runs cooler (relative to A390's published 130 W/m·K).
   const kRel = (M.piston.conductivityWmK ?? 130) / 130;
   const heat = 0.64 * (e.airGs ?? 0) + (e.lambda > 0.85 && e.map > 90 ? 150 * Math.min(e.lambda - 0.85, 0.5) : 0) + (e.knocking ? 40 * (s.knockSpike - 1) / 0.15 : 0);
-  const base = (e.oilC ?? 100) + 50;                 // the oil under the crown sets its floor
+  // The oil under the crown sets its floor; the oil jets (check balls open at 200 kPa) cool it much better.
+  const jets = clamp(((e.oilKpa ?? 300) - (e.thermal?.g.oilJetKpa ?? 200)) / 50, 0, 1);
+  const base = (e.oilC ?? 100) + 80 - 30 * jets;
   const tTarget = cut ? base : base + heat / kRel ** 0.5;
   s.pistonC += (tTarget - s.pistonC) * Math.min(1, dt * 0.25);
 

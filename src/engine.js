@@ -84,6 +84,10 @@ function stepVtec(e, dt) {
   e.highCam = pressurised;
 }
 
+// Fast idle on a cold engine: the ECU's idle target comes from coolant temperature (Hondata), up to about
+// 1,350 rpm when freezing and back to 750 by 60 °C (shape is an estimate).
+export const coldIdleRpm = ectC => ENGINE.idleRpm + 600 * clamp((60 - ectC) / 60, 0, 1);
+
 export function createEngine(tune) {
   const e = {
     tune,
@@ -112,8 +116,9 @@ export function stepEngine(e, pedal, dt) {
   const rpm = Math.max(e.rpm, 1);
 
   // Idle control: hold idle rpm when the pedal is up and the engine is near idle.
-  const idleErr = ENGINE.idleRpm - rpm;
-  if (pedal < 0.02 && rpm < ENGINE.idleRpm + 600) {
+  const idleRpm = coldIdleRpm(e.ect);
+  const idleErr = idleRpm - rpm;
+  if (pedal < 0.02 && rpm < idleRpm + 600) {
     e.idleI = clamp(e.idleI + idleErr * 0.004 * dt, 0, 10);
     e.idleAir = clamp(e.idleI + idleErr * 0.006, 0, 15);
   } else e.idleAir += ((pedal < 0.02 ? DECEL_AIR : e.idleI) - e.idleAir) * Math.min(1, dt * 2);
