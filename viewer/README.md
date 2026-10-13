@@ -38,6 +38,27 @@ cargo test
 The Windows build lands in `target/x86_64-pc-windows-gnu/release/honda-sim-viewer.exe` and needs no DLLs beyond
 Windows' own (OpenGL 3.3).
 
+## Building it into the sim
+
+The viewer is also a library crate (`honda_sim_viewer`), so a native sim can compile it into its own `.exe`
+and ship one program. The sim hands states over directly, with no socket involved:
+
+```rust
+use honda_sim_viewer::{run, Link, Options, SimState};
+
+let link = Link::in_process();
+let feed = link.clone();
+std::thread::spawn(move || loop {
+    // step the sim, then:
+    feed.send(SimState { rpm: sim.eng.rpm, vtec: sim.eng.high_cam, ..Default::default() });
+});
+run(Options { link, ..Default::default() });   // opens the window; blocks on the main thread until it closes
+```
+
+Add it with `honda-sim-viewer = { path = "viewer" }`. `run` must own the main thread (a windowing rule on
+Windows and macOS), so the sim's loop goes on a worker thread. `cargo run --example embedded` shows this
+working with the demo sim standing in. `SimState` has the same fields as the JSON below, in snake_case.
+
 ## Protocol
 
 The viewer listens on `ws://127.0.0.1:8765`. Each text message is one JSON object with the latest state; send

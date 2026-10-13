@@ -1,17 +1,17 @@
 //! What the viewer shows, as sent by the sim (JSON over the local connection) or made up by the demo.
 //! Field names match the sim's src/viewer-link.js.
 
-use serde::Deserialize;
+use serde::{Deserialize, Serialize};
 use std::collections::HashMap;
 
-#[derive(Deserialize, Clone, Debug)]
+#[derive(Serialize, Deserialize, Clone, Debug)]
 #[serde(untagged)]
 pub enum StressValue {
     One(f32),
     PerCylinder(Vec<f32>),
 }
 
-#[derive(Deserialize, Clone, Debug)]
+#[derive(Serialize, Deserialize, Clone, Debug)]
 pub struct PartMaterial {
     #[serde(default)]
     pub part: String,
@@ -21,7 +21,7 @@ pub struct PartMaterial {
     pub detail: String,
 }
 
-#[derive(Deserialize, Clone, Debug)]
+#[derive(Serialize, Deserialize, Clone, Debug)]
 #[serde(default, rename_all = "camelCase")]
 pub struct SimState {
     pub rpm: f32,
