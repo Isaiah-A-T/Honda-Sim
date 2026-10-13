@@ -91,3 +91,15 @@ test('without an intercooler the hot charge costs power and knock margin', () =>
   assert.ok(hot.knockIndex > ic.knockIndex);
   assert.ok(ic.icDropKpa > 0 && hot.icDropKpa === 0);
 });
+
+test('VTEC locks each cylinder on its own base circle once oil pressure is up, and changes breathing', () => {
+  const t = placeholderTune();
+  const e = createEngine(t);
+  const seen = new Set();
+  for (let i = 0; i < 400; i++) { e.rpm = 6200; stepEngine(e, 1, 0.0005); seen.add(e.vtecPins.filter(p => p >= 1).length); }
+  assert.ok(e.vtecCmd && e.oilKpa > 250);
+  assert.ok([1, 2, 3].filter(n => seen.has(n)).length >= 2 && seen.has(4), [...seen].join());   // cylinders lock at different times
+  assert.equal(e.camF, 1);
+  const lo = wot({ ...t, vtecRpm: 9999 }, 7500).e, hi = wot(t, 7500).e;
+  assert.ok(hi.torqueNm > lo.torqueNm + 15 && hi.airGs > lo.airGs, `${hi.torqueNm} vs ${lo.torqueNm}`);
+});

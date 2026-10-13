@@ -48,8 +48,8 @@ export const TORQUE_TARGETS = {
 // wall heat). Edit TORQUE_TARGETS or the geometry in gasflow.js and rerun the tool, not these.
 export const VE_RPM = TORQUE_TARGETS.low.map(([r]) => r);
 export const VE_HIGH_RPM = TORQUE_TARGETS.high.map(([r]) => r);
-export const VE_CORR_LOW = [0.7341, 0.7517, 0.79, 0.8202, 0.8548, 0.8865, 0.8779, 0.8585, 0.8499, 0.8291, 0.8277, 0.7881, 0.8378];
-export const VE_CORR_HIGH = [0.4828, 0.6297, 0.7594, 0.8318, 0.8565, 0.938, 1.0297, 1.0149, 1.0605, 1.0388, 1.004, 0.9765, 0.9919];
+export const VE_CORR_LOW = [0.7385, 0.7563, 0.7949, 0.8228, 0.8598, 0.8923, 0.8825, 0.865, 0.8535, 0.8336, 0.8328, 0.7903, 0.834];
+export const VE_CORR_HIGH = [0.4896, 0.6341, 0.7635, 0.8364, 0.8624, 0.9419, 1.0363, 1.0194, 1.0664, 1.0444, 1.0092, 0.9799, 0.9905];
 
 export function veCorrection(rpm, highCam) {
   return highCam ? lookup1(VE_HIGH_RPM, VE_CORR_HIGH, rpm) : lookup1(VE_RPM, VE_CORR_LOW, rpm);

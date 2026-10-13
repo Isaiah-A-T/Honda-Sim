@@ -31,7 +31,7 @@ view.update(renderState(sim), dtSeconds);
 |---|---|
 | `running`, `firing`, `rpm`, `crankDeg` | Engine running, burning fuel this cycle (false on rev cut, decel cut, overboost cut), speed, crank angle 0–720 with cylinder 1 firing TDC at 0 |
 | `gear`, `speedMs`, `throttlePct`, `mapKpa` | Drivetrain and load |
-| `cams` | `highCam` (VTEC engaged), `vtcDeg` (intake cam advance), `vtecRpm` |
+| `cams` | `highCam` (ECU on high-cam tables), `vtecCommanded`, `oilKpa`, `vtecPins` (lock pin travel per cylinder 1–4, 0–1), `vtecEngagedShare`, `vtcDeg` (intake cam advance, crank degrees 0–50), `vtecRpm`, `card` (each lobe's `liftMm`, `durationDeg` at 1 mm, `durationSeatDeg`, `centerlineDeg`) |
 | `combustion` | Spark, best-torque spark, knock limit, crank angle where half the charge has burned (`ca50Deg`), burn duration, `knocking`, knock index (1 = edge), λ |
 | `flow` | VE, airflow g/s, residual exhaust share, pumping loss, exhaust manifold pressure, EGT, peak cylinder pressure |
 | `induction`, `intercooler` | `'na'`, `'turbo'` or `'supercharger'`; whether a boosted build has an intercooler |

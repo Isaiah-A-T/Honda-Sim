@@ -9,7 +9,7 @@
 
 import { clamp, lookup2, guessFuelUnits } from './tables.js';
 import { ENGINE, TURBO_GT35, veCorrection, mbt, frictionNm } from './k20z3.js';
-import { FLOW, createGasflow, runCycle, settle, vtcFor } from './gasflow.js';
+import { FLOW, createGasflow, runCycle, settle, vtcFor, valveLiftM } from './gasflow.js';
 
 const AIR_DENSITY_G_PER_L = 1.184;   // 25 °C, sea level
 const STOICH = 14.7;
@@ -27,18 +27,61 @@ function exhaustOutlet(e) {
   if (tb?.enabled && !tb.fixed) return { outKpa: P_AMB + DOWNPIPE_KPA, outAreaM2: (tb.turbineAreaCm2 + tb.wastegateAreaCm2 * e.wgOpen) * 1e-4 };
   return { outKpa: P_AMB, outAreaM2: Math.PI / 4 * G.exhaustDiaM ** 2 };
 }
-function gasConditions(e) {
+function gasConditions(e, high) {
   const t = e.tune, cut = e.revCut || e.dfco || e.boostCut;
-  e.vtc = vtcFor(t, e.rpm, e.map, e.highCam);
-  return { rpm: Math.max(e.rpm, 300), mapKpa: e.map, iatC: e.iat, highCam: e.highCam, vtc: e.vtc, ignDeg: e.ign,
+  const vtc = vtcFor(t, e.rpm, e.map, e.highCam);
+  e.vtc = vtc;
+  return { rpm: Math.max(e.rpm, 300), mapKpa: e.map, iatC: e.iat, highCam: high, vtc, ignDeg: e.ign,
     lambda: Math.min(e.lambda, 3), fire: !cut && e.rpm > 200, octane: t.octane ?? 91, ...exhaustOutlet(e) };
 }
+const blend = (a, b, f) => Object.fromEntries(Object.keys(a).map(k => [k, Number.isFinite(a[k]) && Number.isFinite(b[k]) ? a[k] + (b[k] - a[k]) * f : (f < 0.5 ? a[k] : b[k])]));
+// One gas state per cam lobe set. While VTEC is switching, some cylinders are on each, so both run and
+// their results are mixed by the share of cylinders locked to the VTEC lobe.
 function updateGas(e, dt, force = false) {
-  if (!e.gas || e.gasFlowRef !== e.tune.flow) { e.gas = createGasflow(flowGeom(e.tune)); e.gasFlowRef = e.tune.flow; force = true; }
+  if (!e.gas || e.gasFlowRef !== e.tune.flow) {
+    e.gas = createGasflow(flowGeom(e.tune)); e.gasHi = createGasflow(flowGeom(e.tune)); e.gasFlowRef = e.tune.flow; force = true;
+  }
   e.gasT += dt;
   if (!force && e.gasT < GAS_EVERY_S) return;
   e.gasT = 0;
-  e.gasOut = force ? settle(e.gas, gasConditions(e), 12) : runCycle(e.gas, gasConditions(e));
+  const f = e.camF;
+  const run = (st, high, idle) => (force || idle > 0.2 ? settle(st, gasConditions(e, high), force ? 12 : 4) : runCycle(st, gasConditions(e, high)));
+  if (f < 1) { e.gasLoOut = run(e.gas, false, e.loIdle); e.loIdle = 0; } else e.loIdle += GAS_EVERY_S;
+  if (f > 0) { e.gasHiOut = run(e.gasHi, true, e.hiIdle); e.hiIdle = 0; } else e.hiIdle += GAS_EVERY_S;
+  e.gasOut = f <= 0 ? e.gasLoOut : f >= 1 ? e.gasHiOut : blend(e.gasLoOut, e.gasHiOut, f);
+}
+
+// VTEC actuation. The ECU opens the VTEC solenoid (spool valve) when rpm, load and coolant temperature
+// allow; engine oil pressure then pushes the lock pins through each cylinder's rockers, locking them to
+// the VTEC lobe. A pin can only slide while its rockers sit on the cam's base circle (valves closed),
+// so each cylinder switches at its own point in the firing order. The ECU moves to the high-cam fuel
+// and ignition tables once the oil pressure switch confirms pressure. Dropping out works the same way
+// in reverse: return springs push the pins back, again only on the base circle.
+const VTEC_OIL_KPA = 250;          // oil pressure needed to move the pins (estimate)
+const PIN_TRAVEL_S = 0.04;         // time for oil to stroke a pin once it's free to move (estimate)
+const CYL_OFFSET = [0, 540, 180, 360];   // firing TDC of each cylinder after cylinder 1 (order 1-3-4-2)
+function oilPressureKpa(rpm, ectC) {
+  const warm = clamp((ectC - 20) / 70, 0, 1);
+  return clamp(80 + rpm * 0.065, 0, 600) * (1.25 - 0.25 * warm);   // hot oil is thinner (estimate shape)
+}
+function stepVtec(e, dt) {
+  const t = e.tune, rpm = e.rpm, G = e.gas.G;
+  const want = rpm >= t.vtecRpm && e.map >= t.vtecMinMap && (e.ect ?? 90) >= 60;
+  // Hysteresis: once on, stay on until rpm or load fall clearly below the switch point.
+  e.vtecCmd = e.vtecCmd ? rpm >= t.vtecRpm - 150 && e.map >= t.vtecMinMap - 5 : want;
+  e.oilKpa = oilPressureKpa(rpm, e.ect ?? 90);
+  const pressurised = e.vtecCmd && e.oilKpa >= VTEC_OIL_KPA;
+  for (let i = 0; i < 4; i++) {
+    const theta = e.crankDeg - CYL_OFFSET[i];
+    const onBase = valveLiftM(theta, true, false, e.vtc ?? 0, G) === 0 && valveLiftM(theta, true, true, e.vtc ?? 0, G) === 0
+      && valveLiftM(theta, false, false, 0, G) === 0 && valveLiftM(theta, false, true, 0, G) === 0;
+    if (onBase || (e.vtecPins[i] > 0 && e.vtecPins[i] < 1)) {   // a pin already moving finishes its stroke
+      e.vtecPins[i] = clamp(e.vtecPins[i] + (pressurised ? 1 : -1) * dt / PIN_TRAVEL_S, 0, 1);
+    }
+  }
+  e.camF = e.vtecPins.filter(p => p >= 1).length / 4;
+  // ECU table choice follows the oil pressure switch.
+  e.highCam = pressurised;
 }
 
 export function createEngine(tune) {
@@ -48,7 +91,8 @@ export function createEngine(tune) {
     map: 30,
     tps: 0,
     idleAir: 2, idleI: 2,   // % throttle the idle controller adds (output, integral)
-    highCam: false,
+    highCam: false, vtecCmd: false, vtecPins: [0, 0, 0, 0], camF: 0, oilKpa: 0, crankDeg: 0,
+    gasHi: null, gasLoOut: null, gasHiOut: null, loIdle: 0, hiIdle: 1,
     revCut: false, dfco: false,
     ign: 10, ignTable: 10, knockRetard: 0, knockLimit: 30, knocking: false, knockCount: 0, knockAcc: 0,
     lambda: 1, lambdaTarget: 1, afr: STOICH, ipw: 2,
@@ -130,13 +174,12 @@ export function stepEngine(e, pedal, dt) {
 
   // Manifold pressure: where airflow through the throttle balances what the engine pumps out.
   updateGas(e, dt);
-  const corr = veCorrection(rpm, e.highCam), g = e.gasOut;
+  const corr = veCorrection(rpm, false) + (veCorrection(rpm, true) - veCorrection(rpm, false)) * e.camF, g = e.gasOut;
   const mapTarget = manifoldPressure(e.tps, rpm, g.veDelivered * corr, 101.3 + e.boost - e.icDropKpa, e.iat, flowGeom(t).throttleDiaM);
   e.map += (mapTarget - e.map) * Math.min(1, dt * 12);
 
-  // VTEC: switch to high cam above the set rpm at load, with a little hysteresis.
-  if (!e.highCam && rpm >= t.vtecRpm && e.map >= t.vtecMinMap) e.highCam = true;
-  else if (e.highCam && (rpm < t.vtecRpm - 150 || e.map < t.vtecMinMap - 5)) e.highCam = false;
+  e.crankDeg = (e.crankDeg + rpm * 6 * dt) % 720;
+  stepVtec(e, dt);
 
   // Decel fuel cut, then the rev limiter (also a fuel cut).
   e.dfco = pedal < 0.02 && rpm > 1500;

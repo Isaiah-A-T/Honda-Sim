@@ -8,7 +8,7 @@
 // See docs/MODULES.md.
 
 import { PARTS, GEOMETRY, partMaterial } from './internals.js';
-import { FLOW, valveLiftM } from './gasflow.js';
+import { FLOW, valveLiftM, camCard } from './gasflow.js';
 
 export const FIRING_ORDER = [1, 3, 4, 2];
 // Crank angle of each cylinder's firing TDC after cylinder 1's (cylinders 1–4).
@@ -21,13 +21,21 @@ export function renderState(sim) {
   return {
     running: sim.running,
     rpm: e.rpm,
-    crankDeg: sim.crankDeg ?? 0,              // 0–720, cylinder 1 firing TDC = 0
+    crankDeg: e.crankDeg ?? 0,                // 0–720, cylinder 1 firing TDC = 0
     firing,
     gear: sim.car.gear,                       // -1 reverse, 0 neutral, 1–6
     speedMs: sim.car.speedMs,
     throttlePct: e.tps,
     mapKpa: e.map,
-    cams: { highCam: e.highCam, vtcDeg: e.vtc ?? 0, vtecRpm: t.vtecRpm },
+    cams: {
+      highCam: e.highCam,                     // ECU on the high-cam tables (VTEC solenoid open and oil pressure confirmed)
+      vtecCommanded: !!e.vtecCmd,             // ECU wants VTEC (rpm, load and coolant conditions met)
+      oilKpa: e.oilKpa ?? 0,
+      vtecPins: [...(e.vtecPins ?? [0, 0, 0, 0])],   // lock pin travel per cylinder 1–4, 0 = low lobe, 1 = locked to the VTEC lobe
+      vtecEngagedShare: e.camF ?? 0,          // share of cylinders breathing on the VTEC lobes
+      vtcDeg: e.vtc ?? 0, vtecRpm: t.vtecRpm,
+      card: camCard(geom),                    // lift, duration at 1 mm, centreline for each of the four lobes
+    },
     combustion: {
       ignDeg: e.ign, mbtDeg: e.mbt, knockLimitDeg: e.knockLimit, ca50Deg: Number.isFinite(e.ca50) ? e.ca50 : null,
       burnDeg: e.burnDeg ?? null, knocking: !!e.knocking, knockIndex: e.knockIndex ?? 0, lambda: e.lambda,

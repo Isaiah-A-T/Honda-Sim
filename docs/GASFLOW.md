@@ -10,6 +10,7 @@ everything below reacts to the tune as you drive.
 |---|---|
 | Cylinder volume | Slider-crank geometry: 86.0 bore, 85.9 stroke, 139 mm rod, 11.0:1 |
 | Valve lift | Intake and exhaust lobes for the low and high cam (lift, duration, lobe centre), sine-shaped profiles |
+| VTEC actuation | The ECU opens the VTEC solenoid when rpm, load and coolant temperature allow; oil pressure (rising with rpm, lower when hot) strokes each cylinder's lock pin, which can only move while that cylinder's rockers sit on the base circle. Cylinders lock to the VTEC lobes one or two at a time through the firing order, and breathing blends between the low- and high-lobe results by how many are locked. The ECU switches to the high-cam tables when the oil pressure switch confirms pressure |
 | Cam phasing (VTC) | Moves the intake lobe earlier by the cam angle. Uses your **Cam angle** tables if you paste them, otherwise a stock-like schedule |
 | Valve flow | Compressible flow through the valve curtain (π × valve diameter × lift, capped at the port throat), both ways, so overlap blow-through, backflow into the intake at low rpm and exhaust reversion all happen on their own |
 | Intake runner | A column of air with mass between the plenum and the port: it keeps ramming air in after the piston slows, which gives the rpm-dependent tuning a real runner has |
