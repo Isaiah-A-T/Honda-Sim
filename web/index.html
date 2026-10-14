@@ -1,0 +1,165 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>Honda Sim</title>
+  <link rel="stylesheet" href="style.css">
+  <script type="importmap">{ "imports": { "three": "./vendor/three.module.min.js" } }</script>
+</head>
+<body>
+  <header>
+    <h1>Honda Sim <small id="carName"></small></h1>
+    <div id="tuneName" class="muted"></div>
+    <div id="engineState" class="pill"></div>
+  </header>
+
+  <main>
+    <section class="panel dash">
+      <div class="rpm">
+        <div class="rpmbar"><div id="rpmFill"></div><div id="rpmLimit"></div></div>
+        <div class="rpmrow"><span id="rpm" class="big">0</span> rpm
+          <span id="vtec" class="lamp">VTEC</span><span id="shiftLamp" class="lamp warn">SHIFT</span>
+          <span id="revcut" class="lamp bad">CUT</span><span id="knockLamp" class="lamp bad">KNOCK</span>
+          <span id="boostCutLamp" class="lamp bad">BOOST CUT</span><span id="torqueLamp" class="lamp warn" title="Torque above the limit set for stock rods">RODS</span></div>
+      </div>
+      <div class="grid">
+        <div><label>Gear</label><span id="gear" class="big">N</span></div>
+        <div><label>Speed</label><span id="speed" class="big">0</span> <span id="speedUnit">mph</span></div>
+        <div><label>Throttle</label><span id="tps">0</span>%</div>
+        <div><label>MAP</label><span id="map">0</span> kPa</div>
+        <div><label>Boost / target</label><span id="boost">0</span> psi <span class="muted">/ <span id="boostTarget">–</span></span></div>
+        <div><label>WG duty / IAT</label><span id="wgDuty">0</span>% <span class="muted">/ <span id="iat">0</span> °C</span></div>
+        <div><label>AFR / λ</label><span id="afr">14.7</span> / <span id="lambda">1.00</span></div>
+        <div><label>λ target</label><span id="lamTarget">–</span></div>
+        <div><label>Ignition</label><span id="ign">0</span>° <span class="muted">(table <span id="ignTable">0</span>°)</span></div>
+        <div><label>MBT / knock limit</label><span id="mbt">0</span>° / <span id="kl">0</span>°</div>
+        <div><label>Knock</label><span id="knockCount">0</span> <span class="muted">events, retard <span id="retard">0</span>°</span></div>
+        <div><label>Injector</label><span id="ipw">0</span> ms <span class="muted"><span id="duty">0</span>%</span></div>
+        <div><label>Torque</label><span id="tq">0</span> lb-ft</div>
+        <div><label>Power</label><span id="hp">0</span> hp</div>
+        <div><label>Cam angle / VE</label><span id="vtc">0</span>° <span class="muted">/ <span id="ve">0</span>%</span></div>
+        <div><label>Half burned at</label><span id="ca50">–</span>° ATDC <span class="muted">knock <span id="knockIdx">0</span></span></div>
+        <div><label>EGT / exhaust</label><span id="egt">0</span> °C <span class="muted">/ <span id="exh">0</span> kPa</span></div>
+        <div><label>Pumping / residual</label><span id="pmep">0</span> kPa <span class="muted">/ <span id="resid">0</span>%</span></div>
+        <div><label>Turbo / wastegate</label><span id="turboK">0</span>k rpm <span class="muted">/ <span id="wgOpen">0</span>% open</span></div>
+      </div>
+      <div class="pedals">
+        <div><label>Throttle</label><div class="bar"><div id="barThrottle"></div></div></div>
+        <div><label>Brake</label><div class="bar"><div id="barBrake" class="b"></div></div></div>
+        <div><label>Clutch</label><div class="bar"><div id="barClutch" class="c"></div></div></div>
+      </div>
+      <div class="row">
+        <button id="btnStart">Start engine (R)</button>
+        <button id="btnLog">Start datalog</button>
+        <button id="btnCsv" disabled>Download log CSV</button>
+        <button id="btnDynoClear">Clear dyno</button>
+        <label class="inline"><input type="checkbox" id="kmh"> km/h</label>
+      </div>
+      <canvas id="dyno" width="640" height="220" aria-label="Dyno chart of power and torque at full throttle"></canvas>
+      <p class="muted small">Dyno chart fills in whenever you hold full throttle. Solid: hp, dashed: lb-ft. Faded lines are the previous run.</p>
+    </section>
+
+    <section class="panel tables">
+      <div class="tabs" id="tableTabs"></div>
+      <div class="tablewrap"><table id="tableView"></table></div>
+      <details>
+        <summary>Paste a table from FlashPro Manager</summary>
+        <p class="small">For CSV files, use <b>Load CSV tables</b> below: files named like afr, fuel, ignition, boost or wg_duty go to the matching table. In FlashPro Manager, click inside the table, press Ctrl+A then Ctrl+C, and paste here. The first row should be the column axis (MAP) and the first column the row axis (RPM).</p>
+        <textarea id="pasteBox" rows="8" placeholder="Paste table here"></textarea>
+        <div class="row">
+          <select id="pasteTarget"></select>
+          <button id="btnPaste">Load into tune</button>
+        </div>
+        <div id="pasteMsg" class="small"></div>
+      </details>
+      <div class="settings">
+        <label>VTEC rpm <input type="number" id="setVtec" step="50"></label>
+        <label>VTEC min MAP <input type="number" id="setVtecMap" step="1"></label>
+        <label>Rev limit <input type="number" id="setRev" step="50"></label>
+        <label>Fuel <select id="setFuel"></select></label>
+        <label>Fuel pump <select id="setPump"></select></label>
+        <label>Fuel pressure <span>50 psi (fixed)</span></label>
+        <label>Injector cc/min <input type="number" id="setInjCc" step="10"></label>
+        <label>Injector dead time ms <input type="number" id="setDead" step="0.05"></label>
+        <label>Overboost cut kPa <input type="number" id="setOverboost" step="1"></label>
+        <label>Torque warning Nm <input type="number" id="setTorqueLim" step="10"></label>
+        <label>Clutch capacity Nm <input type="number" id="setClutch" step="10"></label>
+        <label class="inline"><input type="checkbox" id="setTurbo"> Turbo (off = N/A)</label>
+        <label class="inline"><input type="checkbox" id="setIc"> Intercooler</label>
+        <label>Wastegate spring kPa <input type="number" id="setSpring" step="1"></label>
+        <label>Turbo max boost kPa <input type="number" id="setMaxBoost" step="5"></label>
+        <label>Turbine area cm² <input type="number" id="setTurbArea" step="0.5" title="Effective flow area of the turbine housing. Smaller spools sooner but makes more back pressure."></label>
+        <label>Wastegate area cm² <input type="number" id="setWgArea" step="0.5" title="Effective flow area of the wastegate when fully open"></label>
+        <label>Compressor tip mm <input type="number" id="setCompTip" step="1" title="Compressor wheel tip radius; sets how much boost a given shaft speed makes"></label>
+        <label>Throttle body mm <input type="number" id="setTb" step="1"></label>
+        <label>Intake runner (effective) mm <input type="number" id="setRunner" step="10" title="Effective length of the air column the model treats as one slug; about half the physical runner"></label>
+        <label>Exhaust (effective) mm <input type="number" id="setExhaust" step="1" title="The whole exhaust after the manifold as one orifice. Stock 52; a free-flowing cat-back is about 60–65."></label>
+        <label>WG duty gain <input type="number" id="setWgGain" step="0.05" title="How strongly solenoid duty raises boost above the spring. 1 means 100% duty reaches max boost. Match it to a real datalog."></label>
+        <label>Fuel table units
+          <select id="setFuelUnits"><option value="lambda">Lambda target</option><option value="afr">AFR target</option><option value="ms">Injector ms</option></select></label>
+      </div>
+      <div class="row">
+        <button id="btnSaveTune">Save tune (.json)</button>
+        <label class="filebtn">Open tune (.json)<input type="file" id="fileTune" accept=".json,application/json"></label>
+        <label class="filebtn">Load CSV tables<input type="file" id="fileCsv" accept=".csv,.txt,text/csv" multiple></label>
+        <button id="btnTurbo">Turbo build preset</button>
+        <button id="btnResetTune">Reset to placeholder</button>
+      </div>
+    </section>
+
+    <section class="panel engine3d">
+      <h2>3D engine</h2>
+      <div class="row small">
+        <label>Speed <select id="r3dSpeed"><option value="1">Real time</option><option value="0.1">1/10</option><option value="0.02" selected>1/50</option><option value="0.005">1/200</option></select></label>
+        <label class="inline"><input type="checkbox" id="r3dStress" checked> Color by stress</label>
+        <label class="inline"><input type="checkbox" id="r3dCut" checked> See-through block</label>
+        <span id="viewerLink" class="pill off" title="Run honda-sim-viewer.exe for the full 3D view">Viewer app not running</span>
+        <span class="muted">Drag to orbit, scroll to zoom. Green is relaxed, yellow is at the fatigue limit, red is overloaded.</span>
+      </div>
+      <div id="r3d" class="r3d"></div>
+    </section>
+
+    <section class="panel internals">
+      <h2>Engine internals</h2>
+      <div class="row small">
+        <span>Peak cylinder pressure <b id="pmax">0</b> bar</span>
+        <span>Piston crown <b id="pistonC">0</b> °C</span>
+        <span>Rod load <b id="rodComp">0</b> kN down / <b id="rodTen">0</b> kN up</span>
+        <button id="btnRebuild">Rebuild engine</button>
+      </div>
+      <div id="failBanner" class="fail" hidden></div>
+      <div class="tablewrap"><table id="partsTable"></table></div>
+      <details open>
+        <summary>Bottom end: crank, rods and pistons (real aftermarket parts)</summary>
+        <div class="row">
+          <label>Crank / kit <select id="selCrank"></select></label>
+          <label>Rods <select id="selRod"></select></label>
+          <label>Pistons <select id="selPiston"></select></label>
+        </div>
+        <p id="bottomSummary" class="small"></p>
+        <p id="bottomNotes" class="small muted"></p>
+      </details>
+      <details>
+        <summary>Materials: pick an alloy per part, see its published properties</summary>
+        <div class="tablewrap"><table id="matTable"></table></div>
+        <p class="small muted">Published: 86 × 86 mm bore and stroke, 11.0:1, 139 mm rods, 22 mm pins, 48 mm rod big end, powdered-metal stock rods, aluminium open-deck block with iron sleeves, and every material property shown unless it is marked est. (hover it for why).
+          Estimated: part masses and sections, which grade Honda used, load paths and the piston temperature model. Peak pressure comes from the gas exchange model.
+          Load is demand ÷ capacity. Below 80% a part lives indefinitely; above it, fatigue builds up and "life used" climbs; at 150% it breaks at once.</p>
+      </details>
+    </section>
+
+    <section class="panel controls">
+      <h2>Wheel and pedals</h2>
+      <div id="padName" class="muted small">No wheel or pedals detected yet. Press any pedal or button.</div>
+      <div id="learnRows"></div>
+      <div id="learnMsg" class="small"></div>
+      <h2>Keyboard</h2>
+      <p class="small">W / ↑ throttle (hold Shift for faster), S / ↓ brake, C or Space clutch, E shift up, Q shift down, 1–6 pick a gear, 0 reverse, N neutral, R start.
+        With no clutch pedal mapped, the clutch is automatic for launches and shifts.</p>
+    </section>
+  </main>
+
+  <script type="module" src="src/ui.js"></script>
+</body>
+</html>

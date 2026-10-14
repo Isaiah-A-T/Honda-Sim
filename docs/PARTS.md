@@ -2,7 +2,7 @@
 
 The **Bottom end** panel under Engine internals swaps the crank, rods and pistons. Every aftermarket part
 is a real, purchasable part from `docs/parts-catalog.json`, with the manufacturer's or a retailer's page as the
-source. Regenerate `src/parts-catalog.js` with `node tools/build-parts.mjs` after editing the JSON.
+source. Regenerate `web/src/parts-catalog.js` with `node web/tools/build-parts.mjs` after editing the JSON.
 
 What changes when you swap parts:
 
@@ -19,8 +19,8 @@ Fit rules: the piston can stick out of the deck by at most 0.3 mm; rods must mat
 journal and the piston's pin. Parts that don't fit are greyed out with the reason. Stroker kits that ship
 with their own pistons or rods (Toda, Brian Crower 92 mm) lock those choices.
 
-The K24/K20 option is the usual hybrid: a K24A block (231.5 mm deck) with its 99 mm crank and 152 mm rods under
-the K20Z3 head.
+Blocks, heads and oil pumps are picked in the Engine section above the bottom end (docs/ENGINES.md). The K24/K20
+hybrid is a K24A2 block with the K20Z3 head; saved tunes that picked it from the old crank list load that way.
 
 Left out: the Brian Crower 102 mm K24 kit (bore and compression not published).
 

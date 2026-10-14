@@ -1,6 +1,6 @@
 # Engine internals model
 
-`src/internals.js` turns what the engine is doing into loads on each part and tracks metal fatigue. Every part has a
+`web/src/internals.js` turns what the engine is doing into loads on each part and tracks metal fatigue. Every part has a
 material you can change in the **Materials** section of the internals panel (stock cast pistons or forged 4032/2618,
 powdered-metal or 4340/300M/titanium rods, ARP bolts and studs, tri-metal bearings, billet or EN40B cranks, ductile iron
 sleeves, copper head gaskets). The choice is saved with the tune (`tune.materials`).
@@ -38,7 +38,7 @@ sleeves, copper head gaskets). The choice is saved with the tune (`tune.material
 Every value below comes from the linked page, except those marked * which had to be estimated (the app shows the
 reason when you hover "est."). Load ratings for bearings, thread fatigue for bolts and gasket seal factors are model
 inputs, not material constants, and are estimates. The full data with notes is in
-[materials-sources.json](materials-sources.json); `python3 tools/build-materials.py` rebuilds `src/materials.js` from it.
+[materials-sources.json](materials-sources.json); `python3 web/tools/build-materials.py` rebuilds `web/src/materials.js` from it.
 
 | Part | Alloy | Density kg/m³ | Modulus GPa | Yield MPa | Tensile MPa | Fatigue MPa | Elong. % | Expansion µm/m·K | Conductivity W/m·K | Sources |
 |---|---|---|---|---|---|---|---|---|---|---|

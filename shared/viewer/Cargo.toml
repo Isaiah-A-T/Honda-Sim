@@ -1,0 +1,16 @@
+[package]
+name = "honda-sim-viewer"
+version = "0.1.0"
+edition = "2021"
+description = "Native 3D engine viewer for Honda Sim (K20Z3)"
+license = "MIT"
+
+[dependencies]
+three-d = { version = "0.19", default-features = false, features = ["egui-gui"] }
+tungstenite = "0.30"
+serde = { version = "1", features = ["derive"] }
+serde_json = "1"
+
+# three-d's window feature pulls in glutin, which has no iOS backend; iOS hosts draw through their own surface.
+[target.'cfg(not(target_os = "ios"))'.dependencies]
+three-d = { version = "0.19", features = ["egui-gui", "window"] }

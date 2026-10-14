@@ -1,6 +1,6 @@
 # Sim vs published dynos, paired with the tune that made them
 
-`node tools/validate.mjs` runs each of these and prints the numbers. "Confirmed" means the source says what the tune
+`node web/tools/validate.mjs` runs each of these and prints the numbers. "Confirmed" means the source says what the tune
 was; "guessed" means only the hardware and boost are known, so the sim runs a careful pump-gas tune
 (timing 1° under the knock limit, λ 0.78 on boost) in place of the real one. Boost runs use the exhaust-driven turbo
 model where the turbo is known, so turbine back pressure is part of the result.

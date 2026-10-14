@@ -1,0 +1,17 @@
+[package]
+name = "honda-sim-app"
+version = "0.11.1"
+edition = "2021"
+description = "Honda Sim: the K20Z3 sim with wheel input, tune panels and the 3D engine view in one program"
+license = "MIT"
+
+[[bin]]
+name = "HondaSim"
+path = "src/main.rs"
+
+[dependencies]
+honda-sim-core = { path = "../shared/core" }
+honda-sim-viewer = { path = "../shared/viewer" }
+gilrs = "0.11"
+serde = { version = "1", features = ["derive"] }
+serde_json = "1"

@@ -1,0 +1,60 @@
+# Builds the Android app (android/) into HondaSim.apk. Runs when the phone code or anything it uses
+# changes, and from the Actions tab (Android APK, Run workflow). The newest APK is published as the
+# "android-latest" pre-release on the Releases page: open it on the phone and tap HondaSim.apk to install.
+#
+# Signing: set the repository secrets ANDROID_KEYSTORE_BASE64 (base64 of a .keystore file) and
+# ANDROID_KEYSTORE_PASSWORD to sign every build with the same key, so a new APK installs over the old one.
+# Without them each run signs with a fresh key, and you uninstall the old app before installing a new one.
+name: Android APK
+
+permissions:
+  contents: write
+
+on:
+  push:
+    paths: ['android/**', 'shared/**', 'windows/src/**', 'Cargo.toml', 'Cargo.lock', '.github/workflows/android.yml']
+  workflow_dispatch:
+
+jobs:
+  apk:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Rust for Android
+        run: |
+          rustup target add aarch64-linux-android
+          cargo install cargo-apk --locked
+
+      - name: Signing key
+        env:
+          KEYSTORE: ${{ secrets.ANDROID_KEYSTORE_BASE64 }}
+          PASSWORD: ${{ secrets.ANDROID_KEYSTORE_PASSWORD }}
+        run: |
+          mkdir -p target
+          if [ -n "$KEYSTORE" ]; then
+            echo "$KEYSTORE" | base64 -d > target/honda-sim-release.keystore
+            echo "CARGO_APK_RELEASE_KEYSTORE=$PWD/target/honda-sim-release.keystore" >> "$GITHUB_ENV"
+            echo "CARGO_APK_RELEASE_KEYSTORE_PASSWORD=$PASSWORD" >> "$GITHUB_ENV"
+          else
+            keytool -genkeypair -v -keystore target/honda-sim-release.keystore -alias androiddebugkey -keyalg RSA -keysize 2048 \
+              -validity 10000 -storepass android -keypass android -dname "CN=Honda Sim"
+          fi
+
+      - name: Build HondaSim.apk
+        env:
+          ANDROID_HOME: ${{ env.ANDROID_SDK_ROOT }}
+        run: |
+          export ANDROID_NDK_ROOT="$ANDROID_NDK_LATEST_HOME"
+          cargo apk build --release -p honda-sim-android
+          find target -name '*.apk' -exec ls -l {} \;
+          cp target/release/apk/HondaSim.apk "$GITHUB_WORKSPACE/HondaSim.apk"
+
+      - name: Publish as the android-latest pre-release
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          gh release delete android-latest --cleanup-tag -y || true
+          gh release create android-latest HondaSim.apk --target "$GITHUB_SHA" --prerelease \
+            --title "Honda Sim for Android (latest build)" \
+            --notes "Built from ${GITHUB_REF_NAME} at ${GITHUB_SHA::7}. On your phone: download HondaSim.apk, open it, and allow installing from your browser when Android asks."

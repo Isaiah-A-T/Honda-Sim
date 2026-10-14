@@ -1,0 +1,51 @@
+# Xcode project for Honda Sim on iPhone and iPad, generated with XcodeGen:
+#   brew install xcodegen && cd ios/xcode && xcodegen && open HondaSim.xcodeproj
+# See shared/phone/README.md for signing and installing.
+name: HondaSim
+options:
+  bundleIdPrefix: com.hondasim
+  deploymentTarget:
+    iOS: "13.0"
+targets:
+  HondaSim:
+    type: application
+    platform: iOS
+    sources: [HondaSim]
+    preBuildScripts:
+      - name: Build the Rust app
+        script: '"$PROJECT_DIR/../build-rust.sh"'
+        basedOnDependencyAnalysis: false
+    dependencies:
+      - sdk: OpenGLES.framework
+      - sdk: QuartzCore.framework
+      - sdk: UIKit.framework
+      - sdk: CoreGraphics.framework
+      - sdk: Foundation.framework
+      - sdk: GameController.framework
+    settings:
+      base:
+        PRODUCT_NAME: HondaSim
+        PRODUCT_BUNDLE_IDENTIFIER: com.hondasim.app
+        MARKETING_VERSION: "0.11.1"
+        CURRENT_PROJECT_VERSION: "1"
+        TARGETED_DEVICE_FAMILY: "1,2"
+        CODE_SIGN_STYLE: Automatic
+        # Put your Apple team ID here, or pick your team in Xcode's Signing & Capabilities tab.
+        DEVELOPMENT_TEAM: ""
+        ARCHS: arm64
+        LIBRARY_SEARCH_PATHS: "$(PROJECT_DIR)/../../target/ios/$(PLATFORM_NAME)"
+        OTHER_LDFLAGS: "-lhonda_sim_ios"
+        GCC_PREPROCESSOR_DEFINITIONS: "GLES_SILENCE_DEPRECATION=1"
+    info:
+      path: HondaSim/Info.plist
+      properties:
+        CFBundleDisplayName: Honda Sim
+        UILaunchScreen: {}
+        UIRequiresFullScreen: true
+        UIStatusBarHidden: true
+        UISupportedInterfaceOrientations: [UIInterfaceOrientationLandscapeLeft, UIInterfaceOrientationLandscapeRight, UIInterfaceOrientationPortrait]
+        UISupportedInterfaceOrientations~ipad: [UIInterfaceOrientationLandscapeLeft, UIInterfaceOrientationLandscapeRight, UIInterfaceOrientationPortrait, UIInterfaceOrientationPortraitUpsideDown]
+        # Saved tunes and logs show up in the Files app.
+        UIFileSharingEnabled: true
+        LSSupportsOpeningDocumentsInPlace: true
+        GCSupportsControllerUserInteraction: true

@@ -2,7 +2,7 @@
 
 ## From another program (the 3D renderer exe)
 
-The sim (the Windows app, or `npm start` with the page open) serves its state on this PC only:
+The sim (the Windows app, or `npm start` in `web/` with the page open) serves its state on this PC only:
 
 - `ws://127.0.0.1:8080/ws`: a WebSocket. Every message is a JSON text frame
   `{ "type": "state", "v": 1, "t": <seconds>, "state": { ...renderState... } }`, about 60 a second. The latest frame is
@@ -15,7 +15,7 @@ changes only if the format changes in a way that breaks readers; new fields can 
 ## Inside the app
 
 Display and logging modules (the 3D engine, extra gauges, a datalogger) read the sim through one interface,
-`src/simstate.js`, so the engine model can change underneath them without breaking them.
+`web/src/simstate.js`, so the engine model can change underneath them without breaking them.
 
 ```js
 import { renderState, valveLift, FIRING_OFFSET_DEG } from './simstate.js';
@@ -41,8 +41,8 @@ view.update(renderState(sim), dtSeconds);
 | `failed` | Name of the failed part, or `null` |
 | `forces` | Rod force down on the firing stroke and up at TDC (N), sleeve hoop stress (MPa) |
 | `geometry` | Bore, stroke, rod length, deck height and deck clearance, valve sizes (m); compression ratio; displacement (L). Changes with the fitted crank, rods and pistons |
-| `bottomEnd` | Names of the fitted crank (or stroker kit), rods and pistons, the block (K20Z3 or K24A), whether it's all stock, and any fitment notes |
-| `cooling` | Coolant and oil: temperatures (head, radiator outlet, pump inlet, oil), thermostat opening, fans, flows (L/min), heat (kW), boiling point and overheat time, oil pressure, viscosity and cooler; `coolantCircuit` and `oilCircuit` list each hose, passage and line as `{from, to, name, flowLpm, tempC}` between the components in `COMPONENTS` (src/thermal.js; `cooling_components()` in the native core), which gives each one a name and an approximate position and size for drawing. See docs/COOLING.md. |
+| `bottomEnd` | Names of the fitted crank (or stroker kit), rods and pistons, the block, head and oil pump ids (docs/ENGINES.md), whether it's all stock, and any fitment notes |
+| `cooling` | Coolant and oil: temperatures (head, radiator outlet, pump inlet, oil), thermostat opening, fans, flows (L/min), heat (kW), boiling point and overheat time, oil pressure, viscosity and cooler; `coolantCircuit` and `oilCircuit` list each hose, passage and line as `{from, to, name, flowLpm, tempC}` between the components in `COMPONENTS` (web/src/thermal.js; `cooling_components()` in the native core), which gives each one a name and an approximate position and size for drawing. See docs/COOLING.md. |
 
 Helpers:
 - `valveLift(state, cyl, intake, crankDeg?)` gives valve lift in metres for cylinder 1–4 from the same cam lobes and VTC
